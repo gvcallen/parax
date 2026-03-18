@@ -12,6 +12,8 @@ from parax.parameter import Parameter
 from parax.parameter_group import ParameterGroup
 from parax.partition import partition
 
+from parax.parameters import *
+
 import parax.parameters as parameters
 import parax.distributions as distributions
 
@@ -22,10 +24,7 @@ __all__ = [
     "Module",
     "Parameter",
     "ParameterGroup",
-    "parameters",
-    "distribution",
     "partition",
     "distributions",
 ]
 __all__.extend(parameters.__all__)
-__all__.extend(distributions.__all__)

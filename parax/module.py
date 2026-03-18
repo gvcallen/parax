@@ -28,7 +28,7 @@ from parax.parameter_group import ParameterGroup
 from parax.field import field
 from parax.partition import partition
 from parax.distributions import JointDistribution
-from parax.utils import classproperty, get_first_underlying_type, is_convertible_to_float, nodes_by_type, value_at_path, is_valid_param, as_param
+from parax.utils import get_first_underlying_type, is_convertible_to_float, nodes_by_type, is_valid_param, as_param
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
 class ModuleMeta(type(eqx.Module)):
@@ -463,42 +463,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         yield from params
     
-    # ---- Defaults / Primary ---------------------------------------------------    
-    
-    @classproperty
-    def DEFAULT_NAMED_PARAMS(cls) -> dict[str, Parameter]:
-        """Default named parameters for the module.
-
-        Returns
-        -------
-        dict[str, Parameter]
-            Mapping from parax.Parameter name to :class:`Parameter`.
-        """
-        instance = cls()
-        return instance.named_params()
-    
-    @classproperty
-    def DEFAULT_PARAM_NAMES(cls) -> list[str]:
-        """Default parameter names for the module.
-
-        Returns
-        -------
-        list[str]
-        """
-        instance = cls()
-        return instance.param_names()
-    
-    @classproperty
-    def DEFAULT_PARAMS(cls) -> list[Parameter]:
-        """Default parameters for the module.
-
-        Returns
-        -------
-        list[str]
-        """
-        instance = cls()
-        return instance.params()
-
     @property
     def num_params(self) -> int:
         """Number of free parameters.

@@ -10,10 +10,8 @@ dependencies = [
     "equinox",
     "jax",
     "jaxtyping",
-    "numpy",
     "numpyro",
     "jsonpickle",
-    "cloudpickle",
 ]
 
 [project.optional-dependencies]

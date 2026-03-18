@@ -19,7 +19,6 @@ import jax.numpy as jnp
 from jax import flatten_util
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 import equinox as eqx
-import numpy as np
 import numpyro.distributions as dist
 from numpyro.distributions import Distribution
 

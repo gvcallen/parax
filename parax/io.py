@@ -2,8 +2,9 @@
 IO helpers e.g. for module loading and saving.
 """
 import os
-import jsonpickle
 from typing import BinaryIO
+
+import jsonpickle
 
 from parax.module import Module
 

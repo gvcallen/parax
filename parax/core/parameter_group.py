@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import numpyro.distributions as dist
 from numpyro.distributions.distribution import Distribution
 
-from parax.field import field
-from parax.parameter import Parameter
+from parax.core.field import field
+from parax.core.parameter import Parameter
 
 @dataclass
 class ParameterGroup:

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpyro.distributions as dist
 from numpyro.distributions import constraints
 
-from parax.parameter import Parameter
+from parax.core.parameter import Parameter
 
 def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, *, n: int | None = None, **kwargs) -> Parameter:
     r"""

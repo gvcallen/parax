@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import jax.scipy.special as jss
 import jax.nn as jnn
 
-from parax.parameter import Parameter
-from parax.transform import ParameterTransform
+from parax.core.parameter import Parameter
+from parax.core.transform import ParameterTransform
 
 class HypercubeTransform(ParameterTransform):
     def __call__(self, param: Parameter):

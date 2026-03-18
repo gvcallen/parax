@@ -7,7 +7,7 @@ import equinox as eqx
 import numpyro.distributions as dist
 from numpyro.distributions.distribution import Distribution
 
-from parax.field import field
+from parax.core.field import field
 from parax.utils import format_val, split_vectorized_distribution, serialize_distribution, deserialize_distribution, format_distribution
 
 class Parameter(eqx.Module):

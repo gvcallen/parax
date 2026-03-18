@@ -6,7 +6,7 @@ from typing import BinaryIO
 
 import jsonpickle
 
-from parax.module import Module
+from parax.core.module import Module
 
 def load(source: str | BinaryIO) -> Module:
     """

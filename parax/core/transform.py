@@ -4,7 +4,7 @@ Additional transforms not defined in NumPyro.
 
 import equinox as eqx
 
-from parax.parameter import Parameter
+from parax.core.parameter import Parameter
 
 class ParameterTransform(eqx.Module):
     """Base class for all Parax parameter transformations."""

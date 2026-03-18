@@ -152,7 +152,7 @@ def process_docstring(app, what, name, obj, options, lines):
     """Prevent base Module class docstrings from bleeding into component subclasses."""
     if what == "class" and isinstance(obj, type):
         try:
-            from parax.module import Module
+            from parax.core.module import Module
             # If it is a subclass of Module, but NOT the Module base class itself
             if issubclass(obj, Module) and obj is not Module:
                 # If the child's docstring is perfectly identical to the parent's, 

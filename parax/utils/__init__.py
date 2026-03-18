@@ -1,17 +1,9 @@
 """
 General undocumented utilities.
 """
-from pmrf.utils.array import *
-from pmrf.utils.distribution import *
-from pmrf.utils.logging import *
-from pmrf.utils.misc import *
-from pmrf.utils.mpi import *
-from pmrf.utils.network import *
-from pmrf.utils.parameter import *
-from pmrf.utils.preprocessing import *
-from pmrf.utils.random import *
-from pmrf.utils.string import *
-from pmrf.utils.tree import *
-from pmrf.utils.validation import *
+from parax.utils.distribution import *
+from parax.utils.misc import *
+from parax.utils.string import *
+from parax.utils.tree import *
 
 __all__ = []

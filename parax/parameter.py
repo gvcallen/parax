@@ -7,26 +7,26 @@ import equinox as eqx
 import numpyro.distributions as dist
 from numpyro.distributions.distribution import Distribution
 
-from pmrf.core.field import field
-from pmrf.utils import format_val, split_vectorized_distribution, serialize_distribution, deserialize_distribution, format_distribution
-from pmrf.constants import MIN_PERCENTILE, MAX_PERCENTILE
+from parax.field import field
+from parax.utils import format_val, split_vectorized_distribution, serialize_distribution, deserialize_distribution, format_distribution
 
 class Parameter(eqx.Module):
     """
-    A container for a parameter, usually used within a `Model`.
+    A container for a parameter, usually used within a `Module`.
 
     This class serves as the fundamental building block for defining the
-    tunable or fixed parameters within a **parax** `Model` and for fitting.
+    tunable or fixed parameters within a **parax** `Module`.
+    
     It is designed to be a flexible container that behaves like a standard numerical type
     (e.g., a `numpy.ndarray`) while holding additional metadata for model
-    fitting and analysis.
+    training and analysis.
 
     Usage
     -----
     
     * Use in mathematical operations just like a JAX/numpy array.
     * ``Parameter`` objects are JAX PyTrees, compatible with JAX transformations (jit, grad).
-    * Mark as ``fixed`` (honoured by fitting and sampling routines).
+    * Mark as ``fixed`` (honoured by :meth:`parax.partition`).
     * Associate distributions, specified as numpyro distributions (uniform, normal, etc.).
 
     Attributes
@@ -34,46 +34,19 @@ class Parameter(eqx.Module):
     value : jnp.ndarray
         The underlying unscaled value. Automatically converted to a float64 array.
     distribution : numpyro.distributions.Distribution or None
-        The prior distribution associated with this parameter.
+        The distribution associated with this parameter.
     fixed : bool
         If True, the parameter is treated as a constant during optimization/sampling.
     scale : float
         A scaling factor. The effective value used in calculations is ``value * scale``.
     name : str or None
         An optional name for the parameter (marked as static).
-
-    Examples
-    --------
-    .. code-block:: python
-
-        import pmrf as prf
-        import jax.numpy as jnp
-
-        # A simple, single-valued parameter with a scale, initialized with a float
-        p1 = prf.Parameter(value=1.0, scale=1e-12, name='C1')
-
-        # This parameter can be used in calculations directly (scaling is done during casting)
-        impedance = 1 / (2j * jnp.pi * 1e9 * p1)
-        print(f"Impedance: {impedance}")
-
-        # A parameter that is fixed and will not be optimized during a fit
-        p2 = prf.Parameter(value=50.0, fixed=True, name='R2')
-
-        # A parameter with a uniform distribution
-        # The provided factory functions in pmrf.parameters are a convenient way to create these
-        from pmrf.parameters import Uniform
-        p3 = Uniform(0.9, 1.1, scale=1e-9, name='L1')
-        print(f"Initial value of L1: {p3.value}") # initialized to the mean
-
-        # More complicated parameters can be initialized with any "numpyro" distribution
-        from numpyro.distributions import LogNormal
-        p4 = prf.Parameter(value=10.0, distribution=LogNormal(10.0, 1.0))
     """
     # Underlying values/dists (unscaled). Multiply by scale above to get to true value (done automatically when converting to array)
-    value: jnp.ndarray = field(converter=lambda x: jnp.asarray(x, dtype=jnp.float64))
-    distribution: Distribution | None = field(default=None)
+    value: jnp.ndarray = field(converter=lambda x: jnp.asarray(x))
     
-    # Static (metadata) fields
+    # Metadata fields
+    distribution: Distribution | None = field(default=None)
     fixed: bool = field(default=False, static=True)
     scale: float = field(default=1.0, static=True)
     name: str | None = field(default=None, static=True)
@@ -92,52 +65,6 @@ class Parameter(eqx.Module):
         The number of dimensions for this parameter.
         """
         return self.value.size
-    
-    @property
-    def min(self) -> jnp.ndarray:
-        r"""
-        The unscaled minimum value of the parameter's distribution.
-        
-        This uses a percentile for all distributions other than uniform.
-        
-        Returns
-        -------
-        jnp.ndarray
-            The minimum value, or the current value if no distribution is set.
-        """        
-        if isinstance(self.distribution, dist.ImproperUniform):
-            return jnp.full(self.shape, -jnp.inf)
-        elif isinstance(self.distribution, dist.Delta):
-            return self.distribution.v
-        elif isinstance(self.distribution, dist.Uniform):
-            return self.distribution.low
-        elif self.distribution is not None:
-            return self.distribution.icdf(MIN_PERCENTILE)
-        
-        return jnp.full(self.shape, -jnp.inf)
-
-    @property
-    def max(self) -> jnp.ndarray:
-        r"""
-        The unscaled maximum value of the parameter's distribution.
-        
-        This uses a percentile for all distributions other than uniform.
-        
-        Returns
-        -------
-        jnp.ndarray
-            The maximum value, or the current value if no distribution is set.
-        """              
-        if isinstance(self.distribution, dist.ImproperUniform):
-            return jnp.full(self.shape, jnp.inf)
-        elif isinstance(self.distribution, dist.Delta):
-            return self.distribution.v
-        elif isinstance(self.distribution, dist.Uniform):
-            return self.distribution.high
-        elif self.distribution is not None:
-            return self.distribution.icdf(MAX_PERCENTILE)
-            
-        return jnp.full(self.shape, jnp.inf)
 
     @property
     def mean(self) -> jnp.ndarray:
@@ -446,9 +373,6 @@ class Parameter(eqx.Module):
     
 from typing import Any, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pmrf.core import Parameter
-
 def is_param(x) -> bool:
     r"""
     Check if an object is an instance of a `Parameter`.
@@ -463,7 +387,6 @@ def is_param(x) -> bool:
     bool
         `True` if the object is a Parameter, `False` otherwise.
     """
-    from pmrf.core import Parameter
     return isinstance(x, Parameter)
 
 def is_valid_param(x) -> bool:
@@ -480,7 +403,6 @@ def is_valid_param(x) -> bool:
     bool
         `True` if the object is a valid Parameter, `False` otherwise.
     """
-    from pmrf.core import Parameter
     return isinstance(x, Parameter) and x.value is not None
 
 def is_free_param(x) -> bool:
@@ -497,7 +419,6 @@ def is_free_param(x) -> bool:
     bool
         `True` if the object is a non-fixed Parameter, `False` otherwise.
     """
-    from pmrf.core import Parameter
     return isinstance(x, Parameter) and not x.fixed
 
 def is_fixed_param(x) -> bool:
@@ -514,7 +435,6 @@ def is_fixed_param(x) -> bool:
     bool
         `True` if the object is a fixed Parameter, `False` otherwise.
     """
-    from pmrf.core import Parameter
     return isinstance(x, Parameter) and x.fixed
 
 def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
@@ -536,8 +456,7 @@ def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
     Parameter
         The object wrapped as a `Parameter`.
     """
-    from pmrf.parameters import Free, Fixed
-    from pmrf.core import Parameter
+    from parax.parameters import Free, Fixed
     
     if isinstance(x, Parameter):
         return x

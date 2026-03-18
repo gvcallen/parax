@@ -2,7 +2,7 @@ from typing import TypeVar
 
 import jax
 import equinox as eqx
-from pmrf.utils import is_valid_param
+from parax.utils import is_valid_param
 
 T = TypeVar("T")
 
@@ -11,7 +11,7 @@ def partition(pytree: T, include_fixed=False, param_objects=False) -> tuple[T, T
     Partitions an arbitrary PyTree into (dynamic, static) halves.
 
     This upgrades `eqx.partition` to be "parameter-aware",
-    treating only :class:`pmrf.core.parameter` objects as dynamic and
+    treating only :class:`paraxParameter` objects as dynamic and
     also taking into account whether they are fixed or not.
     
     Args:

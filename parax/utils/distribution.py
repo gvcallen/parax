@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import numpyro.distributions as dist
 from numpyro.distributions import Distribution
 
-from pmrf.utils.string import format_val
-from pmrf.distributions import StackedDistribution
+from parax.utils.string import format_val
+from parax.distributions import StackedDistribution
 
 def split_vectorized_distribution(d: Distribution) -> list[Distribution]:
     """
@@ -72,37 +72,6 @@ def split_vectorized_distribution(d: Distribution) -> list[Distribution]:
         split_dists.append(dist_class(**args))
 
     return split_dists
-
-def stack_vectorized_distributions(dists: list[Distribution | None]) -> Distribution | None:
-    """
-    Combine a list of scalar numpyro distributions into a single batched distribution.
-    
-    Parameters
-    ----------
-    dists : list[numpyro.distributions.Distribution | None]
-        A list of distributions to stack.
-
-    Returns
-    -------
-    numpyro.distributions.Distribution | None
-        The vectorized distribution, or None if no distributions were provided.
-    """
-    if all(d is None for d in dists):
-        return None
-    if any(d is None for d in dists):
-        raise ValueError("Cannot stack a mix of parameters where some have distributions and others do not.")
-        
-    dist_classes = set(type(d) for d in dists)
-    
-    # Fast path: If they are all the exact same family, use native NumPyro batching
-    if len(dist_classes) == 1:
-        dist_cls = dists[0].__class__
-        param_names = dists[0].arg_constraints.keys()
-        stacked_kwargs = {name: jnp.stack([getattr(d, name) for d in dists]) for name in param_names}
-        return dist_cls(**stacked_kwargs)
-        
-    # Flexible path: Use our custom meta-distribution for mixed types!
-    return StackedDistribution(dists)
 
 def serialize_distribution(d: Distribution | None) -> dict | None:
     r"""

@@ -144,20 +144,20 @@ html_static_path = []  # Reverted back to an empty list
 # --- Event Hooks ---
 def skip_member(app, what, name, obj, skip, options):
     """Skip members marked with the internal auto flag."""
-    if what == "class" and getattr(obj, "_pmrf_auto", False):
+    if what == "class" and getattr(obj, "_parax_auto", False):
         return True
     return skip
 
 def process_docstring(app, what, name, obj, options, lines):
-    """Prevent base Model class docstrings from bleeding into component subclasses."""
+    """Prevent base Module class docstrings from bleeding into component subclasses."""
     if what == "class" and isinstance(obj, type):
         try:
-            from pmrf.core import Model
-            # If it is a subclass of Model, but NOT the Model base class itself
-            if issubclass(obj, Model) and obj is not Model:
+            from parax.module import Module
+            # If it is a subclass of Module, but NOT the Module base class itself
+            if issubclass(obj, Module) and obj is not Module:
                 # If the child's docstring is perfectly identical to the parent's, 
                 # Python inherited it automatically. Wipe it clean.
-                if getattr(obj, '__doc__', None) == getattr(Model, '__doc__', None):
+                if getattr(obj, '__doc__', None) == getattr(Module, '__doc__', None):
                     lines[:] = []  
         except ImportError:
             pass

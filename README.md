@@ -12,7 +12,7 @@ The library is mainly intended for use in domain-specific scientific modeling (s
 |-------------|-------|
 | **Author**  | Gary Allen |
 | **Homepage** | [github.com/parax/parax](https://github.com/parax/parax) |
-| **Docs** | [parax.github.io/parax](https://parax.github.io/parax) |
+| **Docs** | [gvcallen.github.io/parax](https://gvcallen.github.io/parax) |
 
 ## Installation
 Parax can be installed using pip directly:

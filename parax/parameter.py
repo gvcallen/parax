@@ -49,8 +49,7 @@ class Parameter(eqx.Module):
     distribution: Distribution | None = field(default=None)
     fixed: bool = field(default=False, static=True)
     scale: float = field(default=1.0, static=True)
-    name: str | None = field(default=None, static=True)
-    flat_names: list[str] | None = field(default=None, converter=lambda x: list(x) if x is not None else x, static=True)
+    name: str | list[str] | None = field(default=None, converter=lambda x: list(x) if isinstance(x, tuple) else x, static=True)
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -171,8 +170,8 @@ class Parameter(eqx.Module):
         ValueError
             If any internal distributions cannot be de-vectorized.
         """
-        # Handle scalar / 0-d array
-        if self.value.ndim == 0 and self.flat_names is None:
+        # Handle scalar / 0-d array. Check if name is NOT a list.
+        if self.value.ndim == 0 and not isinstance(self.name, list):
             return [self]
             
         # Flatten the value
@@ -184,19 +183,20 @@ class Parameter(eqx.Module):
         else:
             dists_split = [None] * flat_val.size
 
-        # Generate names
-        flat_names = self.flat_names
-        if flat_names is None:
-            if self.name is not None:
-                flat_names = [f"{self.name}{separator}{i}" for i in range(flat_val.size)]
-            else:
-                flat_names = [None] * flat_val.size
+        # Generate names based on the type of self.name
+        if isinstance(self.name, list):
+            if len(self.name) != flat_val.size:
+                raise ValueError(f"Length of name list ({len(self.name)}) must match parameter size ({flat_val.size}).")
+            flat_names = self.name
+        elif self.name is not None:
+            flat_names = [f"{self.name}{separator}{i}" for i in range(flat_val.size)]
+        else:
+            flat_names = [None] * flat_val.size
                 
         return [
             Parameter(value=val, distribution=p, fixed=self.fixed, scale=self.scale, name=n) 
             for val, p, n in zip(flat_val, dists_split, flat_names)
-        ]              
-        
+        ]
     def as_fixed(self) -> 'Parameter':
         r"""
         Return a copy of self with ``fixed=True``.

@@ -451,7 +451,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if flatten:
             flat_params: list[tuple[str, Parameter]] = []
             for name, param in params:
-                if param.size > 1 or param.flat_names is not None:
+                # Updated check: look for list instance instead of flat_names
+                if param.size > 1 or isinstance(param.name, list):
                     flattened_params = param.flattened(separator=self._separator)
                     for i, subparam in enumerate(flattened_params):
                         suffix = subparam.name if subparam.name is not None else str(i)

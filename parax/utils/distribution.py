@@ -4,7 +4,6 @@ import numpyro.distributions as dist
 from numpyro.distributions import Distribution
 
 from parax.utils.string import format_val
-from parax.distributions import StackedDistribution
 
 def split_vectorized_distribution(d: Distribution) -> list[Distribution]:
     """

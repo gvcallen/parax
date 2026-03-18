@@ -939,7 +939,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             # We check if the group overlaps with the valid parameters.
             # If the intersection is empty, it means all parameters in the group 
             # are fixed (or don't exist), so we exclude the group.
-            if not set(group.param_names).isdisjoint(valid_param_names):
+            if not set(group.names).isdisjoint(valid_param_names):
                 groups.append(deepcopy(group))
 
         # 2. Traverse submodules to get their groups recursively
@@ -962,7 +962,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
                 # "Lift" the submodule groups into the current namespace
                 for sub_group in sub_groups:
-                    new_names = [prefix + name for name in sub_group.param_names]
+                    new_names = [prefix + name for name in sub_group.names]
                     # Create a new group with the updated names
                     lifted_group = dataclasses.replace(sub_group, param_names=new_names)
                     groups.append(lifted_group)
@@ -994,7 +994,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
         for name, param in all_params.items():
             if name not in seen_params:
-                final_groups.append(ParameterGroup(param_names=[name], distribution=param.distribution))
+                final_groups.append(ParameterGroup(names=[name], distribution=param.distribution))
                 seen_params.add(name)
 
         return final_groups
@@ -1014,7 +1014,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         if param_groups:
             groups = self.param_groups()
-            group_names = [pg.param_names for pg in groups]
+            group_names = [pg.names for pg in groups]
             group_dists = [pg.distribution for pg in groups]
         else:
             named_flat_params = self.named_flat_params()
@@ -1354,7 +1354,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         new_claimed_params = set()
         for group in param_groups:
             # Assumes the field name is 'param_names' per your previous context
-            new_claimed_params.update(group.param_names)
+            new_claimed_params.update(group.names)
 
         # 2. Filter OLD groups (Atomic check)
         current_groups = self._param_groups if self._param_groups is not None else []
@@ -1363,7 +1363,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         for group in current_groups:
             # Check for intersection: Does this existing group contain ANY parameter 
             # that is now being redefined in the new groups?
-            existing_group_params = set(group.param_names)
+            existing_group_params = set(group.names)
             
             if existing_group_params.isdisjoint(new_claimed_params):
                 # No conflict: Keep this group entirely
@@ -1413,9 +1413,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             demoted = False
             for prefix, field_name in submodule_prefixes.items():
                 # Check if ALL parameters in the group belong to this submodule
-                if all(name.startswith(prefix) for name in group.param_names):
+                if all(name.startswith(prefix) for name in group.names):
                     # Strip prefix
-                    new_names = [name[len(prefix):] for name in group.param_names]
+                    new_names = [name[len(prefix):] for name in group.names]
                     new_group = dataclasses.replace(group, param_names=new_names)
                     submodule_groups[field_name].append(new_group)
                     demoted = True

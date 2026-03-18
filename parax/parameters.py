@@ -1,5 +1,4 @@
 from typing import Sequence
-import warnings
 
 import jax.numpy as jnp
 import numpyro.distributions as dist
@@ -41,38 +40,6 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     dists = dist.Uniform(low, high)
     values = (low + high) / 2.0 if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
-
-def PercentUniform(mean: float | Sequence[float], perc: float | Sequence[float], *args, **kwargs) -> Parameter:
-    r"""
-    Create a `Parameter` with a uniform distribution defined by a percentage width.
-
-    Parameters
-    ----------
-    mean : float | Sequence[float]
-        The mean of the distribution. Can be a sequence for a multi-valued Parameter.
-    perc : float | Sequence[float]
-        The percentage deviation from the mean to either of the bounds.
-        Bounds are calculated as `mean +/- (perc * mean / 200)`.
-    **kwargs
-        Additional keyword arguments passed to the `Uniform` factory function.
-
-    Returns
-    -------
-    Parameter
-        The created Parameter object.
-    """
-    warnings.warn(
-        "PercentUniform is deprecated and will be removed in a future version. "
-        "Please use RelativeUniform instead",
-        category=DeprecationWarning,
-        stacklevel=2
-    )    
-    
-    if isinstance(perc, Sequence) or isinstance(perc, jnp.ndarray):
-        delta = jnp.array(perc) * jnp.array(mean) / 200.0
-    else:
-        delta = perc * jnp.array(mean) / 200.0
-    return Uniform(mean-delta, mean+delta, *args, **kwargs)
 
 def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | Sequence[float], *args, **kwargs) -> Parameter:
     r"""
@@ -164,40 +131,6 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], n: int |
     dists = dist.Normal(mean, std)
     values = mean if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
-    
-def PercentNormal(mean: float | Sequence[float], perc: float | Sequence[float], **kwargs) -> Parameter:
-    r"""
-    Create a `Parameter` with a normal (Gaussian) distribution and a percentage standard deviation.
-
-    Parameters
-    ----------
-    mean : float | Sequence[float]
-        The mean of the distribution. Can be a sequence for a multi-valued Parameter.
-    perc : float | Sequence[float]
-        The percentage width to use to initialize the standard deviation,
-        assuming the percentage represents +/- 2*sigma (95% coverage).
-        As an example, passing `5.0` results in `std = 0.025 * mean`.
-        Can be a sequence for a multi-valued Parameter.
-    **kwargs
-        Additional keyword arguments passed to the `Normal` factory function.
-
-    Returns
-    -------
-    Parameter
-        The created Parameter object.
-    """
-    warnings.warn(
-        "PercentNormal is deprecated and will be removed in a future version. "
-        "Please use RelativeNormal instead",
-        category=DeprecationWarning,
-        stacklevel=2
-    )        
-    
-    if isinstance(perc, Sequence) or isinstance(perc, jnp.ndarray):
-        std = jnp.array(perc) * jnp.array(mean) / 200.0
-    else:
-        std = perc * jnp.array(mean) / 200.0
-    return Normal(mean=mean, std=std, **kwargs)
 
 def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence[float], **kwargs) -> Parameter:
     r"""
@@ -304,3 +237,13 @@ def Free(value, n: int | None = None, **kwargs) -> Parameter:
         kwargs['distribution'] = dists
         
     return Parameter(value=value, **kwargs)
+
+__all__= [
+    "Uniform",
+    "RelativeUniform",
+    "CenteredUniform",
+    "Normal",
+    "RelativeNormal",
+    "Fixed",
+    "Free",
+]

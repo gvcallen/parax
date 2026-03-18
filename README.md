@@ -1,6 +1,8 @@
 ![parax logo](assets/logo.png)
 
-# Parax: Declarative, Parametric Modeling in JAX
+# Parax
+
+## Declarative, parametric modeling in JAX
 
 **Parax**, is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 

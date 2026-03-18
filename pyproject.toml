@@ -1,7 +1,7 @@
 [project]
 name = "parax"
-version = "0.1.0"
-description = "Parax: Declarative, Parametric Modelling in JAX"
+version = "0.1.1"
+description = "Declarative, parametric modelling in JAX"
 readme = "README.md"
 authors = [
     { name = "Gary Allen", email = "gvcallen@gmail.com" }

@@ -22,12 +22,12 @@ import equinox as eqx
 import numpyro.distributions as dist
 from numpyro.distributions import Distribution
 
-from parax.parameter import Parameter
+from parax.parameter import Parameter, is_valid_param, as_param
 from parax.parameter_group import ParameterGroup
 from parax.field import field
 from parax.partition import partition
 from parax.distributions import JointDistribution
-from parax.utils import get_first_underlying_type, is_convertible_to_float, nodes_by_type, is_valid_param, as_param
+from parax.utils import get_first_underlying_type, is_convertible_to_float, nodes_by_type
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
 class ModuleMeta(type(eqx.Module)):

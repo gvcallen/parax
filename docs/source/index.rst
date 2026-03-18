@@ -17,12 +17,15 @@ The library is mainly intended for us in domain-specific scientific modeling, bu
 | Docs     | https://parax.github.io/parax                  |
 +----------+------------------------------------------------+
 
+Installation
+=====================
+Parax can be installed directly using pip:
+
+``pip install parax``
+
 .. toctree::
    :maxdepth: 2
    :caption: Documentation
 
-   installation
-   introduction/index
    api/index
    license
-

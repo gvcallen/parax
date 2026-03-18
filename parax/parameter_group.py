@@ -6,7 +6,7 @@ import numpyro.distributions as dist
 from numpyro.distributions.distribution import Distribution
 
 from parax.field import field
-from parax.parameter import Parameter, MIN_PERCENTILE, MAX_PERCENTILE
+from parax.parameter import Parameter
 
 @dataclass
 class ParameterGroup:
@@ -47,52 +47,7 @@ class ParameterGroup:
         int
             The count of names in ``parameter_names``.
         """
-        return len(self.param_names)
-            
-    @property
-    def min(self) -> jnp.array:
-        r"""
-        The unscaled minimum value of the parameter group's distribution.
-        
-        Determined by the `MIN_PERCENTILE` quantile.
-
-        Returns
-        -------
-        jnp.array
-            The minimum value, or -inf if no distribution is set.
-        """
-        if self.distribution is not None:
-            if hasattr(self.distribution, 'min'):
-                return self.distribution.min.reshape((self.num_params))
-            elif hasattr(self.distribution, 'low'):
-                return self.distribution.low.reshape((self.num_params))
-            else:
-                return self.distribution.icdf(jnp.array([MIN_PERCENTILE] * self.num_params))
-            
-        return jnp.array([-jnp.inf] * self.num_params)
-    
-    @property
-    def max(self) -> jnp.array:
-        r"""
-        The unscaled maximum value of the parameter group's distribution.
-        
-        Determined by the `MAX_PERCENTILE` quantile.
-
-        Returns
-        -------
-        jnp.array
-            The maximum value, or inf if no distribution is set.
-        """
-        if self.distribution is not None:
-            if hasattr(self.distribution, 'max'):
-                return self.distribution.max.reshape((self.num_params))
-            elif hasattr(self.distribution, 'high'):
-                return self.distribution.high.reshape((self.num_params))
-            else:
-                # TODO implement optimization to determine maximum
-                return self.distribution.icdf(jnp.array([MAX_PERCENTILE] * self.num_params))
-            
-        return jnp.array([jnp.inf] * self.num_params)
+        return len(self.param_names)        
     
     def with_distribution(self, distribution: Distribution) -> 'Parameter':
         r"""

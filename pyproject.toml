@@ -1,0 +1,40 @@
+[project]
+name = "parax"
+version = "0.1.0"
+description = "Parax: Composable, Parametric Modelling in JAX"
+readme = "README.md"
+authors = [
+    { name = "Gary Allen", email = "gvcallen@gmail.com" }
+]
+dependencies = [
+    "equinox",
+    "jax",
+    "jaxtyping",
+    "numpy",
+    "numpyro",
+    "jsonpickle",
+    "cloudpickle",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "myst-parser",
+    "ghp-import",
+    "sphinx-rtd-theme",
+    "sphinx-math-dollar",
+]
+
+[project.urls]
+homepage = "https://github.com/gvcallen/parax"
+
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "setuptools_scm[toml]>=6.2",
+]
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools.packages.find]
+include = ["parax"]

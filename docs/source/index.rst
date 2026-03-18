@@ -1,18 +1,20 @@
-Parax: Parametric Radio Frequency Modelling, Fitting and Sampling
+Parax: Declarative, Parametric Modeling in JAX
 ===================================================================
-**Parax**, or ``pmrf``, is an open-source radio frequency (RF) modelling framework. It provides an object-orientated means for frequency-domain modelling, fitting and sampling of RF models, with focus on circuit models. This documentation serves as an introduction into the framework and its features with some basic examples, and also provides an overall API reference.
 
+**Parax**, is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
+
+At its core, the library provides a `Parameter` class which can be set as fixed and assigned metadata, such as a probability distribution, name, scale etc. However, `Parax` also provides an extend version of Equinox's `Module` in `parax.Module`. This allows for module naming, provides hierarchical parameter naming and inspection, and more.
+
+The library is mainly intended for us in domain-specific scientific modeling, but can easily be applied to broader applications.
 
 +----------+------------------------------------------------+
 | Version  | |release|                                      |
 +----------+------------------------------------------------+
 | Author   | Gary Allen                                     |
 +----------+------------------------------------------------+
-| Homepage | https://github.com/parax/parax             |
+| Homepage | https://github.com/parax/parax                 |
 +----------+------------------------------------------------+
-| Docs     | https://parax.github.io/parax              |
-+----------+------------------------------------------------+
-| Paper    | https://doi.org/10.48550/arXiv.2510.15881      |
+| Docs     | https://parax.github.io/parax                  |
 +----------+------------------------------------------------+
 
 .. toctree::
@@ -22,40 +24,5 @@ Parax: Parametric Radio Frequency Modelling, Fitting and Sampling
    installation
    introduction/index
    api/index
-   skrf_comparison
    license
 
-
-Key Features
----------------------
-
-* **Declarative and Composable Modelling**: Allows for the definition of models using either a self-documenting, declarative syntax or via compositional techniques such as cascading. Since models can consist of a mix of ``Parameter`` objects as well as other ``Model``'s, this allows for a natural means of building complex, hierarchial models from both equations and other sub-models.
-* **Unified Fitting Engine**: Provides a number of commonly available fitting algorithms with a unified interface, catering for both classical frequentist optimization and statistical Bayesian inference.
-* **JAX Backend**: Leverages `JAX` for Just-In-Time (JIT) compilation of models to high-performance hardware (CPU, GPU, TPU). This removes python overhead due to interpreter context switching; enables better vectorization and parallelization; and provides automatic differentiation through the entire model structure, enabling new analysis and more efficient gradient-based optimization.
-* **Extensibility**: Designed to be extendable, such that additional models, fitting algorithms, cost functions, sampling routines etc. can easily be implemented.
-* **scikit-rf Integration**: Designed for seamless interoperability with *scikit-rf*, ``pmrf`` models can be evaluated and converted to ``skrf.Network`` objects, providing access to *scikit-rf*'s library of analysis and plotting tools.
-
-
-Citation
----------------------
-
-If you have used Parax for academic work, please cite the original paper (https://doi.org/10.48550/arXiv.2510.15881):
-as: ::
-
-   G.V.C. Allen, D.I.L. de Villiers, (2025). Parax: A JAX-native Framework for Declarative Circuit Modelling. arXiv, https://doi.org/10.48550/arXiv.2510.15881.
-
-or using the BibTeX:
-
-.. code:: bibtex
-
-   @article{parax,
-      doi = {10.48550/arXiv.2510.15881},
-      url = {https://doi.org/10.48550/arXiv.2510.15881}, 
-      year = {2025},
-      month = {Oct},
-      title = {Parax: A JAX-native Framework for Declarative Circuit Modelling}, 
-      author = {Gary V. C. Allen and Dirk I. L. de Villiers},
-      eprint = {2510.15881},
-      archivePrefix = {arXiv},
-      primaryClass = {cs.OH},
-   }

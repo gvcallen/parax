@@ -632,7 +632,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             (num_samples, *func_output_shape).
         """
         # 1. Get the joint distribution and sample it
-        dist = self.distribution()
+        dist = self.flat_distribution()
         flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
 
         # 2. Define the single-sample evaluation, passing freq explicitly
@@ -728,7 +728,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Module
         """
-        dist = self.distribution()
+        dist = self.flat_distribution()
         flat_param_samples = dist.sample(key, sample_shape=(1,))[0]
         return self.with_params(flat_param_samples)
        
@@ -901,7 +901,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         Equivalent to getting the bounds from :meth:`.distribution`,
         which key-word arguments are forwarded to.
         """
-        return self.distribution(**kwargs).bounds
+        return self.flat_distribution(**kwargs).bounds
     
     def param_groups(self, include_fixed=False, explicit_only=False) -> list[ParameterGroup]:
         """Return all parameter groups relevant to this module, including submodules.
@@ -999,8 +999,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         return final_groups
     
-    def distribution(self, param_groups: bool = True) -> JointDistribution:
-        """Joint distribution over (flattened) parameters.
+    def flat_distribution(self, param_groups: bool = True) -> JointDistribution:
+        """Joint distribution over flattened parameters.
         
         Parameters
         ----------

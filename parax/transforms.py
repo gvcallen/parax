@@ -2,26 +2,35 @@
 Additional transforms not defined in NumPyro.
 """
 
-import numpyro.distributions.transforms as transforms
-from numpyro.distributions import Distribution
+import jax.numpy as jnp
+import jax.scipy.special as jss
+import jax.nn as jnn
 
-class HypercubeTransform(transforms.ParameterFreeTransform):
-    domain = transforms.constraints.real_vector
-    codomain = transforms.constraints.unit_interval
-    dist: Distribution
+from parax.parameter import Parameter
+from parax.transform import ParameterTransform
 
-    def __init__(self, dist: Distribution):
-        self.dist = dist
-        super().__init__()
+class HypercubeTransform(ParameterTransform):
+    def __call__(self, param: Parameter):
+        if param.distribution is None:
+            return param
+        return param.with_value(param.distribution.cdf(param.value))
 
-    def __call__(self, x):
-        return self.dist.cdf(x)
+    def inv(self, param: Parameter):
+        if param.distribution is None:
+            return param
+        return param.with_value(param.distribution.icdf(param.value))
 
-    def _inverse(self, u):
-        return self.dist.icdf(u)
+class UnboundedTransform(ParameterTransform):
+    def __call__(self, param: Parameter):
+        if param.distribution is None:
+            return param
+        eps = jnp.finfo(param.value.dtype).eps
+        u = param.distribution.cdf(param.value)
+        return param.with_value(jss.logit(jnp.clip(u, eps, 1.0 - eps)))
 
-def SigmoidHypercubeTransform(dist: Distribution):
-    return transforms.ComposeTransform([
-        HypercubeTransform(dist),
-        transforms.SigmoidTransform().inv
-    ])        
+    def inv(self, param: Parameter):
+        if param.distribution is None:
+            return param
+        eps = jnp.finfo(param.value.dtype).eps    
+        u = jnp.clip(jnn.sigmoid(param.value), eps, 1.0 - eps)
+        return param.with_value(param.distribution.icdf(u))

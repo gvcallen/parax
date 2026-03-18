@@ -11,7 +11,7 @@ __all__ = [
     "load",
     "save",
     "Module",
-    "Parameter",
+    "Parameter", "is_param", "is_valid_param", "is_free_param", "is_fixed_param",
     "ParameterGroup",
     "partition",
     "ParameterTransform",

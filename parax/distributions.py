@@ -122,5 +122,3 @@ class JointDistribution(Distribution):
             for i, name in enumerate(group_names):
                 values[self.name_to_index[name]] = group_u[..., i]
         return jnp.stack(values, axis=-1)    
-
-__all__ = ["JointDistribution"]

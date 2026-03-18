@@ -1,3 +1,7 @@
+"""
+Additional transforms not defined in NumPyro.
+"""
+
 import numpyro.distributions.transforms as transforms
 from numpyro.distributions import Distribution
 

@@ -12,27 +12,23 @@ from typing import Callable, Sequence, Iterator, Self, ClassVar, Any
 import dataclasses
 from dataclasses import fields, is_dataclass
 from functools import update_wrapper
-from collections.abc import Sequence
-from typing import Sequence, Callable
-from typing_extensions import dataclass_transform  # Or 'from typing import...' if >= 3.11
+from typing_extensions import dataclass_transform
 
 import jax
 import jax.numpy as jnp
 from jax import flatten_util
-from jaxtyping import PyTree
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 import equinox as eqx
 import numpy as np
-import skrf as skrf
 import numpyro.distributions as dist
 from numpyro.distributions import Distribution
 
 from parax.parameter import Parameter
 from parax.parameter_group import ParameterGroup
 from parax.field import field
+from parax.partition import partition
 from parax.distributions import JointDistribution
-from parax.utils import classproperty, is_overridden, get_first_underlying_type, is_convertible_to_float, nodes_by_type, value_at_path
-from parax.utils import partition_shared, combine_shared, is_valid_param, as_param
+from parax.utils import classproperty, get_first_underlying_type, is_convertible_to_float, nodes_by_type, value_at_path, is_valid_param, as_param
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
 class ModuleMeta(type(eqx.Module)):
@@ -259,7 +255,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 for k, v in init_kwargs.items():
                     if accepts_kwargs or k in sig.parameters:
                         user_kwargs[k] = v
-                    elif k in valid_fields or k in {"name", "z0"}:
+                    elif k in valid_fields or k in {"name"}:
                         base_kwargs[k] = v
                     else:
                         raise TypeError(f"{type(self).__name__}.__init__() got an unexpected keyword argument '{k}'")
@@ -302,70 +298,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
             cls.__post_init__ = wrapped_post_init
             
-    # ---- Internal PyTree manipulation, introspection and helpers -------------------------------------------------
-    
-    @property
-    def _param_value_spec(self) -> PyTree:
-        """PyTree spec for **all** parameter values within the module (arrays)."""
-        def is_param_value(path, node):
-            if len(path) == 0 or not eqx.is_inexact_array(node):
-                return False
-            return hasattr(path[-1], 'name') and path[-1].name == 'value'
-        
-        return jax.tree.map_with_path(is_param_value, self, is_leaf=lambda node: eqx.is_inexact_array(node))
-        
-    @property
-    def _param_object_spec(self) -> PyTree:
-        """PyTree spec for all :class:`Parameter` objects within the module."""
-        return jax.tree.map(is_valid_param, self, is_leaf=lambda node: is_valid_param(node))
-    
-    @property
-    def _core_value_spec(self) -> PyTree:
-        """PyTree spec for core (non-derived) parameter values."""        
-        # A parameter is derived if any of its parent dataclasses have 'derived' set to True in its field metadata.
-        path_is_derived = {}
-        def is_leaf(path, node):
-            if is_dataclass(node):
-                for field in fields(node):
-                    if field.metadata.get('derived', False):
-                        field_path = path + (GetAttrKey(field.name),)
-                        path_is_derived[field_path] = True
-            
-            # Set base path as not being derived, and this path's derived as equal to the parents if not already set
-            if len(path) == 0:
-                path_is_derived[path] = False
-            else:
-                path_is_derived.setdefault(path, path_is_derived[path[0:-1]])
-            return isinstance(node, bool)
-        return jax.tree.map_with_path(lambda path, node: node and not path_is_derived[path], self._param_value_spec, is_leaf=is_leaf, is_leaf_takes_path=True)    
-    
-    @property
-    def _param_object_spec(self) -> PyTree:
-        """PyTree spec for core (non-derived) :class:`Parameter` objects."""        
-        return self._param_object_spec
-        # return jax.tree.map(lambda param, core_spec: is_valid_param(param) and core_spec.value, self, self.core_value_spec, is_leaf=lambda node: is_valid_param(node))
-
-    @property
-    def _free_value_spec(self) -> PyTree:
-        """PyTree spec for **free** parameter values (arrays)."""        
-        # A Pytree filter for all free Module parameter values.
-        def is_not_fixed(path, is_core):
-            if not is_core:
-                return False
-            # Here we check that the array is within a parameter and that the parameter is varying
-            param = value_at_path(self, path[0:-1])
-            if not isinstance(param, Parameter):
-                raise Exception(f"Found an array in a module not within a parameter: this is not allowed (at path {path})")
-            return not param.fixed
-        return jax.tree.map_with_path(is_not_fixed, self._core_value_spec)
-
-    @property
-    def _free_object_spec(self) -> PyTree:
-        """PyTree spec for **free** :class:`Parameter` objects."""        
-        # A Pytree filter for all free Module `Parameter` objects.
-        return jax.tree.map(lambda param, fit_spec: is_valid_param(param) and fit_spec.value, self, self._free_value_spec, is_leaf=lambda node: is_valid_param(node))               
-    
-    def _path_to_param_name(self, path) -> str:
+    def path_to_param_name(self, path) -> str:
         """Convert a PyTree path to a fully-qualified parameter name."""
         name_fields = []
         node = self
@@ -392,8 +325,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     if explicit_name is not None:
                         name_fields.append(explicit_name)
                 else:
-                    # If not transparent, we use the standard attribute name `k` as the namespace.
-                    name_fields.append(k)
+                    name_fields.append(explicit_name if explicit_name is not None else k)
                         
                 node = next_node
                 
@@ -421,7 +353,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
         return self._separator.join(name_fields)
     
-    def _saveable(self: Self) -> Self:
+    def saveable(self: Self) -> Self:
         def strip_unsaveable_recursive(obj, memo=None):
             if memo is None:
                 memo = {}
@@ -474,7 +406,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         clean_module = strip_unsaveable_recursive(copy(self))
         return clean_module
     
-    def _iter_params(
+    def iter_params(
         self,
         param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None,
         *,
@@ -483,10 +415,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         submodules: 'Module | Sequence[Module] | str | Sequence[str] | None' = None,
     ) -> Iterator[tuple[str, Parameter]]:
         """Iterate over (name, Parameter) pairs in internal order."""
-        spec = self._param_object_spec if include_fixed else self._free_object_spec
-        params_tree = eqx.filter(self, spec, is_leaf=is_valid_param)
+        params_tree, _ = partition(self, include_fixed=include_fixed, param_objects=True)
         path_and_params, _ = jax.tree.flatten_with_path(params_tree, is_leaf=is_valid_param)
-        params: list[tuple[str, Parameter]] = [(self._path_to_param_name(path), param) for path, param in path_and_params]
+        params: list[tuple[str, Parameter]] = [(self.path_to_param_name(path), param) for path, param in path_and_params]
 
         # Parameter filtering
         if param_filter is not None:
@@ -650,7 +581,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         Parameters
         ----------
-        func : Callable[[Module, Frequency], jnp.ndarray]
+        func : Callable[[Module], jnp.ndarray]
             Function to evaluate.
         args : Any
             The args to pass to `func`.
@@ -671,7 +602,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         # 1. Setup the flat parameter evaluation
         def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
             sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, freq)
+            return func(sampled_module, args)
 
         theta = self.flat_param_values()
         
@@ -687,7 +618,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             sens_array = jac_array * theta
             
         elif kind == 'relative':
-            y_nom = func(self, freq)
+            y_nom = func(self, args)
             y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
             sens_array = jac_array * (theta / y_safe[..., None])
             
@@ -723,6 +654,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         ----------
         func : Callable[[Module], jnp.ndarray]
             A function that takes a Module instance and returns a JAX array.
+        args : Any
+            The args to pass to `func`.            
         prng_key : jax.Array
             JAX random key for sampling.
         num_samples : int, default=1000
@@ -768,8 +701,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             return [v for k, v in named_param_values.items() if k in key]
         
     def __repr__(self):
-        from pmrf.core import Parameter 
-        
         module_param_fields = []
         other_fields = []
         base_fields = []
@@ -783,15 +714,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             val_repr = repr(val)
             
             # Indent multi-line strings (like nested modules) for perfect alignment
-            indented_val_repr = val_repr.replace('\n', '\n    ')
-            formatted_field = f"    {f.name}={indented_val_repr}"
+            indented_val_repr = val_repr.replace('\n', '\n  ')
+            formatted_field = f"  {f.name}={indented_val_repr}"
             
             # Sort into the three buckets:
             
-            # 1. Base fields (name and z0) go at the very bottom
+            # 1. Base fields (name) go at the very bottom
             if f.name == "name":
-                base_fields.append(formatted_field)
-            elif f.name == "z0":
                 base_fields.append(formatted_field)
                 
             # 2. Modules and Parameters go at the very top
@@ -826,100 +755,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         list[Module]
         """
-        return nodes_by_type(self, Module)[1:]        
-
-    # ---- Module Manipulation --------------------------------------------------    
-
-    def partition(self: Self, include_fixed=False, param_objects=False) -> tuple[Self, Self]:        
-        """Partition module into (parameters, static) trees.
-        
-        This is useful for internal use, or for inspecting the module
-        and its parameters.
-        
-        Parameters
-        ----------
-        include_fixed : bool, default=False
-            Include fixed parameters in the parameter tree.
-        param_objects : bool, default=False
-            If ``True``, keep full :class:`Parameter` objects; otherwise filter to ``.value``.
-
-        Returns
-        -------
-        (Self, Self)
-            ``(params_tree, static_tree)``
-        """        
-        if param_objects:
-            shared_spec = self._param_object_spec
-            if include_fixed:
-                filter_spec = self._param_object_spec
-            else:
-                filter_spec = self._free_object_spec
-        else:
-            shared_spec = self._param_value_spec
-            if include_fixed:
-                filter_spec = self._core_value_spec
-            else:
-                filter_spec = self._free_value_spec
-        return partition_shared(self, filter_spec, shared_spec)    
-
-    def flipped(self, **kwargs) -> 'Module':
-        """Return a version of the module with ports flipped.
-        
-        See :class:`pmrf.modules.composite.transformed.Flipped`.
-
-        Returns
-        -------
-        Module
-        """
-        from pmrf.core import Flipped
-        if isinstance(self, Flipped):
-            return self.module
-        return Flipped(self, **kwargs)
-
-    def renumbered(self, from_ports: tuple[int], to_ports: tuple[int]= None, **kwargs) -> 'Module':
-        """Return a version of the module with ports renumbered.
-        
-        See :class:`pmrf.modules.composite.transformed.Renumbered`.
-
-        from_ports : tuple[int]
-            The original port indices that map to `to_ports`.
-        to_ports : tuple[int]
-            The new port indices.
-            
-        Returns
-        -------
-        Module
-        """
-        from pmrf.core import Renumbered
-        return Renumbered(self, from_ports, to_ports, **kwargs)
-    
-    def terminated(self, load: 'Module' = None, **kwargs) -> 'Module':
-        """Returns a new module that contains this module terminated in another.
-        
-        See :class:`pmrf.modules.composite.transformed.Terminated`.
-
-        Parameters
-        ----------
-        load : Module | str, optional
-            Load network. Can be 'short' or 'open' as aliases for SHORT and OPEN.
-            Defaults to a SHORT.
-
-        Returns
-        -------
-        Module
-        """
-        from pmrf.core import SHORT, OPEN, Terminated
-
-        if isinstance(load, str):
-            if load == 'short':
-                load = SHORT
-            elif load == 'open':
-                load = OPEN
-            else:
-                raise ValueError(f"Unknown load alias {load} received in 'Module.terminated()'")
-
-        load = load or SHORT
-        return Terminated(self, load, **kwargs)
+        return nodes_by_type(self, Module)[1:]         
 
     def sampled(self, key=None, **kwargs) -> 'Module':
         """Returns a new module with parameters sampled from this parameter's distribution.
@@ -954,7 +790,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         dict[str, Parameter]
         """
-        return dict(self._iter_params(param_filter=param_filter, include_fixed=include_fixed, submodules=submodules))
+        return dict(self.iter_params(param_filter=param_filter, include_fixed=include_fixed, submodules=submodules))
     
     def named_param_values(self, scaled=False, **kwargs) -> dict[str, jnp.ndarray]:
         """Named module parameter values as a dict of jax arrays.
@@ -973,9 +809,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         dict[str, jnp.ndarray]
         """     
         if scaled:
-            return {n: jnp.array(p) for n, p in (self._iter_params(**kwargs))}
+            return {n: jnp.array(p) for n, p in (self.iter_params(**kwargs))}
         else:
-            return {n: p.value for n, p in (self._iter_params(**kwargs))}    
+            return {n: p.value for n, p in (self.iter_params(**kwargs))}    
 
     def param_names(self, *args, **kwargs) -> list[str]:
         """
@@ -1040,7 +876,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         dict[str, Parameter]
         """
-        return dict(self._iter_params(flatten=True, include_fixed=include_fixed, submodules=submodules))
+        return dict(self.iter_params(flatten=True, include_fixed=include_fixed, submodules=submodules))
     
     def named_flat_param_values(self, scaled=False, return_floats=False, **kwargs) -> dict[str, jnp.ndarray]:
         """Named flattened module parameter values as a dict of jax arrays.
@@ -1059,9 +895,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         dict[str, jnp.ndarray]
         """     
         if scaled:
-            retval = {n: jnp.array(p) for n, p in (self._iter_params(flatten=True, **kwargs))}
+            retval = {n: jnp.array(p) for n, p in (self.iter_params(flatten=True, **kwargs))}
         else:
-            retval = {n: p.value for n, p in (self._iter_params(flatten=True, **kwargs))}
+            retval = {n: p.value for n, p in (self.iter_params(flatten=True, **kwargs))}
             
         if return_floats:
             retval = {k: float(np.array(v)) for k, v in retval.items()}
@@ -1154,7 +990,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             # Check if the node is a submodule (and not self, though is_leaf handles that mostly)
             if isinstance(node, Module) and node is not self:
                 # Calculate the prefix for this submodule (e.g., "amplifier_")
-                relative_name = self._path_to_param_name(path)
+                relative_name = self.path_to_param_name(path)
                 prefix = f"{relative_name}{self._separator}" if relative_name else ""
 
                 # Recursively get groups from the submodule
@@ -1265,22 +1101,18 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             If shape/order mismatches, unknown/missing names (when checked),
             or if arrays are found outside of Parameters.
         """
-        if include_fixed:
-            raise Exception('Not yet supported')
-        
         # Deal with the sample case i.e. an array-like object
         if not isinstance(params, dict) and len(param_kwargs) == 0:
             params = jnp.array(params)
-            if params.shape[0] != self.num_flat_params:
-                raise Exception(f'Expected {self.num_flat_params} flat parameters but was passed {params.shape[0]}')
-            params_tree, static = self.partition(include_fixed=include_fixed)
+            
+            params_tree, static = partition(self, include_fixed=include_fixed)
             params_out, unravel_fn = flatten_util.ravel_pytree(params_tree)
             
             if jnp.isscalar(params_out) or params_out.shape[0] == 0:
-                raise Exception("Error: no free module parameters found to make feature function")
+                raise Exception("Error: no free module parameters")
             
             params_tree_recon = unravel_fn(params)
-            return combine_shared(params_tree_recon, static)
+            return eqx.combine(params_tree_recon, static)
 
         params = params if params is not None else {}
         params.update(param_kwargs)
@@ -1362,25 +1194,23 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         # Convert to an array of parameters instead of floats
         if all(is_convertible_to_float(v) for v in params.values()):            
             for name, value in params.items():
-                # TODO create specs for the full parameter objects such that we can get and use the built-in scales
                 new_params[name] = dataclasses.replace(new_params[name], value=jnp.array(value))
         else:
             new_params.update(params)
         new_flat_params = list(new_params.values())
     
         # Get the current flat parameter object
-        params_tree, static = partition_shared(self, self._param_object_spec, self._param_object_spec, is_leaf=is_valid_param)
+        params_tree, static = partition(self, include_fixed=True, param_objects=True)
         flat_params, treedef = jax.tree.flatten(params_tree, is_leaf=is_valid_param)
         
         # We allow the caller to pass None for name and then we update the name. Otherwise names should match
         for i, param in enumerate(flat_params):
-            if new_flat_params[i].name == None:
+            if new_flat_params[i].name is None:
                 new_flat_params[i] = dataclasses.replace(new_flat_params[i], name=param.name)
         
         # Create the update tree and return
         new_params_tree = jax.tree.unflatten(treedef, new_flat_params)
-        combined: Module = combine_shared(new_params_tree, static, is_leaf=is_valid_param)
-        return combined         
+        return eqx.combine(new_params_tree, static)
 
     def with_mapped_params(
         self: Self, 

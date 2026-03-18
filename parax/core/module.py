@@ -91,8 +91,6 @@ class ModuleMeta(type(eqx.Module)):
 # 2. Assign the metaclass to your base Module
 class Module(eqx.Module, metaclass=ModuleMeta):
     """
-    Overview
-    --------
     The main module class.
 
     Derive from this class to define your parametric Model.

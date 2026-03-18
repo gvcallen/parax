@@ -1,3 +1,7 @@
+"""
+Parameter factories with pre-defined probability distributions.
+"""
+
 from typing import Sequence
 
 import jax.numpy as jnp

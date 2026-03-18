@@ -7,13 +7,14 @@ Core API
 .. autosummary::
    :toctree: generated/
 
-   parax.Module
    parax.Parameter
+   parax.partition
    parax.ParameterGroup
+   parax.ParameterTransform
+   parax.Module
    parax.load
    parax.save
    parax.field
-   parax.partition
 
 Modules
 -------

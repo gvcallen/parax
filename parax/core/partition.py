@@ -8,7 +8,7 @@ T = TypeVar("T")
 
 def partition(pytree: T, include_fixed=False, param_objects=False) -> tuple[T, T]:
     """
-    Partitions an arbitrary PyTree into (dynamic, static) halves.
+    Partitions an arbitrary PyTree into (dynamic, static) halves while honouring fixed parameters.
 
     This upgrades `eqx.partition` to be "parameter-aware",
     treating only :class:`paraxParameter` objects as dynamic and

@@ -12,10 +12,10 @@ from parax.utils import format_val, split_vectorized_distribution, serialize_dis
 
 class Parameter(eqx.Module):
     """
-    A container for a parameter, usually used within a `Module`.
-
+    The main Parameter class.
+    
     This class serves as the fundamental building block for defining the
-    tunable or fixed parameters within a **parax** `Module`.
+    parameters within an equinox Module or parax `Module`.
     
     It is designed to be a flexible container that behaves like a standard numerical type
     (e.g., a `numpy.ndarray`) while holding additional metadata for model

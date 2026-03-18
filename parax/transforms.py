@@ -1,5 +1,5 @@
 """
-Additional transforms not defined in NumPyro.
+Parameter transform sub-classes with pre-defined functionality.
 """
 
 import jax.numpy as jnp

@@ -9,7 +9,7 @@ def field(
     transparent: bool = False,
     **kwargs: Any,
 ) -> Any:
-    """Custom field specifier for Parax."""
+    """Custom field specifier for Parax modules."""
 
     # Handle Parax-specific metadata
     metadata = dict(kwargs.pop("metadata", {}))

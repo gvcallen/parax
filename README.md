@@ -1,6 +1,3 @@
-[![Tests](https://github.com/parax/parax/actions/workflows/tests.yml/badge.svg)](https://github.com/parax/parax/actions/workflows/tests.yml)
-[![Docs](https://github.com/parax/parax/actions/workflows/deploy_docs.yml/badge.svg)](https://github.com/parax/parax/actions/workflows/deploy_docs.yml)
-
 ![parax logo](assets/logo.png)
 
 # Parax: Declarative, Parametric Modeling in JAX

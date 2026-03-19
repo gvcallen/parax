@@ -25,7 +25,7 @@ from numpyro.distributions import Distribution
 from parax.core.parameter import Parameter, is_valid_param, as_param
 from parax.core.parameter_group import ParameterGroup
 from parax.core.field import field
-from parax.core.partition import partition
+from parax.core.tree import partition
 from parax.distributions import JointDistribution
 from parax.utils import get_first_underlying_type, is_convertible_to_float, nodes_by_type
 
@@ -41,7 +41,7 @@ class ModuleMeta(type(eqx.Module)):
             field_type = get_first_underlying_type(field_types)
             is_param_type = field_type is not None and isinstance(field_type, type) and issubclass(field_type, Parameter)
             
-            # 1. Handle explicit Field declarations (e.g., x = prf.field(...))
+            # 1. Handle explicit Field declarations (e.g., x = prx.field(...))
             if isinstance(default, dataclasses.Field):
                 if is_param_type:
                     has_converter = default.metadata is not None and "converter" in default.metadata
@@ -63,7 +63,7 @@ class ModuleMeta(type(eqx.Module)):
                         
                         field_kwargs = {k: v for k, v in field_kwargs.items() if v is not dataclasses.MISSING}
                         
-                        # USE CUSTOM FIELD: Repackage the explicitly defined field using prf.field
+                        # USE CUSTOM FIELD: Repackage the explicitly defined field using prx.field
                         namespace[field_name] = field(**field_kwargs)
                 continue
 
@@ -159,7 +159,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     :meth:`flat_param_names`          Flattened parameter names as a list.
     :meth:`flat_params`               Flattened parameters as a list.
     :meth:`flat_param_values`         Flattened module parameter values as a flat array.
-    :meth:`flat_param_bounds`         Flattened module parameter bounds as jax arrays.
     :meth:`param_groups`              Return all parameter groups relevant to this module.
     :meth:`distribution`              Joint distribution over (flattened) parameters.
     ================================= ====================================================================
@@ -232,68 +231,68 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     _transparent: ClassVar[bool] = False
 
     # ---- Internal initialization methods -------------------------------------------------
-
+    
     def __init_subclass__(cls, transparent: bool = False, **kwargs):
         """Customize subclass construction."""        
         super().__init_subclass__(**kwargs)
 
         cls._transparent = transparent
 
-        if '__init__' in cls.__dict__:
-            user_init = cls.__dict__['__init__']
-            sig = inspect.signature(user_init)
-            accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        # if '__init__' in cls.__dict__:
+        #     user_init = cls.__dict__['__init__']
+        #     sig = inspect.signature(user_init)
+        #     accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
             
-            def wrapped_init(self, *args, **init_kwargs):
-                user_kwargs = {}
-                base_kwargs = {}
+        #     def wrapped_init(self, *args, **init_kwargs):
+        #         user_kwargs = {}
+        #         base_kwargs = {}
                 
-                valid_fields = {f.name for f in dataclasses.fields(type(self))}
-                for k, v in init_kwargs.items():
-                    if accepts_kwargs or k in sig.parameters:
-                        user_kwargs[k] = v
-                    elif k in valid_fields or k in {"name"}:
-                        base_kwargs[k] = v
-                    else:
-                        raise TypeError(f"{type(self).__name__}.__init__() got an unexpected keyword argument '{k}'")
+        #         valid_fields = {f.name for f in dataclasses.fields(type(self))}
+        #         for k, v in init_kwargs.items():
+        #             if accepts_kwargs or k in sig.parameters:
+        #                 user_kwargs[k] = v
+        #             elif k in valid_fields or k in {"name"}:
+        #                 base_kwargs[k] = v
+        #             else:
+        #                 raise TypeError(f"{type(self).__name__}.__init__() got an unexpected keyword argument '{k}'")
                 
-                for k, v in base_kwargs.items():
-                    object.__setattr__(self, k, v)
+        #         for k, v in base_kwargs.items():
+        #             object.__setattr__(self, k, v)
                     
-                user_init(self, *args, **user_kwargs)
+        #         user_init(self, *args, **user_kwargs)
                 
-                # SIMPLIFIED: Only apply defaults/converters to fields the user's init missed!
-                for f in dataclasses.fields(type(self)):
-                    if not hasattr(self, f.name):
-                        val = dataclasses.MISSING
+        #         # SIMPLIFIED: Only apply defaults/converters to fields the user's init missed!
+        #         for f in dataclasses.fields(type(self)):
+        #             if not hasattr(self, f.name):
+        #                 val = dataclasses.MISSING
                         
-                        # Grab the default from the metaclass blueprint
-                        if f.default is not dataclasses.MISSING:
-                            val = f.default
-                        elif f.default_factory is not dataclasses.MISSING:
-                            val = f.default_factory()
+        #                 # Grab the default from the metaclass blueprint
+        #                 if f.default is not dataclasses.MISSING:
+        #                     val = f.default
+        #                 elif f.default_factory is not dataclasses.MISSING:
+        #                     val = f.default_factory()
                         
-                        # If a default existed, convert it and set it
-                        if val is not dataclasses.MISSING:
-                            converter = f.metadata.get("converter") if hasattr(f, "metadata") else None
-                            if converter is not None:
-                                val = converter(val)
-                            object.__setattr__(self, f.name, val)
+        #                 # If a default existed, convert it and set it
+        #                 if val is not dataclasses.MISSING:
+        #                     converter = f.metadata.get("converter") if hasattr(f, "metadata") else None
+        #                     if converter is not None:
+        #                         val = converter(val)
+        #                     object.__setattr__(self, f.name, val)
                 
-                if hasattr(self, '__post_init__'):
-                    self.__post_init__()
+        #         if hasattr(self, '__post_init__'):
+        #             self.__post_init__()
 
-            update_wrapper(wrapped_init, user_init)
-            cls.__init__ = wrapped_init       
+        #     update_wrapper(wrapped_init, user_init)
+        #     cls.__init__ = wrapped_init       
 
-        else:
-            user_post_init = getattr(cls, '__post_init__', None)
+        # else:
+        #     user_post_init = getattr(cls, '__post_init__', None)
             
-            def wrapped_post_init(self, *args, **kwargs_pi):
-                if user_post_init is not None:
-                    user_post_init(self, *args, **kwargs_pi)
+        #     def wrapped_post_init(self, *args, **kwargs_pi):
+        #         if user_post_init is not None:
+        #             user_post_init(self, *args, **kwargs_pi)
                 
-            cls.__post_init__ = wrapped_post_init
+        #     cls.__post_init__ = wrapped_post_init
             
     def path_to_param_name(self, path) -> str:
         """Convert a PyTree path to a fully-qualified parameter name."""
@@ -889,18 +888,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return jnp.array(list(self.named_flat_param_values(*args, **kwargs).values())).reshape(-1)
 
-    def flat_param_bounds(self, **kwargs) -> tuple[jnp.ndarray, jnp.ndarray]:
-        """
-        Return flattened module parameter bounds as jax arrays.
-        
-        Note that a minimum and maximum percentile is used to get the bounds
-        for any non-uniform distribution.
-
-        Equivalent to getting the bounds from :meth:`.distribution`,
-        which key-word arguments are forwarded to.
-        """
-        return self.flat_distribution(**kwargs).bounds
-    
     def param_groups(self, include_fixed=False, explicit_only=False) -> list[ParameterGroup]:
         """Return all parameter groups relevant to this module, including submodules.
 

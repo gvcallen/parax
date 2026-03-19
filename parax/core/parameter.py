@@ -419,7 +419,7 @@ def is_free_param(x) -> bool:
     bool
         `True` if the object is a non-fixed Parameter, `False` otherwise.
     """
-    return isinstance(x, Parameter) and not x.fixed
+    return isinstance(x, Parameter) and not x.fixed and is_valid_param(x)
 
 def is_fixed_param(x) -> bool:
     r"""
@@ -435,7 +435,7 @@ def is_fixed_param(x) -> bool:
     bool
         `True` if the object is a fixed Parameter, `False` otherwise.
     """
-    return isinstance(x, Parameter) and x.fixed
+    return isinstance(x, Parameter) and x.fixed and is_valid_param(x)
 
 def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
     r"""

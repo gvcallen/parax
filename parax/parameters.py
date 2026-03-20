@@ -194,14 +194,6 @@ def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
     else:
         value = jnp.array(value)
         
-    if not 'distribution' in kwargs:
-        dists = dist.ImproperUniform(
-            constraints.real, 
-            batch_shape=value.shape, 
-            event_shape=()
-        )
-        kwargs['distribution'] = dists        
-        
     return Parameter(value=value, fixed=True, **kwargs)
 
 def Free(value, n: int | None = None, **kwargs) -> Parameter:
@@ -231,13 +223,5 @@ def Free(value, n: int | None = None, **kwargs) -> Parameter:
         value = jnp.broadcast_to(jnp.array(value), shape)
     else:
         value = jnp.array(value)
-        
-    if not 'distribution' in kwargs:
-        dists = dist.ImproperUniform(
-            constraints.real, 
-            batch_shape=value.shape, 
-            event_shape=()
-        )
-        kwargs['distribution'] = dists
         
     return Parameter(value=value, **kwargs)

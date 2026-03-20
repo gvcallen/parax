@@ -15,15 +15,15 @@ class ParameterGroup:
 
     Attributes
     ----------
-    names : list[str]
+    param_names : list[str]
         The names of the parameters included in this group.
     distribution : dist.Distribution or None
         An optional joint distribution over the flattened parameters.
     """
-    names: list[str]
+    param_names: list[str]
     distribution: dist.Distribution | None = field(default=None)
     
-    def __init__(self, names: list[str], distribution: dist.Distribution | None = None):
+    def __init__(self, param_names: list[str], distribution: dist.Distribution | None = None):
         r"""
         Construct a :class:`ParameterGroup`.
 
@@ -34,7 +34,7 @@ class ParameterGroup:
         dist : numpyro.distributions.Distribution, optional
             An optional joint distribution over the flattened parameters.
         """
-        self.names = names
+        self.param_names = param_names
         self.distribution = distribution
         
     @property
@@ -47,7 +47,7 @@ class ParameterGroup:
         int
             The count of names in ``parameter_names``.
         """
-        return len(self.names)        
+        return len(self.param_names)        
     
     def with_distribution(self, distribution: Distribution) -> 'Parameter':
         r"""

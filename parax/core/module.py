@@ -5,13 +5,11 @@ This module defines :class:`parax.Module`, a frozen, JAX-compatible, Equinox mod
 
 """
 
-import inspect
 from functools import partial
 from copy import copy, deepcopy
 from typing import Callable, Sequence, Iterator, Self, ClassVar, Any
 import dataclasses
 from dataclasses import fields, is_dataclass
-from functools import update_wrapper
 from typing_extensions import dataclass_transform
 
 import jax
@@ -27,7 +25,7 @@ from parax.core.parameter_group import ParameterGroup
 from parax.core.field import field
 from parax.core.tree import partition
 from parax.distributions import JointDistribution
-from parax.utils import get_first_underlying_type, is_convertible_to_float, nodes_by_type
+from parax.utils import get_first_underlying_type, nodes_by_type
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
 class ModuleMeta(type(eqx.Module)):
@@ -226,8 +224,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     name: str | None = field(default=None, kw_only=True, static=True)
     _param_groups: list[ParameterGroup] = field(default_factory=list, kw_only=True, repr=False, static=True, init=False)
     
-    # Claa variables
-    _separator: ClassVar[bool] = '_'
+    # Class variables
+    _separator: ClassVar[str] = '_'
     _transparent: ClassVar[bool] = False
 
     # ---- Internal initialization methods -------------------------------------------------
@@ -235,64 +233,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def __init_subclass__(cls, transparent: bool = False, **kwargs):
         """Customize subclass construction."""        
         super().__init_subclass__(**kwargs)
-
         cls._transparent = transparent
-
-        # if '__init__' in cls.__dict__:
-        #     user_init = cls.__dict__['__init__']
-        #     sig = inspect.signature(user_init)
-        #     accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
-            
-        #     def wrapped_init(self, *args, **init_kwargs):
-        #         user_kwargs = {}
-        #         base_kwargs = {}
-                
-        #         valid_fields = {f.name for f in dataclasses.fields(type(self))}
-        #         for k, v in init_kwargs.items():
-        #             if accepts_kwargs or k in sig.parameters:
-        #                 user_kwargs[k] = v
-        #             elif k in valid_fields or k in {"name"}:
-        #                 base_kwargs[k] = v
-        #             else:
-        #                 raise TypeError(f"{type(self).__name__}.__init__() got an unexpected keyword argument '{k}'")
-                
-        #         for k, v in base_kwargs.items():
-        #             object.__setattr__(self, k, v)
-                    
-        #         user_init(self, *args, **user_kwargs)
-                
-        #         # SIMPLIFIED: Only apply defaults/converters to fields the user's init missed!
-        #         for f in dataclasses.fields(type(self)):
-        #             if not hasattr(self, f.name):
-        #                 val = dataclasses.MISSING
-                        
-        #                 # Grab the default from the metaclass blueprint
-        #                 if f.default is not dataclasses.MISSING:
-        #                     val = f.default
-        #                 elif f.default_factory is not dataclasses.MISSING:
-        #                     val = f.default_factory()
-                        
-        #                 # If a default existed, convert it and set it
-        #                 if val is not dataclasses.MISSING:
-        #                     converter = f.metadata.get("converter") if hasattr(f, "metadata") else None
-        #                     if converter is not None:
-        #                         val = converter(val)
-        #                     object.__setattr__(self, f.name, val)
-                
-        #         if hasattr(self, '__post_init__'):
-        #             self.__post_init__()
-
-        #     update_wrapper(wrapped_init, user_init)
-        #     cls.__init__ = wrapped_init       
-
-        # else:
-        #     user_post_init = getattr(cls, '__post_init__', None)
-            
-        #     def wrapped_post_init(self, *args, **kwargs_pi):
-        #         if user_post_init is not None:
-        #             user_post_init(self, *args, **kwargs_pi)
-                
-        #     cls.__post_init__ = wrapped_post_init
             
     def path_to_param_name(self, path) -> str:
         """Convert a PyTree path to a fully-qualified parameter name."""
@@ -316,8 +257,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
                 # 3. Rule application
                 if is_transparent:
-                    # If transparent, we ONLY add a namespace if the user explicitly named the child.
-                    # Otherwise, we pass right through without appending the internal variable name.
                     if explicit_name is not None:
                         name_fields.append(explicit_name)
                 else:
@@ -328,16 +267,11 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             elif isinstance(item, DictKey):
                 k = item.key
                 node = node[k]
-                
-                # Rule: Dictionaries ALWAYS use the key.
                 name_fields.append(str(k))
                     
             elif isinstance(item, (SequenceKey, FlattenedIndexKey)):
                 idx = item.idx if hasattr(item, 'idx') else item.key
                 node = node[idx]
-                
-                # Rule: Sequences promote explicitly named modules, 
-                # otherwise use just the index "{idx}".
                 explicit_name = getattr(node, 'name', None)
                 if explicit_name is not None:
                     name_fields.append(explicit_name)
@@ -363,7 +297,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 updates = {}
                 
                 for f in dataclasses.fields(obj):
-                    # Check for our custom save flag
                     if f.metadata.get('save', True) is False:
                         if f.default is not dataclasses.MISSING:
                             new_val = f.default
@@ -377,7 +310,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                         
                     updates[f.name] = new_val
                 
-                # Override non-init fields
                 for k, v in updates.items():
                     object.__setattr__(obj, k, v)
 
@@ -425,7 +357,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if not isinstance(resolved_submodules[0], Module):
                 raise Exception(f"Got unknown type when expecting a module or string. Type was: {type(resolved_submodules[0])}")
 
-            # Fast collection of allowed IDs without triggering recursive iter_params
             allowed_param_ids = set()
             for sm in resolved_submodules:
                 sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_valid_param)
@@ -441,7 +372,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         if param_filter is not None:
             if isinstance(param_filter, str):
-                param_filter = {param_filter} # O(1) set
+                param_filter = {param_filter} 
                 filter_is_seq_str = True
             elif isinstance(param_filter, Parameter):
                 filter_ids = {id(param_filter)}
@@ -449,7 +380,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             elif isinstance(param_filter, Sequence):
                 if len(param_filter) > 0:
                     if isinstance(param_filter[0], str):
-                        param_filter = set(param_filter) # O(1) set
+                        param_filter = set(param_filter) 
                         filter_is_seq_str = True
                     elif isinstance(param_filter[0], Parameter):
                         filter_ids = {id(p) for p in param_filter}
@@ -461,24 +392,19 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         # 4. The Single Lazy Pass
         for path, param in path_and_nodes:
-            # Type and fixed check
             if not is_valid_param(param):
                 continue
             if not include_fixed and getattr(param, "fixed", False):
                 continue
 
-            # Check Submodule boundaries (Fast ID check)
             if allowed_param_ids is not None and id(param) not in allowed_param_ids:
                 continue
 
-            # Check Parameter Object filter (Fast ID check, skips name gen if fails)
             if filter_is_seq_param and id(param) not in filter_ids:
                 continue
 
-            # -- Expensive Name Generation only happens if we make it here --
             name = self.path_to_param_name(path)
 
-            # Check String/Callable filters
             if filter_is_seq_str and name not in param_filter:
                 continue
             if filter_is_callable and not param_filter(name):
@@ -544,16 +470,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             sampled_module = self.with_params(flat_params_array)
             return func(sampled_module, args)
 
-        # Calculate the Jacobian. By default, JAX appends the parameter dimension 
-        # to the end of the output shape: (*func_shape, num_params)
         jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
-        
-        # Move the parameter dimension to the front: (num_params, *func_shape)
         jac_moved = jnp.moveaxis(jac_array, -1, 0)
-        
         param_names = self.flat_param_names()
         
-        # Map each slice to its corresponding parameter name
         return {name: jac_moved[i] for i, name in enumerate(param_names)}
     
     @eqx.filter_jit
@@ -593,18 +513,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             If `norm` is specified, returns a 0D scalar jax array representing 
             the global sensitivity metric.
         """
-        # 1. Setup the flat parameter evaluation
         def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
             sampled_module = self.with_params(flat_params_array)
             return func(sampled_module, args)
 
         theta = self.flat_param_values()
-        
-        # Calculate raw Jacobian. JAX appends the parameter dimension to the end: 
-        # jac_array shape: (*func_shape, num_params)
         jac_array = jax.jacfwd(func_from_flat)(theta)
         
-        # 2. Scale the Jacobian entirely via array broadcasting
         if kind == 'absolute':
             sens_array = jac_array
             
@@ -620,12 +535,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
                              f"Supported: 'relative', 'semi-relative', 'absolute'") 
         
-        # 3. Apply the norm if requested
         if norm is not None:
             return jnp.linalg.norm(sens_array, ord=norm)
             
-        # 4. Otherwise, pack it back into the dictionary format
-        # Move the parameter dimension to the front: (num_params, *func_shape)
         sens_moved = jnp.moveaxis(sens_array, -1, 0)
         param_names = self.flat_param_names()
         
@@ -650,7 +562,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             A function that takes a Module instance and returns a JAX array.
         args : Any
             The args to pass to `func`.            
-        prng_key : jax.Array
+        key : jax.Array
             JAX random key for sampling.
         num_samples : int, default=1000
             Number of modules to sample from the joint distribution.
@@ -661,16 +573,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             The function evaluated over all samples. Shape will be 
             (num_samples, *func_output_shape).
         """
-        # 1. Get the joint distribution and sample it
         dist = self.flat_distribution()
         flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
 
-        # 2. Define the single-sample evaluation, passing freq explicitly
         def evaluate_single(flat_params_array):
             sampled_module = self.with_params(flat_params_array)
             return func(sampled_module, args)
 
-        # 3. Vectorize over the samples
         return jax.vmap(evaluate_single)(flat_param_samples)  
     
     # ---- Magic methods and copying --------------------------------------------------
@@ -682,7 +591,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Module
         """        
-        return deepcopy(self)    
+        return deepcopy(self)   
     
     def __getitem__(self, key: str | Sequence[str]):
         if isinstance(key, str):
@@ -700,32 +609,22 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         base_fields = []
         
         for f in dataclasses.fields(self):
-            # Skip hidden/internal fields like _separator
             if f.repr is False:
                 continue
             
             val = getattr(self, f.name)
             val_repr = repr(val)
             
-            # Indent multi-line strings (like nested modules) for perfect alignment
             indented_val_repr = val_repr.replace('\n', '\n  ')
             formatted_field = f"  {f.name}={indented_val_repr}"
             
-            # Sort into the three buckets:
-            
-            # 1. Base fields (name) go at the very bottom
             if f.name == "name":
                 base_fields.append(formatted_field)
-                
-            # 2. Modules and Parameters go at the very top
             elif isinstance(val, (Module, Parameter)):
                 module_param_fields.append(formatted_field)
-                
-            # 3. Everything else (bools, ints, floats) goes in the middle
             else:
                 other_fields.append(formatted_field)
             
-        # Combine the lists in the requested order
         all_fields_str = module_param_fields + other_fields + base_fields
         joined_fields = ",\n".join(all_fields_str)
         
@@ -761,7 +660,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         dist = self.flat_distribution()
         flat_param_samples = dist.sample(key, sample_shape=(1,))[0]
         return self.with_params(flat_param_samples)
-       
+        
     # ---- Parameter inspection -------------------------------------------------- 
     
     def named_params(self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None, *, include_fixed=False, submodules: 'Module' | Sequence['Module'] | str | Sequence[str] | None = None) -> dict[str, Parameter]:
@@ -894,6 +793,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             retval = {n: p.value for n, p in (self.iter_params(flatten=True, **kwargs))}
             
         if return_floats:
+            import numpy as np
             retval = {k: float(np.array(v)) for k, v in retval.items()}
         return retval
          
@@ -943,76 +843,44 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if explicit_only:
             return deepcopy(self._param_groups)
         
-        # 0. Identify valid parameters for the current mode (Free vs All)
-        # We use named_flat_params to get the definitive list of "active" parameters.
-        # This handles the logic for whether parameters are fixed or not.
         all_valid_params = self.named_flat_params(include_fixed=include_fixed)
         valid_param_names = set(all_valid_params.keys())
 
-        # 1. Start with local, explicit groups defined in this module
-        # We only keep groups that contain at least one parameter that is valid 
-        # (i.e. not fixed, unless include_fixed=True).
         groups = []
         for group in self._param_groups:
-            # We check if the group overlaps with the valid parameters.
-            # If the intersection is empty, it means all parameters in the group 
-            # are fixed (or don't exist), so we exclude the group.
-            if not set(group.names).isdisjoint(valid_param_names):
+            if not set(group.param_names).isdisjoint(valid_param_names):
                 groups.append(deepcopy(group))
 
-        # 2. Traverse submodules to get their groups recursively
-        # We use tree_flatten_with_path to find all Module instances within self.
-        # We treat Module instances as leaves so we don't traverse into their individual parameters here.
         path_and_nodes, _ = jax.tree_util.tree_flatten_with_path(
             self, 
             is_leaf=lambda x: isinstance(x, Module) and x is not self
         )
 
         for path, node in path_and_nodes:
-            # Check if the node is a submodule (and not self, though is_leaf handles that mostly)
             if isinstance(node, Module) and node is not self:
-                # Calculate the prefix for this submodule (e.g., "amplifier_")
                 relative_name = self.path_to_param_name(path)
                 prefix = f"{relative_name}{self._separator}" if relative_name else ""
-
-                # Recursively get groups from the submodule
                 sub_groups = node.param_groups(include_fixed=include_fixed)
 
-                # "Lift" the submodule groups into the current namespace
                 for sub_group in sub_groups:
-                    new_names = [prefix + name for name in sub_group.names]
-                    # Create a new group with the updated names
+                    new_names = [prefix + name for name in sub_group.param_names]
                     lifted_group = dataclasses.replace(sub_group, param_names=new_names)
                     groups.append(lifted_group)
 
-        # 3. Deduplication and Conflict Resolution
-        # We prioritize groups that appear earlier in the list (Parent groups > Submodule groups).
-        # We filter the list to ensure every parameter appears in exactly one group.
-        
         final_groups = []
         seen_params = set()
 
         for group in groups:
-            # Find parameters in this group that haven't been claimed by a higher-priority group
             valid_names = [name for name in group.param_names if name not in seen_params]
-            
-            # If the group has valid parameters left, add it
             if valid_names:
-                # If the group shrank (because parent claimed some params), update it
                 if len(valid_names) != len(group.param_names):
                     group = dataclasses.replace(group, param_names=valid_names)
-                
                 final_groups.append(group)
                 seen_params.update(valid_names)
 
-        # 4. Handle Orphans
-        # Any parameter in the entire module that wasn't caught in the steps above 
-        # (mostly local parameters of `self` that weren't in `_param_groups`) gets a singleton group.
-        all_params = self.named_flat_params(include_fixed=include_fixed)
-        
-        for name, param in all_params.items():
+        for name, param in all_valid_params.items():
             if name not in seen_params:
-                final_groups.append(ParameterGroup(names=[name], distribution=param.distribution))
+                final_groups.append(ParameterGroup(param_names=[name], distribution=param.distribution))
                 seen_params.add(name)
 
         return final_groups
@@ -1032,7 +900,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         if param_groups:
             groups = self.param_groups()
-            group_names = [pg.names for pg in groups]
+            group_names = [pg.param_names for pg in groups]
             group_dists = [pg.distribution for pg in groups]
         else:
             named_flat_params = self.named_flat_params()
@@ -1083,83 +951,66 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             If shape/order mismatches, unknown/missing names (when checked),
             or if arrays are found outside of Parameters.
         """
-        # Deal with the sample case i.e. an array-like object
-        if not isinstance(params, dict) and len(param_kwargs) == 0:
-            params = jnp.array(params)
+        # 1. High-Efficiency Array Update Path
+        if params is not None and not isinstance(params, dict):
+            if len(param_kwargs) > 0:
+                raise ValueError("Cannot pass both a flat array and explicit keyword arguments to with_params.")
+                
+            params_array = jnp.asarray(params)
             
-            params_tree, static = partition(self, include_fixed=include_fixed)
-            params_out, unravel_fn = flatten_util.ravel_pytree(params_tree)
+            # Use `eqx.partition` to perfectly isolate parameter values while preserving exact tree structure
+            dynamic, static = partition(self, include_fixed=include_fixed, param_objects=False)
+            flat_dynamic, unflatten_fn = flatten_util.ravel_pytree(dynamic)
             
-            if jnp.isscalar(params_out) or params_out.shape[0] == 0:
-                raise Exception("Error: no free module parameters")
+            if flat_dynamic.size != params_array.size:
+                raise Exception(f"Array size mismatch: Expected {flat_dynamic.size} elements, but got {params_array.size}.")
+                
+            new_dynamic = unflatten_fn(params_array)
+            return eqx.combine(new_dynamic, static)
             
-            params_tree_recon = unravel_fn(params)
-            return eqx.combine(params_tree_recon, static)
-
+        # 2. Dictionary / Kwargs Update Path
         params = params if params is not None else {}
+        params = dict(params)
         params.update(param_kwargs)
-    
-        # Generate an ordered, input flat params array for verification
+        
         new_params = self.named_params(include_fixed=True)
-
-        # ---- NEW: Pre-process to handle flattened keys with suffixes (e.g., 'z_real') ----
-        # We must identify keys in `params` that are not in `new_params` (parents)
-        # but ARE in the flattened view.
         
         parent_keys = set(new_params.keys())
         input_keys = set(params.keys())
-        
-        # Keys that are not top-level parameters
         potential_flat_keys = input_keys - parent_keys
         
         if potential_flat_keys:
-            # Iterate over parents to find which flattened keys belong to them.
-            # We only search parents that aren't ALREADY being fully replaced.
             parents_to_scan = [p for p in parent_keys if p not in params]
-            
             for parent_name in parents_to_scan:
                 parent_param = new_params[parent_name]
-                
-                # Optimization: only checking multi-dimensional parameters
                 if parent_param.size > 0: 
-                    # We must replicate the _iter_params name generation logic exactly
                     sub_params = parent_param.flattened(separator=self._separator)
-                    
                     updates_found = False
                     new_sub_values = []
                     
-                    # Reconstruct the value array from current values + updates
                     for i, sub_p in enumerate(sub_params):
                         suffix = sub_p.name if sub_p.name is not None else str(i)
                         flat_name = f"{parent_name}{self._separator}{suffix}"
                         
                         if flat_name in params:
                             val = params[flat_name]
-                            # Handle single-element arrays or scalars
-                            if hasattr(val, 'item') and val.size == 1:
+                            if hasattr(val, 'item') and getattr(val, "size", 1) == 1:
                                 val = val.item()
                             try:
                                 val = float(val)
-                            except:
+                            except Exception:
                                 raise Exception(f"Value for flat parameter '{flat_name}' must be convertible to float. Got: {val}")
                             new_sub_values.append(val)
-                            
-                            # Remove the flat key so it doesn't trigger 'unknown parameter' errors
                             del params[flat_name]
                             updates_found = True
                         else:
                             new_sub_values.append(sub_p.value)
                     
                     if updates_found:
-                        # Re-assemble the parent parameter
                         new_val_flat = jnp.array(new_sub_values)
                         new_val_shaped = new_val_flat.reshape(parent_param.value.shape)
-                        
-                        # Update the params dict with the FULL parent object
-                        # This ensures it hits the "Case 1" logic in the rest of the function
                         params[parent_name] = dataclasses.replace(parent_param, value=new_val_shaped)            
     
-        # Validate the callers's input
         unknown_params = set(params.keys() - new_params.keys())
         if check_unknown and len(unknown_params) != 0:
             raise Exception(f"Error: the following parameters were passed but are not in the module: {unknown_params}")
@@ -1173,26 +1024,24 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 for missing_param_name in missing_params:
                     new_params[missing_param_name] = dataclasses.replace(new_params[missing_param_name], fixed=True)                    
 
-        # Convert to an array of parameters instead of floats
-        if all(is_convertible_to_float(v) for v in params.values()):            
-            for name, value in params.items():
-                new_params[name] = dataclasses.replace(new_params[name], value=jnp.array(value))
-        else:
-            new_params.update(params)
-        new_flat_params = list(new_params.values())
-    
-        # Get the current flat parameter object
-        params_tree, static = partition(self, include_fixed=True, param_objects=True)
-        flat_params, treedef = jax.tree.flatten(params_tree, is_leaf=is_valid_param)
-        
-        # We allow the caller to pass None for name and then we update the name. Otherwise names should match
-        for i, param in enumerate(flat_params):
-            if new_flat_params[i].name is None:
-                new_flat_params[i] = dataclasses.replace(new_flat_params[i], name=param.name)
-        
-        # Create the update tree and return
-        new_params_tree = jax.tree.unflatten(treedef, new_flat_params)
-        return eqx.combine(new_params_tree, static)
+        for name, value in params.items():
+            if isinstance(value, Parameter):
+                new_params[name] = value
+            else:
+                new_params[name] = dataclasses.replace(new_params[name], value=jnp.asarray(value))
+                
+        # Fast tree mapping bypasses string iteration logic completely
+        def map_fn(path, node):
+            if is_valid_param(node):
+                name = self.path_to_param_name(path)
+                if name in new_params:
+                    new_param = new_params[name]
+                    if new_param.name is None:
+                        new_param = dataclasses.replace(new_param, name=node.name)
+                    return new_param
+            return node
+            
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
 
     def with_mapped_params(
         self: Self, 
@@ -1222,45 +1071,55 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Self
         """
-        current_params = self.named_params(include_fixed=include_fixed)
-        current_param_names = set(current_params.keys())
+        current_param_names = set(self.param_names(include_fixed=include_fixed))
         
-        # NEW: If no filter is provided, target all parameters in the module
         if param_filter is None:
             resolved_filter = current_param_names
+        elif isinstance(param_filter, Callable):
+            resolved_filter = {p for p in current_param_names if param_filter(p)}
         else:
+            # Safely cast single items or dicts to lists
             if isinstance(param_filter, str):
                 param_filter = [param_filter]
             elif isinstance(param_filter, Parameter):
                 param_filter = [param_filter]
+            elif isinstance(param_filter, dict):
+                param_filter = list(param_filter.keys())
+            else:
+                param_filter = list(param_filter)
 
-            if isinstance(param_filter, list) and param_filter and isinstance(param_filter[0], str) and prefixes:
+            # Safely check index 0 only if the list has elements
+            if param_filter and isinstance(param_filter[0], str) and prefixes:
                 for prefix in param_filter:
                     if not any(name.startswith(prefix) for name in current_param_names):
                         raise ValueError(f"Specified prefix '{prefix}' does not match any parameters in the module")
-                
                 valid_prefixes = tuple(param_filter)
-                param_filter = lambda p: p.startswith(valid_prefixes)            
+                resolved_filter = {p for p in current_param_names if p.startswith(valid_prefixes)}
                 
-            if isinstance(param_filter, Callable):
-                param_filter = [p for p in current_params.keys() if param_filter(p)]
-            elif isinstance(param_filter[0], Parameter):
+            elif param_filter and isinstance(param_filter[0], Parameter):
                 param_ids = {id(p) for p in param_filter}
-                param_filter = [k for k, v in current_params.items() if id(v) in param_ids]
-
-            resolved_filter = set(param_filter)            
+                resolved_filter = {name for name, p in self.named_params(include_fixed=include_fixed).items() if id(p) in param_ids}
+                
+            else:
+                resolved_filter = set(param_filter)
+                
             for param_name in resolved_filter:
                 if param_name not in current_param_names:
                     raise ValueError(f"Specified parameter '{param_name}' not found in module")
         
-        new_params = current_params.copy()
-        for name, param in current_params.items():
-            if name in resolved_filter:
-                new_params[name] = mapper(param)
-            elif map_others is not None:
-                new_params[name] = map_others(param)
-                
-        return self.with_params(new_params)   
+        # Directly map using JAX natively
+        def map_fn(path, node):
+            if is_valid_param(node):
+                if not include_fixed and getattr(node, "fixed", False):
+                    return node
+                name = self.path_to_param_name(path)
+                if name in resolved_filter:
+                    return mapper(node)
+                elif map_others is not None:
+                    return map_others(node)
+            return node
+            
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
         
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.
@@ -1282,6 +1141,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if free_others:
             map_others = lambda p: p.as_free()
 
+        kwargs.setdefault('include_fixed', True) 
+        
         return self.with_mapped_params(lambda p: p.as_fixed(), param_filter=param_filter, map_others=map_others, **kwargs)
     
     def with_free_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], *, fix_others: bool = False, **kwargs) -> Self:
@@ -1303,6 +1164,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         map_others = None
         if fix_others:
             map_others = lambda p: p.as_fixed()
+
+        kwargs.setdefault('include_fixed', True) 
 
         return self.with_mapped_params(lambda p: p.as_free(), param_filter=param_filter, map_others=map_others, **kwargs)
     
@@ -1340,6 +1203,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         See :meth:`.`with_free_params``.
         """
+        kwargs.setdefault('include_fixed', True)
+        if kwargs['include_fixed'] == False:
+            raise Exception("Cannot pass include_fixed == False for `with_all_params_free`.")        
         return self.with_free_params(self.param_names(include_fixed=True), **kwargs)
     
     # ---- Parameter group manipulation --------------------------------------------------            
@@ -1368,34 +1234,19 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if not isinstance(param_groups, list):
             param_groups = [param_groups]
         
-        # 1. Identify all parameter names claimed by the NEW groups
         new_claimed_params = set()
         for group in param_groups:
-            # Assumes the field name is 'param_names' per your previous context
-            new_claimed_params.update(group.names)
+            new_claimed_params.update(group.param_names)
 
-        # 2. Filter OLD groups (Atomic check)
         current_groups = self._param_groups if self._param_groups is not None else []
         kept_existing_groups = []
         
         for group in current_groups:
-            # Check for intersection: Does this existing group contain ANY parameter 
-            # that is now being redefined in the new groups?
-            existing_group_params = set(group.names)
-            
+            existing_group_params = set(group.param_names)
             if existing_group_params.isdisjoint(new_claimed_params):
-                # No conflict: Keep this group entirely
                 kept_existing_groups.append(group)
-            else:
-                # Conflict found: Discard this group entirely. 
-                # Note: Parameters in this group that were NOT in 'new_claimed_params' 
-                # are now effectively "released" and will be treated as singletons 
-                # by the main param_groups() method.
-                pass
 
-        # 3. Combine
         new_list = kept_existing_groups + param_groups
-        
         new_module = copy(self)
         object.__setattr__(new_module, '_param_groups', new_list)
         return new_module
@@ -1414,14 +1265,12 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             A new module instance with parameter groups distributed to their lowest 
             relevant submodules.
         """
-        # 1. Identify immediate submodules and their prefixes
         submodule_prefixes = {} 
         for f in dataclasses.fields(self):
             if isinstance(getattr(self, f.name), Module):
                 prefix = f.name + self._separator
                 submodule_prefixes[prefix] = f.name
 
-        # 2. Sort current groups into "keep" (stay here) or "demote" (move to child)
         groups_to_keep = []
         submodule_groups = {name: [] for name in submodule_prefixes.values()}
         
@@ -1430,10 +1279,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         for group in current_groups:
             demoted = False
             for prefix, field_name in submodule_prefixes.items():
-                # Check if ALL parameters in the group belong to this submodule
-                if all(name.startswith(prefix) for name in group.names):
-                    # Strip prefix
-                    new_names = [name[len(prefix):] for name in group.names]
+                if all(name.startswith(prefix) for name in group.param_names):
+                    new_names = [name[len(prefix):] for name in group.param_names]
                     new_group = dataclasses.replace(group, param_names=new_names)
                     submodule_groups[field_name].append(new_group)
                     demoted = True
@@ -1442,25 +1289,17 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if not demoted:
                 groups_to_keep.append(group)
 
-        # 3. Apply updates to submodules AND recurse
         new_fields = {}
-        
-        # We iterate over all submodules (even if they didn't receive new groups from us)
-        # because they might have their *own* local groups that need demoting further down.
         for prefix, field_name in submodule_prefixes.items():
             child_module: Module = getattr(self, field_name)
             
-            # A. Push: Add the groups we demoted from the current level
             groups_to_push = submodule_groups[field_name]
             if groups_to_push:
                 child_module = child_module.with_param_groups(groups_to_push)
             
-            # B. Recurse: Ask the child to demote its groups (including the ones we just pushed)
             child_module = child_module.with_demoted_param_groups()
-            
             new_fields[field_name] = child_module
 
-        # 4. Return updated module
         new_module = self.with_fields(**new_fields)
         object.__setattr__(new_module, '_param_groups', groups_to_keep)
         return new_module
@@ -1477,22 +1316,18 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         Self
             A new module instance with no parameter groups.
         """
-        new_fields = {}  # Removed '_param_groups': [] from the initialization
+        new_fields = {} 
         
         for f in dataclasses.fields(self):
-            # Skip the target field since we handle it at the end
             if f.name == '_param_groups':
                 continue
                 
             child = getattr(self, f.name)
             
-            # 1. Recurse into direct submodules
             if isinstance(child, Module):
                 new_fields[f.name] = child.with_no_param_groups()
                 
-            # 2. Recurse into sequences of submodules (e.g., in composites like Cascade)
             elif isinstance(child, (list, tuple)):
-                # Only process the sequence if it actually contains at least one Module
                 if any(isinstance(x, Module) for x in child):
                     new_fields[f.name] = type(child)(
                         x.with_no_param_groups() if isinstance(x, Module) else x 
@@ -1546,7 +1381,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         mapped_module = self
 
         if param_groups:
-            # 1. Map Local Groups (Current Level)
             current_groups = self._param_groups if self._param_groups is not None else []
             for group in current_groups:
                 if dist_filter is None or dist_filter(group.distribution):
@@ -1554,13 +1388,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 elif map_others is not None:
                     mapped_module = mapped_module.with_param_groups(group.with_distribution(map_others(group.distribution)))
 
-            # 2. Recurse into Submodules
             new_submodules = {}
             for f in dataclasses.fields(mapped_module):
                 child = getattr(mapped_module, f.name)
-                # Check if the field is a direct submodule
                 if isinstance(child, Module):
-                    # Recursive call
                     updated_child = child.with_mapped_distributions(
                         mapper, 
                         dist_filter, 
@@ -1569,26 +1400,23 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     )
                     new_submodules[f.name] = updated_child
             
-            # Apply submodule updates if any
             if new_submodules:
                 mapped_module = mapped_module.with_fields(**new_submodules)
 
         else:
-            # 3. Existing logic for individual params (Global via named_params)
-            new_params = {}
-            for name, param in self.named_params().items():
-                if dist_filter is None or dist_filter(param.distribution):
-                    new_params[name] = param.with_distribution(mapper(param.distribution))
-                elif map_others is not None:
-                    new_params[name] = param.with_distribution(map_others(param.distribution))
-            
-            # Apply all parameter updates at once
-            if new_params:
-                mapped_module = mapped_module.with_params(new_params)
+            def map_fn(node):
+                if is_valid_param(node):
+                    if dist_filter is None or dist_filter(node.distribution):
+                        return node.with_distribution(mapper(node.distribution))
+                    elif map_others is not None:
+                        return node.with_distribution(map_others(node.distribution))
+                return node
+                
+            mapped_module = jax.tree_util.tree_map(map_fn, self, is_leaf=is_valid_param)
                     
         return mapped_module
     
-    def with_uniform_distributions(self, percentage: float, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None, *, respect_bounds=False, remove_param_groups=True, zero_values='keep', **kwargs):
+    def with_uniform_distributions(self, percentage: float, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None, *, respect_bounds=False, remove_param_groups=True, zero_values='keep', **kwargs) -> Self:
         """Return a module with uniform distributions set centered on current parameter values.
 
         The distributions are defined with bounds calculated as ``value * (1.0 +/- percentage)``.
@@ -1613,30 +1441,35 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         Self
             A new module with updated parameter distributions.
         """        
-        updates = {}
-        current_params = self.named_params(param_filter, **kwargs)
-        for name, param in current_params.items():
-            value = param.value
-            if value == 0.0:
-                if zero_values == 'keep':
-                    continue
-                else:
-                    raise Exception("Unknown option for 'zero_values'")
-            elif value > 0.0:
-                new_min = value * (1.0 - percentage)
-                new_max = value * (1.0 + percentage)
-            elif value < 0.0:
-                new_min = value * (1.0 + percentage)
-                new_max = value * (1.0 - percentage)
-            
-            if respect_bounds:
-                new_min = max(new_min, param.min)
-                new_max = min(new_max, param.max)
+        current_param_names = set(self.param_names(param_filter, **kwargs))
+        
+        def map_fn(path, param):
+            if is_valid_param(param):
+                name = self.path_to_param_name(path)
+                if name in current_param_names:
+                    value = jnp.asarray(param.value)
+                    
+                    # Calculate bounds element-wise natively in JAX
+                    base_min = jnp.where(value > 0.0, value * (1.0 - percentage), value * (1.0 + percentage))
+                    base_max = jnp.where(value > 0.0, value * (1.0 + percentage), value * (1.0 - percentage))
+                    
+                    if zero_values == 'keep':
+                        new_min = jnp.where(value == 0.0, 0.0, base_min)
+                        new_max = jnp.where(value == 0.0, 0.0, base_max)
+                    else:
+                        raise Exception("Unknown option for 'zero_values'")
+                    
+                    if respect_bounds:
+                        param_min = getattr(param, 'min', -jnp.inf) if param.bounds is None else param.bounds[0]
+                        param_max = getattr(param, 'max', jnp.inf) if param.bounds is None else param.bounds[1]
+                        new_min = jnp.maximum(new_min, param_min)
+                        new_max = jnp.minimum(new_max, param_max)
 
-            distribution = dist.Uniform(new_min, new_max)
-            updates[name] = param.with_distribution(distribution)
-            
-        new_module = self.with_params(updates)
+                    distribution = dist.Uniform(new_min, new_max)
+                    return param.with_distribution(distribution)
+            return param
+
+        new_module = jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
         if remove_param_groups:
             new_module = new_module.with_no_param_groups()
         return new_module
@@ -1659,25 +1492,18 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """            
         class DefaultsWrapper:
             def __init__(self, p):
-                self.p = p   # underlying partial
+                self.p = p   
 
             def __call__(self, *call_args, **call_kwargs):
-                # 1. Clone ONLY the defaults baked into the wrapper.
-                # This ensures each new module gets its own independent blueprint parameters.
                 baked_args = deepcopy(self.p.args)
                 baked_kwargs = deepcopy(self.p.keywords)
                 
-                # 2. Merge with explicitly passed arguments.
-                # We DO NOT clone call_args or call_kwargs to preserve intentional parameter tying!
                 final_args = baked_args + call_args
                 final_kwargs = {**baked_kwargs, **call_kwargs}
                 
-                # 3. Instantiate the module
                 return self.p.func(*final_args, **final_kwargs)
 
-            # chaining
             def with_defaults(self, *new_args, **new_kwargs):
-                # merge new defaults after existing ones
                 merged_args = self.p.args + new_args
                 merged_kwargs = {**self.p.keywords, **new_kwargs} if self.p.keywords else new_kwargs
                 return DefaultsWrapper(partial(self.p.func, *merged_args, **merged_kwargs))
@@ -1705,7 +1531,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         combined = self
         for other in modules:
             combined = combined.with_params(other.named_params())
-            combined = combined.with_param_groups(other.param_groups)
+            combined = combined.with_param_groups(other.param_groups())
         return combined
     
     def with_fields(self: Self, *args, **kwargs) -> Self:
@@ -1716,11 +1542,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         new_module = dataclasses.replace(self, *args, **kwargs)
         
-        # Generically copy all init=False fields so replace() doesn't drop them
         for f in dataclasses.fields(self):
             if not f.init:
                 val = getattr(self, f.name)
-                # Use deepcopy to prevent shared state mutations, just in case
                 object.__setattr__(new_module, f.name, deepcopy(val))
                 
         return new_module
@@ -1744,30 +1568,25 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             Can be a single string with a path e.g. 'submodule1.submodule2',
             or a list of submodules e.g. ['submodule1', 'submodule2'].
         """
-        # Normalize input to a list of strings
         if isinstance(submodule, str) and submodule.find('.'):
             path = submodule.split('.')
         else:
             path = [submodule] if isinstance(submodule, str) else list(submodule)
         
         if not path:
-            # If path is empty, apply fields to self (standard with_fields behavior)
             return self.with_fields(*args, **kwargs)
 
         target_key = path[0]
 
         if len(path) == 1:
-            # Base case: We are at the parent of the final target submodule
             updated_child = getattr(self, target_key).with_fields(*args, **kwargs)
         else:
-            # Recursive step: Tell the child to handle the rest of the path
             child = getattr(self, target_key)
             updated_child = child.with_submodule_fields(path[1:], *args, **kwargs)
 
-        # Return a copy of 'self' with the new version of the child
-        return self.with_fields(**{target_key: updated_child})    
+        return self.with_fields(**{target_key: updated_child})  
     
-    def with_free_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str], include_fixed=False, fix_others=False) -> Self:
+    def with_free_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str], fix_others=False, include_fixed=True) -> Self:
         """Free all parameters in the given submodules.
 
         Submodules parameters are obtained using :meth:`.param_names`.,
@@ -1777,8 +1596,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         ----------
         submodules : Module | Sequence[Module] | str | Sequence[str]
             Submodules whose parameters should be free.
-        include_fixed : bool, default=False
-            Also free parameters that are currently fixed in the submodules.
+        include_fixed : bool, default=True
+            Include fixed parameters in the submodule.
         fix_others : bool, default=False
             Fix all other submodules.
 
@@ -1786,21 +1605,22 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Self
         """        
+        # FIX: include_fixed now defaults to True so we can find parameters that are already fixed
         module_param_names = self.param_names(include_fixed=include_fixed, submodules=submodules)
         return self.with_free_params(module_param_names, fix_others=fix_others)
-
-    def with_free_submodules_only(self: Self, *args, **kwargs) -> Self:
+    
+    def with_free_submodules_only(self: Self, *args, include_fixed=False, **kwargs) -> Self:
         """Returns a module with only the specified submodules freed.
         
         This is an alias for calling :meth:`.with_free_submodules`
-        with `fix_others=True`.
+        with `fix_others=True` and `include_fixed=False` by default.
 
         See :meth:`.`with_free_params``.
         """     
         kwargs.setdefault('fix_others', True)
         if kwargs['fix_others'] == False:
             raise Exception("Cannot pass fix_others == False for `with_free_submodules_only`.")
-        return self.with_free_submodules(*args, **kwargs)
+        return self.with_free_submodules(*args, include_fixed=include_fixed, **kwargs)
     
     def with_fixed_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str]) -> Self:
         """Fix all parameters in the given submodules.
@@ -1817,5 +1637,5 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Self
         """        
-        module_param_names = self.param_names(submodules=submodules)
+        module_param_names = self.param_names(include_fixed=True, submodules=submodules)
         return self.with_fixed_params(module_param_names)

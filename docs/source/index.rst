@@ -3,7 +3,7 @@ Parax: Parametric Modeling in JAX
 
 **Parax**, is a declarative, parametric modelling library built on top of `JAX <https://github.com/jax-ml/jax>`_ and `Equinox <https://github.com/patrick-kidger/equinox>`_.
 
-At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, units, bounds and probability distribution, bijector/transform.
+At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, units, bounds, probability distribution and bijector/transform.
 
 The transform and scale metadata are particularly useful. The raw `value` inside a parameter is stored *untransformed* and *unscaled*. However, parameters can be used directly in mathematical expression as if they were JAX arrays, at which point these transforms are applied. This completely abstract the underlying *value* (to be used in optimization) from the user.
 

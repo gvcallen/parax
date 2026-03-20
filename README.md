@@ -2,11 +2,15 @@
 
 # Parax: Declarative, parametric modeling in JAX
 
-**Parax**, is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax**, is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class (derived from `eqx.Module`) which can be set as fixed (non-trainable) as well as assigned metadata. Example metadata includes a name, scale and distribution (via [numpyro](https://github.com/pyro-ppl/numpyro)). However, `Parax` also provides an extended version of Equinox's `Module` itself in `parax.Module`. This allows for module naming, automated hierarchical parameter access, parameter grouping and mapping, and more.
+At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, units, bounds and probability distribution, bijector/transform.
 
-The library is mainly intended for use in domain-specific scientific modeling (see [ParamRF](https://github.com/gvcallen/paramrf) for an example), but can easily be applied to broader applications.
+The transform and scale metadata are particularly useful. The raw `value` inside a parameter is *untransformed* and *unscaled*. However, parameters can be used directly in mathematical expression as if they were JAX arrays, at which point these transforms are applied. This completely abstract the underlying *value* (to be used in optimization) from the user.
+
+Further, `Parax` also provides an extended version of Equinox's `Module` in `parax.Module`. This allows for parameter-aware module inspection and manipulation. For example, parameters can easily be flattened, updated using a single string assigned using the hierarchy, and mapped in batches.
+
+The library is mainly intended for us in domain-specific scientific modeling, but can easily be applied to broader applications.
 
 | **Parax** |  |
 |-------------|-------|

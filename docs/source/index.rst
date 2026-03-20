@@ -70,15 +70,16 @@ In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fi
     y_true = 3.0 * (x_true ** 2) - 2.0 * x_true + 10.0 # True a=3.0, b=-2.0
     y_true = y_true + jax.random.normal(jax.random.key(0), x_true.shape)
 
+    # 3. Partition the model into free and fixed parameters
     params, static = prx.partition(model)
 
-    # 3. Define the loss Function
+    # 4. Define the loss Function
     def loss_fn(params, args=None):
         model = eqx.combine(params, static)
         y_pred = model(x_true)
         return jnp.mean((y_pred - y_true)**2)
 
-    # 4. Run the BFGS optimizer
+    # 5. Run the BFGS optimizer
     solver = optx.LBFGS(rtol=1e-6, atol=1e-6)
     solution = optx.minimise(
         fn=loss_fn,
@@ -87,7 +88,7 @@ In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fi
         args=(x_true, y_true, static),
     )
 
-    # 5. Recombine to get the final fitted model
+    # 6. Recombine to get the final fitted model
     fitted_model = eqx.combine(solution.value, static)
 
     print(f"Fitted 'a': {jnp.array(fitted_model.a):.8f} (Expected ~3.0)")

@@ -1531,7 +1531,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         combined = self
         for other in modules:
             combined = combined.with_params(other.named_params())
-            combined = combined.with_param_groups(other.param_groups())
+            combined = combined.with_param_groups(other.param_groups(explicit_only=True))
         return combined
     
     def with_fields(self: Self, *args, **kwargs) -> Self:

@@ -85,13 +85,7 @@ python_use_unqualified_type_names = True
 autodoc_inherit_docstrings = True 
 
 # Unwrap NumPyro aliases so they document fully instead of saying "alias of..."
-autodoc_type_aliases = {
-    'UniformDistribution': 'numpyro.distributions.Uniform',
-    'LogUniformDistribution': 'numpyro.distributions.LogUniform',
-    'NormalDistribution': 'numpyro.distributions.Normal',
-    'MultivariateNormalDistribution': 'numpyro.distributions.MultivariateNormal',
-    'LogNormalDistribution': 'numpyro.distributions.LogNormal',
-}
+autodoc_type_aliases = {}
 
 autodoc_member_order = 'bysource'
 autodoc_default_options = {
@@ -118,7 +112,7 @@ napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 napoleon_use_param = True
 napoleon_use_rtype = True
-napoleon_use_ivar = True
+napoleon_use_ivar = False
 
 # --- MyST Markdown Settings ---
 myst_enable_extensions = ['colon_fence', 'deflist', 'linkify', 'dollarmath']

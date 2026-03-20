@@ -29,10 +29,10 @@ pip install parax
 
 ## Example
 
-```python
 In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and ``optimistix`` to fit the model to some noisy data.
 
-.. code-block:: python
+```python
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx

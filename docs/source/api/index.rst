@@ -8,10 +8,11 @@ Core API
    :toctree: generated/
 
    parax.Parameter
-   parax.partition
+   parax.ParameterMetadata
    parax.ParameterGroup
    parax.ParameterTransform
    parax.Module
+   parax.partition
    parax.load
    parax.save
    parax.field

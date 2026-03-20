@@ -48,6 +48,7 @@ class Parameter(eqx.Module):
         If True, the parameter is treated as a constant during optimization/sampling.
     metadata : ParameterMetadata or None
         The hidden structure containing all extended parameter properties.
+        See :class:`parax.ParameterMetadata`.
     distribution : numpyro.distributions.Distribution or None
         The distribution associated with this parameter.
     transform : numpyro.distributions.transforms.Transform or None

@@ -411,54 +411,87 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         submodules: 'Module | Sequence[Module] | str | Sequence[str] | None' = None,
     ) -> Iterator[tuple[str, Parameter]]:
         """Iterate over (name, Parameter) pairs in internal order."""
-        params_tree, _ = partition(self, include_fixed=include_fixed, param_objects=True)
-        path_and_params, _ = jax.tree.flatten_with_path(params_tree, is_leaf=is_valid_param)
-        params: list[tuple[str, Parameter]] = [(self.path_to_param_name(path), param) for path, param in path_and_params]
+        
+        # 1. Direct Flattening
+        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_valid_param)
 
-        # Parameter filtering
+        # 2. Pre-process submodule IDs outside the loop (Fast JAX C++ traversal)
+        allowed_param_ids = None
+        if submodules is not None:
+            if isinstance(submodules, (Module, str)):
+                submodules = [submodules]
+                
+            resolved_submodules = [getattr(self, sm) if isinstance(sm, str) else sm for sm in submodules]
+            if not isinstance(resolved_submodules[0], Module):
+                raise Exception(f"Got unknown type when expecting a module or string. Type was: {type(resolved_submodules[0])}")
+
+            # Fast collection of allowed IDs without triggering recursive iter_params
+            allowed_param_ids = set()
+            for sm in resolved_submodules:
+                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_valid_param)
+                for node in sm_nodes:
+                    if is_valid_param(node) and (include_fixed or not getattr(node, "fixed", False)):
+                        allowed_param_ids.add(id(node))
+
+        # 3. Pre-process filters into O(1) lookups
+        filter_is_seq_str = False
+        filter_is_seq_param = False
+        filter_is_callable = False
+        filter_ids = None
+
         if param_filter is not None:
-            # Normalization
             if isinstance(param_filter, str):
-                param_filter = [param_filter]
-
-            # Apply filter
-            if isinstance(param_filter, Sequence) and isinstance(param_filter[0], str):
-                params = [(k, v) for k, v in params if k in param_filter]
-            elif isinstance(param_filter, Sequence) and isinstance(param_filter[0], Parameter):
-                filter_ids = [id(v) for v in param_filter]
-                params = [(k, v) for k, v in params if id(v) in filter_ids]
+                param_filter = {param_filter} # O(1) set
+                filter_is_seq_str = True
+            elif isinstance(param_filter, Parameter):
+                filter_ids = {id(param_filter)}
+                filter_is_seq_param = True
+            elif isinstance(param_filter, Sequence):
+                if len(param_filter) > 0:
+                    if isinstance(param_filter[0], str):
+                        param_filter = set(param_filter) # O(1) set
+                        filter_is_seq_str = True
+                    elif isinstance(param_filter[0], Parameter):
+                        filter_ids = {id(p) for p in param_filter}
+                        filter_is_seq_param = True
             elif isinstance(param_filter, Callable):
-                params = [(k, v) for k, v in params if param_filter(k)]
+                filter_is_callable = True
             else:
                 raise Exception(f"Unknown filter type passed for parameters: {param_filter}")
 
-        # Submodule filtering
-        if submodules is not None:
-            if isinstance(submodules, (Module, str)):
-                submodules: list[Module] = [submodules]
-            if isinstance(submodules[0], str):
-                submodules: list[Module] = [getattr(self, name) for name in submodules]
-            if not isinstance(submodules[0], Module):
-                raise Exception(f"Got unknown type when expecting a module or string. Type was: {submodules}")
+        # 4. The Single Lazy Pass
+        for path, param in path_and_nodes:
+            # Type and fixed check
+            if not is_valid_param(param):
+                continue
+            if not include_fixed and getattr(param, "fixed", False):
+                continue
 
-            allowed = {id(p) for sm in submodules for p in sm.params(include_fixed=include_fixed)}
-            params = [(k, v) for k, v in params if id(v) in allowed]
+            # Check Submodule boundaries (Fast ID check)
+            if allowed_param_ids is not None and id(param) not in allowed_param_ids:
+                continue
 
-        # Flatten multi-dimensional parameters if requested
-        if flatten:
-            flat_params: list[tuple[str, Parameter]] = []
-            for name, param in params:
-                # Updated check: look for list instance instead of flat_names
-                if param.size > 1 or isinstance(param.name, list):
-                    flattened_params = param.flattened(separator=self._separator)
-                    for i, subparam in enumerate(flattened_params):
-                        suffix = subparam.name if subparam.name is not None else str(i)
-                        flat_params.append((f"{name}{self._separator}{suffix}", subparam))
-                else:
-                    flat_params.append((name, param))
-            params = flat_params
+            # Check Parameter Object filter (Fast ID check, skips name gen if fails)
+            if filter_is_seq_param and id(param) not in filter_ids:
+                continue
 
-        yield from params
+            # -- Expensive Name Generation only happens if we make it here --
+            name = self.path_to_param_name(path)
+
+            # Check String/Callable filters
+            if filter_is_seq_str and name not in param_filter:
+                continue
+            if filter_is_callable and not param_filter(name):
+                continue
+
+            # 5. Flattening & Yielding
+            if flatten and (param.size > 1 or isinstance(param.name, list)):
+                flattened_params = param.flattened(separator=self._separator)
+                for i, subparam in enumerate(flattened_params):
+                    suffix = subparam.name if subparam.name is not None else str(i)
+                    yield f"{name}{self._separator}{suffix}", subparam
+            else:
+                yield name, param
     
     @property
     def num_params(self) -> int:

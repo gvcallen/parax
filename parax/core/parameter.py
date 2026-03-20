@@ -1,21 +1,32 @@
 import json
 import dataclasses
 from copy import deepcopy
-
+from typing import Any
 import jax.numpy as jnp
 import equinox as eqx
 import numpyro.distributions as dist
+from numpyro.distributions.transforms import Transform
 from numpyro.distributions.distribution import Distribution
 
 from parax.core.field import field
-from parax.utils import format_val, split_vectorized_distribution, serialize_distribution, deserialize_distribution, format_distribution
+from parax.core.parameter_metadata import ParameterMetadata
+from parax.utils import (
+    format_val, 
+    split_vectorized_distribution, 
+    serialize_distribution, 
+    deserialize_distribution, 
+    format_distribution,
+    serialize_transform,
+    deserialize_transform,
+    format_transform,
+)
 
 class Parameter(eqx.Module):
     """
-    The main Parameter class.
-    
+    A container for a JAX parameter.
+
     This class serves as the fundamental building block for defining the
-    parameters within an equinox Module or parax `Module`.
+    tunable or fixed parameters in your own models, or within a **parax** `Module`.
     
     It is designed to be a flexible container that behaves like a standard numerical type
     (e.g., a `numpy.ndarray`) while holding additional metadata for model
@@ -33,23 +44,122 @@ class Parameter(eqx.Module):
     ----------
     value : jnp.ndarray
         The underlying unscaled value. Automatically converted to a float64 array.
-    distribution : numpyro.distributions.Distribution or None
-        The distribution associated with this parameter.
     fixed : bool
         If True, the parameter is treated as a constant during optimization/sampling.
+    metadata : ParameterMetadata or None
+        The hidden structure containing all extended parameter properties.
+    distribution : numpyro.distributions.Distribution or None
+        The distribution associated with this parameter.
+    transform : numpyro.distributions.transforms.Transform or None
+        A bijector used to map unconstrained optimizer spaces to constrained parameter spaces.
+    bounds : jnp.ndarray or None
+        Absolute physical or numerical limits for the parameter.
     scale : float
         A scaling factor. The effective value used in calculations is ``value * scale``.
-    name : str or None
-        An optional name for the parameter (marked as static).
+    name : str, list[str], or None
+        An optional programmatic name for the parameter.
+    description : str or None
+        An optional human-readable description of the parameter's purpose.
+    units : str or None
+        An optional semantic unit for plotting and validation (e.g., "pF", "GHz").
+    info : dict
+        A dictionary containing any arbitrary user-defined metadata.
     """
-    # Underlying values/dists (unscaled). Multiply by scale above to get to true value (done automatically when converting to array)
-    value: jnp.ndarray = field(converter=lambda x: jnp.asarray(x))
+    value: jnp.ndarray
+    fixed: bool = field(static=True)
+    metadata: ParameterMetadata | None = None
+
+    def __init__(
+        self, 
+        value: Any, 
+        fixed: bool = False, 
+        metadata: ParameterMetadata | None = None, 
+        **kwargs
+    ):
+        """
+        Initializes the parameter. Core metadata and arbitrary kwargs are automatically 
+        routed into the hidden `ParameterMetadata` struct. 
+        
+        If a transform is provided, the input `value` is assumed to be in the physical 
+        (constrained) space and is automatically inverted to store the latent 
+        (unconstrained) value for the optimizer.
+        """
+        # 1. Route the metadata first
+        if metadata is not None:
+            self.metadata = metadata
+        else:
+            name = kwargs.pop("name", None)
+            description = kwargs.pop("description", None)
+            units = kwargs.pop("units", None)
+            distribution = kwargs.pop("distribution", None)
+            transform = kwargs.pop("transform", None)
+            bounds = kwargs.pop("bounds", None)
+            scale = kwargs.pop("scale", 1.0)
+            
+            if isinstance(name, tuple):
+                name = list(name)
+                
+            if bounds is not None:
+                bounds = jnp.asarray(bounds)
+                
+            if (distribution is None and transform is None and bounds is None and 
+                scale == 1.0 and name is None and description is None and units is None and not kwargs):
+                self.metadata = None
+            else:
+                self.metadata = ParameterMetadata(
+                    name=name,
+                    description=description,
+                    units=units,
+                    distribution=distribution,
+                    transform=transform,
+                    bounds=bounds,
+                    scale=scale,
+                    info=kwargs 
+                )
+
+        # 2. Process the physical value into latent space
+        raw_value = jnp.asarray(value)
+        
+        # MAGIC: Invert the physical value if a transform exists
+        if self.metadata is not None and self.metadata.transform is not None:
+            raw_value = self.metadata.transform.inv(raw_value)
+            
+        self.value = raw_value
+        self.fixed = fixed
+
+    # --- Property Overloads for Seamless API Compatibility ---
     
-    # Metadata fields
-    distribution: Distribution | None = field(default=None)
-    fixed: bool = field(default=False, static=True)
-    scale: float = field(default=1.0, static=True)
-    name: str | list[str] | None = field(default=None, converter=lambda x: list(x) if isinstance(x, tuple) else x, static=True)
+    @property
+    def name(self) -> str | list[str] | None:
+        return self.metadata.name if self.metadata is not None else None
+
+    @property
+    def description(self) -> str | None:
+        return self.metadata.description if self.metadata is not None else None
+
+    @property
+    def units(self) -> str | None:
+        return self.metadata.units if self.metadata is not None else None
+
+    @property
+    def distribution(self) -> Distribution | None:
+        return self.metadata.distribution if self.metadata is not None else None
+
+    @property
+    def transform(self) -> Transform | None:
+        return self.metadata.transform if self.metadata is not None else None
+
+    @property
+    def bounds(self) -> jnp.ndarray | None:
+        return self.metadata.bounds if self.metadata is not None else None
+
+    @property
+    def scale(self) -> float:
+        return self.metadata.scale if self.metadata is not None else 1.0
+
+    @property
+    def info(self) -> dict:
+        return self.metadata.info if self.metadata is not None else {}    
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -97,11 +207,11 @@ class Parameter(eqx.Module):
         Parameter
             A copy of this object with ``value`` replaced.
         """
-        return dataclasses.replace(self, value=value)
+        return dataclasses.replace(self, value=jnp.asarray(value))
 
     def shifted(self, amount: jnp.ndarray) -> 'Parameter':
         r"""
-        Returns a copy of this parameter with its mean shifted by an amonut.
+        Returns a copy of this parameter with its mean shifted by an amount.
 
         Parameters
         ----------
@@ -122,7 +232,8 @@ class Parameter(eqx.Module):
             new_distribution.loc += amount
         else:
             raise Exception("Can only call 'shifted' on a normal or uniform parameter")
-        return dataclasses.replace(self, value=new_value, distribution=new_distribution)
+            
+        return self.with_distribution(new_distribution).with_value(new_value)
     
     def with_distribution(self, distribution: Distribution) -> 'Parameter':
         r"""
@@ -146,7 +257,12 @@ class Parameter(eqx.Module):
         if not isinstance(distribution, Distribution):
             raise Exception('Only numpyro distributions are supported as parameter distributions')
         
-        return dataclasses.replace(self, distribution=distribution)
+        if self.metadata is None:
+            new_meta = ParameterMetadata(distribution=distribution)
+        else:
+            new_meta = dataclasses.replace(self.metadata, distribution=distribution)
+            
+        return dataclasses.replace(self, metadata=new_meta)
     
     def flattened(self, separator='_') -> 'list[Parameter]':
         r"""
@@ -194,9 +310,21 @@ class Parameter(eqx.Module):
             flat_names = [None] * flat_val.size
                 
         return [
-            Parameter(value=val, distribution=p, fixed=self.fixed, scale=self.scale, name=n) 
+            Parameter(
+                value=val, 
+                distribution=p, 
+                transform=self.transform,
+                bounds=self.bounds, # You may need split_vectorized_bounds if arrays get large
+                fixed=self.fixed, 
+                scale=self.scale, 
+                name=n,
+                description=self.description,
+                units=self.units,
+                **self.info # Safely pass along arbitrary metadata
+            ) 
             for val, p, n in zip(flat_val, dists_split, flat_names)
         ]
+    
     def as_fixed(self) -> 'Parameter':
         r"""
         Return a copy of self with ``fixed=True``.
@@ -234,7 +362,11 @@ class Parameter(eqx.Module):
         jnp.ndarray
             The scaled value as an array (``value * scale``).
         """
-        return jnp.asarray(self.value * self.scale, dtype=dtype)
+        val = self.value
+        if self.transform is not None:
+            val = self.transform(val)
+            
+        return jnp.asarray(val * self.scale, dtype=dtype)
     
     def __jax_array__(self, dtype=None):
         r"""
@@ -250,7 +382,11 @@ class Parameter(eqx.Module):
         jnp.ndarray
             The scaled value as an array (``value * scale``).
         """
-        return jnp.asarray(self.value * self.scale, dtype=dtype)
+        val = self.value
+        if self.transform is not None:
+            val = self.transform(val)
+            
+        return jnp.asarray(val * self.scale, dtype=dtype)
     
     def __len__(self):
         r"""
@@ -280,8 +416,25 @@ class Parameter(eqx.Module):
         if self.distribution is not None:
             args.append(f"distribution={format_distribution(self.distribution)}")
             
+        if self.transform is not None:
+            # Use the custom formatter instead of raw repr
+            args.append(f"transform={format_transform(self.transform)}")
+            
+        if self.bounds is not None:
+            args.append(f"bounds={format_val(self.bounds)}")
+            
         if self.name is not None:
             args.append(f"name={repr(self.name)}")
+            
+        if self.units is not None:
+            args.append(f"units={repr(self.units)}")
+
+        if self.description is not None:
+            args.append(f"description={repr(self.description)}")
+            
+        if self.info:
+            for k, v in self.info.items():
+                args.append(f"{k}={repr(v)}")
             
         return f"Parameter({', '.join(args)})"
             
@@ -328,23 +481,45 @@ class Parameter(eqx.Module):
         """
         return dataclasses.replace(self)
     
-     # Serialization
     def to_json(self) -> str:
         r"""
         Serialize the parameter to a JSON string.
+        Omits any fields that are None or empty to keep the payload lightweight.
 
         Returns
         -------
         str
-            A JSON-formatted string containing value, distribution, fixed, scale, and name.
+            A JSON-formatted string containing the parameter's data.
         """
+        # 1. Base required attributes (scale is included as it defaults to 1.0, not None)
         d = {
             "value": self.value.tolist(),
-            "distribution": serialize_distribution(self.distribution),
             "fixed": self.fixed,
-            "scale": self.scale,
-            "name": self.name
+            "scale": self.scale
         }
+        
+        # 2. Add metadata fields only if they are actively used
+        if self.distribution is not None:
+            d["distribution"] = serialize_distribution(self.distribution)
+            
+        if self.transform is not None:
+            d["transform"] = serialize_transform(self.transform)
+            
+        if self.bounds is not None:
+            d["bounds"] = self.bounds.tolist()
+            
+        if self.name is not None:
+            d["name"] = self.name
+            
+        if self.description is not None:
+            d["description"] = self.description
+            
+        if self.units is not None:
+            d["units"] = self.units
+            
+        if self.info: # Evaluates to False if the dictionary is empty
+            d["info"] = self.info 
+            
         return json.dumps(d, indent=2)
 
     @classmethod
@@ -363,13 +538,24 @@ class Parameter(eqx.Module):
             A reconstructed :class:`Parameter` instance.
         """
         d = json.loads(s)
-        return cls(
-            value=jnp.asarray(d["value"]),
-            distribution=deserialize_distribution(d["distribution"]),
-            fixed=d["fixed"],
-            scale=d["scale"],
-            name=d["name"]
-        )
+        
+        # Extract the fields that don't go into kwargs
+        value = d.pop("value")
+        fixed = d.pop("fixed", False)
+        
+        # Reconstruct complex NumPyro objects if they are present in the JSON
+        if "distribution" in d:
+            d["distribution"] = deserialize_distribution(d["distribution"])
+            
+        if "transform" in d:
+            d["transform"] = deserialize_transform(d["transform"])
+            
+        # Merge arbitrary info back into the top level dictionary
+        # so our smart __init__ can sweep them up via **kwargs
+        info_dict = d.pop("info", {})
+        d.update(info_dict)
+        
+        return cls(value=value, fixed=fixed, **d)
     
 from typing import Any, TYPE_CHECKING
 
@@ -419,7 +605,7 @@ def is_free_param(x) -> bool:
     bool
         `True` if the object is a non-fixed Parameter, `False` otherwise.
     """
-    return isinstance(x, Parameter) and not x.fixed and is_valid_param(x)
+    return isinstance(x, Parameter) and not x.fixed
 
 def is_fixed_param(x) -> bool:
     r"""
@@ -435,7 +621,7 @@ def is_fixed_param(x) -> bool:
     bool
         `True` if the object is a fixed Parameter, `False` otherwise.
     """
-    return isinstance(x, Parameter) and x.fixed and is_valid_param(x)
+    return isinstance(x, Parameter) and x.fixed
 
 def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
     r"""

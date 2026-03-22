@@ -94,7 +94,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     
     One feature includes the ability to inspect and modify parameters use strings based
     on their module path. This is helpful for modifying deep, hierachical modules
-    using a single identifiy.
+    using a single identifier.
     
     Another feature is the fact that attributes marked with the `Parameter` type
     are automatically given parameter-converters. This ensures that they remain parameters after construction

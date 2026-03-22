@@ -3,6 +3,7 @@ Additional bijectors not present in distreqx.
 """
 import jax.numpy as jnp
 from jaxtyping import PyTree, Array
+from typing import Callable
 
 import jax.numpy as jnp
 import distreqx.bijectors as bij
@@ -82,6 +83,52 @@ class Inverse(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector
             return self.bijector.same_as(other.bijector)
         else:
             return self.bijector.same_as(other)
+        
+        
+class Lambda(
+    bij.AbstractFowardInverseBijector,
+    bij.AbstractInvLogDetJacBijector,
+    bij.AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """
+    A bijector defined by arbitrary callable functions.
+    
+    This is useful for creating inline bijectors without needing to define 
+    a custom class.
+    """
+    
+    fn_forward: Callable[[PyTree], PyTree]
+    fn_inverse: Callable[[PyTree], PyTree]
+    fn_forward_log_det: Callable[[PyTree], PyTree]
+    fn_inverse_log_det: Callable[[PyTree], PyTree]
+    
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def forward_and_log_det(self, x: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes y = f(x) and log|det J(f)(x)| using the provided callables."""
+        return self.fn_forward(x), self.fn_forward_log_det(x)
+
+    def inverse_and_log_det(self, y: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)| using the provided callables."""
+        return self.fn_inverse(y), self.fn_inverse_log_det(y)
+
+    def same_as(self, other) -> bool:
+        """
+        Returns True if the other is a Lambda bijector with the exact same callables.
+        
+        Note: Python cannot reliably determine if two different lambda expressions 
+        are mathematically equivalent, so this strictly checks for object identity 
+        of the functions.
+        """
+        return (
+            type(other) is Lambda and 
+            self.fn_forward is other.fn_forward and 
+            self.fn_inverse is other.fn_inverse and
+            self.fn_forward_log_det is other.fn_forward_log_det and
+            self.fn_inverse_log_det is other.fn_inverse_log_det
+        )
 
 
 class Exponential(

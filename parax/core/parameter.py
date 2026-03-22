@@ -59,65 +59,72 @@ class Parameter(eqx.Module):
         hidden `ParameterMetadata` struct. If a bijector is provided, the input 
         `value` is assumed to be in the physical (constrained) space and is 
         automatically inverted to store the latent (unconstrained) value.
-
-        Parameters
-        ----------
-        value : Any, optional
-            The initial, scaled physical value of the parameter.
-            If not passed, `latent_value` **must** be passed.
-        fixed : bool, optional
-            Whether the parameter is fixed during optimization, by default False.
-        metadata : ParameterMetadata, optional
-            Pre-constructed metadata object, by default None.
-        **kwargs
-            Additional metadata (e.g., name, distribution, bijector, bounds, scale).
-            See [`parax.ParameterMetadata`][].
         """
         latent_value = kwargs.pop('latent_value', None)
         
         if latent_value is None and value is None:
             raise Exception("Must pass one of either `latent_value` or `value` to Parameter constructor")
         
+        # 1. Extract known metadata keys from kwargs to differentiate them from arbitrary 'info'
+        updates = {}
+        for key in ["name", "distribution", "bijector", "bounds", "scale"]:
+            if key in kwargs:
+                updates[key] = kwargs.pop(key)
+                
+        # Format specific fields
+        if "name" in updates and isinstance(updates["name"], tuple):
+            updates["name"] = list(updates["name"])
+            
+        if "bounds" in updates and updates["bounds"] is not None:
+            updates["bounds"] = jnp.asarray(updates["bounds"])
+            
+        # Any remaining kwargs belong in the custom 'info' dict
+        info_updates = kwargs if len(kwargs) > 0 else {}
+
+        # 2. Reconcile metadata
         if metadata is not None:
-            self.metadata = metadata
-            
-            if len(kwargs) > 0:
-                raise Exception(f"Parameter got unknown kwargs: {kwargs}")
+            # We are modifying an existing metadata object (e.g., via dataclasses.replace)
+            if updates or info_updates:
+                # Merge old info dict with new info overrides
+                new_info = dict(metadata.info) if metadata.info is not None else {}
+                new_info.update(info_updates)
+                
+                self.metadata = dataclasses.replace(
+                    metadata, 
+                    **updates, 
+                    info=new_info if new_info else None
+                )
+            else:
+                self.metadata = metadata
         else:
-            name = kwargs.pop("name", None)
-            distribution = kwargs.pop("distribution", None)
-            bijector = kwargs.pop("bijector", None)
-            bounds = kwargs.pop("bounds", None)
-            scale = kwargs.pop("scale", 1.0)
+            # We are creating a new metadata object from scratch
+            name = updates.get("name", None)
+            distribution = updates.get("distribution", None)
+            bijector = updates.get("bijector", None)
+            bounds = updates.get("bounds", None)
+            scale = updates.get("scale", 1.0)
             
-            if isinstance(name, tuple):
-                name = list(name)
-                
-            if bounds is not None:
-                bounds = jnp.asarray(bounds)
-                
             if (distribution is None and bijector is None and bounds is None and 
-                scale == 1.0 and name is None and not kwargs):
+                scale == 1.0 and name is None and not info_updates):
                 self.metadata = None
             else:
-                info = kwargs if len(kwargs) > 0 else None
-                
                 self.metadata = ParameterMetadata(
                     name=name,
                     distribution=distribution,
                     bijector=bijector,
                     bounds=bounds,
                     scale=scale,
-                    info=info 
+                    info=info_updates if info_updates else None
                 )
                 
+        # 3. Handle latent value extraction/inversion
         if latent_value is None:
             latent_value = jnp.asarray(value)
             if self.metadata is not None and self.metadata.bijector is not None:
                 latent_value = self.metadata.bijector.inverse(latent_value)
                 
                 if jnp.any(jnp.isnan(latent_value)):
-                    raise ValueError(f"Got nan while applying bijector inverse in parameter init. Input value: {value}, bijector: {bijector}")
+                    raise ValueError(f"Got nan while applying bijector inverse in parameter init. Input value: {value}, bijector: {self.metadata.bijector}")
             
         self.latent_value = latent_value
         self.fixed = fixed
@@ -208,7 +215,9 @@ class Parameter(eqx.Module):
         dict
             Any arbitrary keyword arguments passed during initialization.
         """
-        return self.metadata.info if self.metadata is not None else {}
+        if self.metadata is None or self.metadata.info is None:
+            return {}
+        return self.metadata.info
 
     @property
     def shape(self) -> tuple[int, ...]:

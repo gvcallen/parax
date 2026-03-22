@@ -13,7 +13,7 @@ jobs:
     strategy:
       # This will run your tests across three different Python versions simultaneously!
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
 
     steps:
     - name: Checkout code

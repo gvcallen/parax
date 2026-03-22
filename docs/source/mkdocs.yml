@@ -1,0 +1,45 @@
+site_name: parax
+repo_url: https://github.com/parax/parax
+
+theme:
+  name: material
+  features:
+    - navigation.sections    # Groups the left sidebar into neat sections
+    - toc.integrate          # Integrates the right-side TOC into the left sidebar on mobile
+    - header.autohide        # Gives more screen space for reading docs
+    - content.code.copy      # Adds copy buttons to your JAX example blocks
+  palette:
+    - scheme: default
+      primary: white
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_source: true
+            merge_init_into_class: true # Merges __init__ Parameters into the class docstring
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+
+nav:
+  - Home: index.md
+  - API Reference: api/index.md
+  - License: license.md

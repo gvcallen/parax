@@ -1,4 +1,4 @@
-name: Deploy Sphinx Docs
+name: Deploy MkDocs
 
 on:
   push:
@@ -22,15 +22,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install sphinx sphinx_rtd_theme myst-parser ghp-import
+        pip install mkdocs mkdocs-material mkdocstrings[python]
+        # Keep this so mkdocstrings can import and read your parax package
         pip install -e ".[docs]"
-
-    - name: Build docs
-      run: |
-        cd docs
-        make html
 
     - name: Deploy to GitHub Pages
       run: |
-        cd docs
-        ghp-import -n -p -f build/html
+        # This single command builds the static site and pushes it to the gh-pages branch
+        mkdocs gh-deploy --force

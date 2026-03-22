@@ -16,11 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 docs = [
-    "sphinx",
-    "myst-parser",
-    "ghp-import",
-    "sphinx-rtd-theme",
-    "sphinx-math-dollar",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]"
 ]
 test = [
     "pytest",

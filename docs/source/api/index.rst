@@ -1,30 +1,27 @@
-API Reference
-=============
+# API Reference
 
-Core API
---------
+## Core API
 
-.. autosummary::
-   :toctree: generated/
+::: parax.Parameter
 
-   parax.Parameter
-   parax.ParameterMetadata
-   parax.ParameterGroup
-   parax.ParameterTransform
-   parax.Module
-   parax.partition
-   parax.load
-   parax.save
-   parax.field
+::: parax.ParameterMetadata
 
-Modules
--------
+::: parax.ParameterGroup
 
-.. autosummary::
-   :toctree: generated/
-   :recursive:
+::: parax.ParameterTransform
 
-   parax.distributions
-   parax.parameters
-   parax.transforms
-   
+::: parax.Module
+
+::: parax.partition
+
+::: parax.load
+
+::: parax.save
+
+::: parax.field
+
+## Modules
+
+::: parax.parameters
+
+::: parax.transforms

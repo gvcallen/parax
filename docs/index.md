@@ -52,6 +52,8 @@ class Quadratic(eqx.Module):
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         return self.a * (x ** 2) + self.b * x + self.c
     
+# We pass in free/fixed parameters without metadata using factories.
+# Note that `parax.Module` would allow us to simply pass `a=1.5` for free parameters.
 model = Quadratic(a=Free(1.5), b=Free(0.5), c=Fixed(10.0))
 
 # 2. Generate some dummy "ground truth" data with noise

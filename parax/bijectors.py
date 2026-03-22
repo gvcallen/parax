@@ -1,21 +1,35 @@
 """
 Additional bijectors not present in distreqx.
 """
-from typing import Sequence
-
 import jax.numpy as jnp
-import jax.scipy.special as jss
-import jax.nn as jnn
 from jaxtyping import PyTree
-
-from parax.core.parameter import Parameter
-from parax.core.transform import Transform, ParameterTransform
 
 import jax.numpy as jnp
 import jax.scipy as jsp
 import distreqx.bijectors as bij
 from typing import Tuple
 
+class Identity(
+    bij.AbstractFowardInverseBijector,
+    bij.AbstractInvLogDetJacBijector,
+    bij.AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """Identity bijector: y = x."""
+
+    _is_constant_jacobian: bool = True
+    _is_constant_log_det: bool = True
+
+    def forward_and_log_det(self, x: PyTree):
+        log_det = jnp.zeros_like(x)
+        return x, log_det
+
+    def inverse_and_log_det(self, y: PyTree):
+        log_det = jnp.zeros_like(y)
+        return y, log_det
+
+    def same_as(self, other) -> bool:
+        return isinstance(other, Identity)
 
 class Exponential(
     bij.AbstractFowardInverseBijector,
@@ -23,6 +37,8 @@ class Exponential(
     bij.AbstractFwdLogDetJacBijector,
     strict=True,
 ):
+    """Exponential bijector: y = exp(x)."""
+    
     _is_constant_jacobian: bool = False
     _is_constant_log_det: bool = False
 

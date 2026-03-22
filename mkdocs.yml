@@ -32,14 +32,18 @@ plugins:
             show_root_heading: true
             show_source: true
             merge_init_into_class: true
-            show_toc_entry: false
-            show_if_no_docstring: false
+            show_if_no_docstring: false  # Hides undocumented methods
 
+# Note: Only ONE markdown_extensions block here!
 markdown_extensions:
   - pymdownx.superfences
   - pymdownx.arithmatex:
       generic: true
   - admonition
+  - toc:
+      toc_depth: 2
+  - pymdownx.snippets:
+      base_path: ["."]  # This grants permission to read files in your repo root!
 
 nav:
   - Home: index.md

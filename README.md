@@ -6,14 +6,6 @@
 
 At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, bounds, probability distribution and bijector (invertible transformation).
 
-The transform and scale metadata are particularly useful. The raw `value` inside a parameter is stored in "latent" space i.e. *untransformed* and *unscaled*. However, parameters can be used directly in mathematical expression as if they were JAX arrays, at which point the bijection and scaling is applied. This completely abstracts the underlying latent value (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
-
-To make optimization easy, `Parax` comes with a built-in `parax.partition` function, which partitions a model into trainable parameters. If a model is built purely using `Parameter`'s, this removes the need for any conditional logical that would usually be done manually during `eqx.partition`.
-
-Further, `Parax` also provides an extended version of Equinox's `Module` in `parax.Module`. This allows for parameter-aware module inspection and manipulation. For example, parameters can easily be flattened, updated using a single string assigned using the hierarchy, and mapped in batches.
-
-The library is mainly intended for us in domain-specific scientific modeling, but can easily be applied to broader applications.
-
 | **Parax** |  |
 |-------------|-------|
 | **Author**  | Gary Allen |
@@ -26,6 +18,16 @@ Parax can be installed using pip directly:
 ``
 pip install parax
 ``
+
+## Overview
+
+The `Parameter` class is designed to be used as if it was a JAX array. The raw `value` inside a parameter is therefore stored in "latent" space i.e. *untransformed* and *unscaled*. However, parameters eagerly cast to JAX arrays, at which point the bijection and scaling is applied. This completely abstracts the underlying latent value (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
+
+To make optimization easy, `Parax` also comes with a built-in `parax.partition` function, which partitions a model into trainable parameters. If a model is built purely using `Parameter`'s, this removes the need for any conditional logical that would usually be done manually during `eqx.partition`.
+
+Further, `Parax` also provides an extended version of Equinox's `Module` in `parax.Module`. This allows for parameter-aware module inspection and manipulation. For example, parameters can easily be flattened, updated using a single string assigned using the hierarchy, and mapped in batches.
+
+The library is mainly intended for use in domain-specific scientific modeling, but can easily be applied to broader applications.
 
 ## Example
 

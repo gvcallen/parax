@@ -37,18 +37,14 @@ class Parameter(eqx.Module):
     * `Parameter` objects are JAX PyTrees, compatible with JAX transformations (jit, grad).
     * Mark as `fixed` (honored by `parax.partition`).
     * Associate distributions and bijectors using `distreqx`.
-
-    Attributes
-    ----------
-    latent_value : jnp.ndarray
-        The underlying unscaled, untransformed, latent value.
-    fixed : bool
-        If True, the parameter is treated as a constant during optimization/sampling.
-    metadata : ParameterMetadata or None
-        The hidden structure containing all extended parameter properties.
     """
+    #: The underlying unscaled, untransformed, latent value.
     latent_value: jnp.ndarray
+      
+    #: If True, the parameter is treated as a constant during optimization/sampling.
     fixed: bool = field(default=False, static=True)
+        
+    #: The hidden structure containing all extended parameter properties.
     metadata: ParameterMetadata | None = None
 
     def __init__(

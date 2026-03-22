@@ -15,19 +15,26 @@ def partition(
     Partitions an arbitrary PyTree into (dynamic, static) halves.
 
     By default, this acts as a "strict" parameter partitioner: ONLY non-fixed 
-    `Parameter` objects are routed to the dynamic tree. Raw JAX arrays are 
-    treated as static data.
+    [`~parax.Parameter`][] objects are routed to the dynamic tree. Raw JAX arrays are 
+    treated as static data unless explicitly requested.
     
-    Args:
-        pytree: The PyTree to partition.
-        include_fixed: If True, includes Parameter objects where fixed=True.
-        include_arrays: If True, standard JAX floating-point arrays (not wrapped in a 
-                        Parameter) are ALSO routed to the dynamic tree.
-        param_objects: If True, the entire Parameter object is routed to the dynamic tree. 
-                       If False, ONLY the .value array is routed to the dynamic tree.
-                       
-    Returns:
-        tuple: (dynamic, static) PyTrees.
+    Parameters
+    ----------
+    pytree : T
+        The PyTree to partition.
+    include_fixed : bool, default=False
+        If True, includes [`~parax.Parameter`][] objects where `fixed=True`.
+    include_arrays : bool, default=False
+        If True, standard JAX floating-point arrays (not wrapped in a 
+        [`~parax.Parameter`][]) are ALSO routed to the dynamic tree.
+    param_objects : bool, default=False
+        If True, the entire [`~parax.Parameter`][] object is routed to the dynamic tree. 
+        If False, ONLY the underlying `.latent_value` array is routed to the dynamic tree.
+                    
+    Returns
+    -------
+    tuple of T
+        A tuple containing `(dynamic, static)` PyTrees.
     """
     
     def build_mask(node):

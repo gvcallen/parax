@@ -30,24 +30,6 @@ class Parameter(eqx.Module):
     to be a flexible container that behaves like a standard numerical type
     (e.g., a `numpy.ndarray`) while holding additional metadata for model
     training and analysis.
-    
-    Core metadata and arbitrary kwargs are automatically routed into the 
-    hidden `ParameterMetadata` struct. If a bijector is provided, the input 
-    `value` is assumed to be in the physical (constrained) space and is 
-    automatically inverted to store the latent (unconstrained) value.
-
-    Parameters
-    ----------
-    value : Any, optional
-        The initial, scaled physical value of the parameter.
-        If not passed, `latent_value` **must** be passed.
-    fixed : bool, optional
-        Whether the parameter is fixed during optimization, by default False.
-    metadata : ParameterMetadata, optional
-        Pre-constructed metadata object, by default None.
-    **kwargs
-        Additional metadata (e.g., name, distribution, bijector, bounds, scale).
-        See :class:`parax.ParameterMetadata`.
 
     Usage
     -----
@@ -72,6 +54,27 @@ class Parameter(eqx.Module):
         metadata: ParameterMetadata | None = None, 
         **kwargs
     ):
+        """
+        Initialize the parameter.
+
+        Core metadata and arbitrary kwargs are automatically routed into the 
+        hidden `ParameterMetadata` struct. If a bijector is provided, the input 
+        `value` is assumed to be in the physical (constrained) space and is 
+        automatically inverted to store the latent (unconstrained) value.
+
+        Parameters
+        ----------
+        value : Any, optional
+            The initial, scaled physical value of the parameter.
+            If not passed, `latent_value` **must** be passed.
+        fixed : bool, optional
+            Whether the parameter is fixed during optimization, by default False.
+        metadata : ParameterMetadata, optional
+            Pre-constructed metadata object, by default None.
+        **kwargs
+            Additional metadata (e.g., name, distribution, bijector, bounds, scale).
+            See :class:`parax.ParameterMetadata`.
+        """
         latent_value = kwargs.pop('latent_value', None)
         
         if latent_value is None and value is None:

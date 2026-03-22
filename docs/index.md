@@ -2,13 +2,20 @@
 
 **Parax**, is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, bounds, probability distribution and bijector (invertible transformation).
+At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata.
 
 | **Parax** |  |
 |-------------|-------|
 | **Author**  | Gary Allen |
 | **Homepage** | [github.com/parax/parax](https://github.com/parax/parax) |
 | **Docs** | [gvcallen.github.io/parax](https://gvcallen.github.io/parax) |
+
+## Features
+
+- **Easily fix parameters**: Easily specify parameters as *fixed* and partition your model based on this using *parax.partition*.
+- **Attach arbitrary metadata**: Allows attaching arbitrary metadata to model parameters, natively catering for distributions, bijections, scaling, bounds and a name.
+- **Encapsulated constraints and scaling**: Abstracts away scaling and bijector transformations by eagerly casting to a JAX array. This can be used, for example, to enforce parameter positivity or arbitrary constraints during optimization.
+- **Extended Equinox module**: Provides `parax.Module` to allow easy updating, fixing, freeing, or mapping parameters deep within complex models using simple string pathsand bulk `with_*` methods.
 
 ## Installation
 Parax can be installed using pip directly:

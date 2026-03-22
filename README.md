@@ -4,7 +4,7 @@
 
 **Parax**, is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, bounds, probability distribution and bijector (invertible transformation).
+At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata.
 
 | **Parax** |  |
 |-------------|-------|
@@ -14,11 +14,10 @@ At its core, the library provides a `Parameter` class which can be set as fixed 
 
 ## Features
 
-- Encapsulated Parameters: Abstract unscaled, unconstrained latent values for optimization while behaving exactly like standard JAX arrays in math operations, complete with fixed/free states, scales, and physical bounds.
-- Distributions & Bijectors: Native distreqx integration allows you to attach probability distributions and invertible transforms (bijectors) to individual parameters or joint ParameterGroups.
-- Auto-Casting Modules: Equinox-powered modules automatically convert raw floats or arrays into full Parameter objects during initialization based purely on your type hints.
-- Hierarchical Manipulation: Easily update, fix, free, or map parameters deep within complex models using simple string paths (e.g., layer.gain) and bulk with_* methods.
-- Optimization & Math Tools: Includes a custom parax.partition function to seamlessly route only the free latent arrays to optimizers, plus built-in methods for Jacobians, parameter sensitivities, and sampling.
+- **Easily fix parameters**: Easily specify parameters as *fixed* and partition your model based on this using *parax.partition*.
+- **Attach arbitrary metadata**: Allows attaching arbitrary metadata to model parameters, natively catering for distributions, bijections, scaling, bounds and a name.
+- **Encapsulated constraints and scaling**: Abstracts away scaling and bijector transformations by eagerly casting to a JAX array. This can be used, for example, to enforce parameter positivity or arbitrary constraints during optimization.
+- **Extended equinox module**: Provides *parax.Module* to allow easy updating, fixing, freeing, or mapping parameters deep within complex models using simple string paths (e.g., layer.gain) and bulk `with_*` methods.
 
 ## Installation
 Parax can be installed using pip directly:

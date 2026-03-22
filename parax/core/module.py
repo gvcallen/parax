@@ -24,7 +24,6 @@ from parax.core.parameter import Parameter, is_valid_param, as_param
 from parax.core.parameter_group import ParameterGroup
 from parax.core.field import field
 from parax.core.tree import partition
-from parax.distributions import JointDistribution
 from parax.utils import get_first_underlying_type, nodes_by_type
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
@@ -740,29 +739,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         return final_groups
     
-    def flat_distribution(self, param_groups: bool = True) -> JointDistribution:
-        """Joint distribution over flattened parameters.
-        
-        Parameters
-        ----------
-        param_groups : bool, optional
-            Whether or not to use the internal parameter groups
-            to create the joint distribution. Defaults to ``True``.
-        
-        Returns
-        -------
-        JointParameterDistribution
-        """
-        if param_groups:
-            groups = self.param_groups()
-            group_names = [pg.param_names for pg in groups]
-            group_dists = [pg.distribution for pg in groups]
-        else:
-            named_flat_params = self.named_flat_params()
-            group_names = [[name] for name in named_flat_params.keys()]
-            group_dists = [param.distribution for param in named_flat_params.values()]
-            
-        return JointDistribution(distributions=group_dists, distribution_names=group_names, param_names=self.flat_param_names())
+
     
     # ---- Parameter Manipulation --------------------------------------------------            
 

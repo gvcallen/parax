@@ -11,10 +11,10 @@ from parax.core.parameter import Parameter
 from parax.core.transform import Transform, ParameterTransform
 
 class IdentityTransform(Transform):
-    def __call__(self, x):
+    def forward(self, x):
         return x
     
-    def inv(self, x):
+    def inverse(self, x):
         return x
     
 class LowerPercentile(ParameterTransform):
@@ -74,14 +74,14 @@ class ComposeTransform(ParameterTransform):
     
     transforms: Sequence[ParameterTransform] 
 
-    def __call__(self, x):
+    def forward(self, x):
         for transform in self.transforms:
             x = transform(x)
         return x
 
-    def inv(self, x):
+    def inverse(self, x):
         for transform in reversed(self.transforms):
-            param = transform.inv(param)  # <-- Use .inv() to respect the pipeline
+            param = transform.inverse(param)  # <-- Use .inv() to respect the pipeline
         return param
     
 def HypercubeLogitTransform() -> ComposeTransform:

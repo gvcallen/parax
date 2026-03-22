@@ -22,6 +22,10 @@ docs = [
     "sphinx-rtd-theme",
     "sphinx-math-dollar",
 ]
+test = [
+    "pytest",
+    "optimistix",
+]
 
 [project.urls]
 homepage = "https://github.com/gvcallen/parax"

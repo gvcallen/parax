@@ -4,9 +4,9 @@
 
 **Parax**, is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, units, bounds, probability distribution and bijector/transform.
+At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata. Core metadata includes assigning a name, description, scale, bounds, probability distribution and bijector (invertible transformation).
 
-The transform and scale metadata are particularly useful. The raw `value` inside a parameter is stored *untransformed* and *unscaled*. However, parameters can be used directly in mathematical expression as if they were JAX arrays, at which point these transforms are applied. This completely abstracts the underlying *value* (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
+The transform and scale metadata are particularly useful. The raw `value` inside a parameter is stored in "latent" space i.e. *untransformed* and *unscaled*. However, parameters can be used directly in mathematical expression as if they were JAX arrays, at which point the bijection and scaling is applied. This completely abstracts the underlying latent value (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
 
 To make optimization easy, `Parax` comes with a built-in `parax.partition` function, which partitions a model into trainable parameters. If a model is built purely using `Parameter`'s, this removes the need for any conditional logical that would usually be done manually during `eqx.partition`.
 

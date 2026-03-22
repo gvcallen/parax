@@ -6,8 +6,6 @@
 
 ::: parax.ParameterGroup
 
-::: parax.ParameterTransform
-
 ::: parax.Module
 
 ::: parax.partition

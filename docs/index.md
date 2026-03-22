@@ -24,5 +24,6 @@ The library is mainly intended for use in domain-specific scientific modeling, b
 
 Parax can be installed directly using pip:
 
-```bash
+``
 pip install parax
+``

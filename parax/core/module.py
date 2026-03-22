@@ -1287,7 +1287,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         ----------
         percentage : float
             The fractional width of the uniform distribution (e.g. 0.1 = 10%).
-        filter: str | Sequence[str] | Callable[[str], bool], default=None
+        param_filter: str | Sequence[str] | Callable[[str], bool], default=None
             The parameters to be updated with new uniform distributions. For the default case, all are updated.
         respect_bounds: bool, default=False
             Whether or not the `min` and `max` bounds of the current distributions should be respected.

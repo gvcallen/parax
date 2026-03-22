@@ -31,7 +31,9 @@ plugins:
             docstring_style: numpy
             show_root_heading: true
             show_source: true
-            merge_init_into_class: true # Merges __init__ Parameters into the class docstring
+            merge_init_into_class: true
+            show_toc_entry: false
+            show_if_no_docstring: false
 
 markdown_extensions:
   - pymdownx.superfences

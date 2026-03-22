@@ -1,7 +1,5 @@
 # API Reference
 
-## Core API
-
 ::: parax.Parameter
 
 ::: parax.ParameterMetadata
@@ -19,8 +17,6 @@
 ::: parax.save
 
 ::: parax.field
-
-## Modules
 
 ::: parax.parameters
 

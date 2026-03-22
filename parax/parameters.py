@@ -58,7 +58,7 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
         The relative radius of the distribution bounds as a fraction of the mean.
         e.g., 0.1 results in bounds of [0.9 * mean, 1.1 * mean].
     **kwargs
-        Additional keyword arguments passed to the `Uniform` constructor.
+        Additional keyword arguments passed to :func:`Uniform`.
 
     Returns
     -------
@@ -82,12 +82,8 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
         The mean value of the distribution. Can be a sequence for a multi-valued Parameter.
     half_width : float | Sequence[float]
         The half-width value of the distribution. Can be a sequence for a multi-valued Parameter.
-    n : int, optional
-        The number of identical parameters to create in an array. Defaults to None.
-    value : optional
-        The initial value. If None, the midpoint of the distribution is used. Defaults to None.
     **kwargs
-        Additional keyword arguments passed to the `Parameter` constructor.
+        Additional keyword arguments passed to :func:`Uniform`.
 
     Returns
     -------

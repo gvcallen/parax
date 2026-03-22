@@ -101,7 +101,6 @@ class Parameter(eqx.Module):
                 self.metadata = None
             else:
                 info = kwargs if len(kwargs) > 0 else None
-                print(info)
                 
                 self.metadata = ParameterMetadata(
                     name=name,

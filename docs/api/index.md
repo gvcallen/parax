@@ -20,4 +20,4 @@
 
 ::: parax.parameters
 
-::: parax.transforms
+::: parax.bijectors

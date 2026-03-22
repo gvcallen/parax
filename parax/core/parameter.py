@@ -27,8 +27,8 @@ class Parameter(eqx.Module):
 
     This class serves as the fundamental building block for defining
     parameters with metadata within Equinox modules. It is designed
-    to be a flexible container that behaves like a standard numerical type
-    (e.g., a `numpy.ndarray`) while holding additional metadata for model
+    to be a flexible container that behaves like a standard JAX array
+    (i.e.., a `jax.numpy.ndarray`) while holding additional metadata for model
     training and analysis.
 
     Usage
@@ -55,9 +55,7 @@ class Parameter(eqx.Module):
         **kwargs
     ):
         """
-        Initialize the parameter.
-
-        Core metadata and arbitrary kwargs are automatically routed into the 
+        During initialization, core metadata and arbitrary kwargs are automatically routed into the 
         hidden `ParameterMetadata` struct. If a bijector is provided, the input 
         `value` is assumed to be in the physical (constrained) space and is 
         automatically inverted to store the latent (unconstrained) value.

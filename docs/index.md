@@ -12,9 +12,10 @@ At its core, the library provides a `Parameter` class which can be set as fixed 
 
 ## Features
 
-- **Easily fix parameters**: Easily specify parameters as *fixed* and partition your model based on this using *parax.partition*.
+- **Easy parameter fixing**: Parameters can be marked as *fixed* and the resultant modules partitioned using *parax.partition* for on-the-fly fixing.
+- **Encapsulated constraints and scaling**: Scaling and bijector transformations are abstracted away by applying them when the parameter class is casted to a JAX array. This can be used, for example, to enforce positivity or arbitrary constraints during optimization.
+- **Parameter transforms**: Arbitrary transformed can be achieved using `parax.Parameter.transformed(bij)`. This applies a bijector to both the parameter and its underlying distribution.
 - **Attach arbitrary metadata**: Allows attaching arbitrary metadata to model parameters, natively catering for distributions, bijections, scaling, bounds and a name.
-- **Encapsulated constraints and scaling**: Abstracts away scaling and bijector transformations by eagerly casting to a JAX array. This can be used, for example, to enforce parameter positivity or arbitrary constraints during optimization.
 - **Extended Equinox module**: Provides `parax.Module` to allow easy updating, fixing, freeing, or mapping parameters deep within complex models using simple string pathsand bulk `with_*` methods.
 
 ## Installation
@@ -33,6 +34,8 @@ To make optimization easy, `Parax` also comes with a built-in `parax.partition` 
 Further, `Parax` also provides an extended version of Equinox's `Module` in `parax.Module`. This allows for parameter-aware module inspection and manipulation. For example, parameters can easily be flattened, updated using a single string assigned using the hierarchy, and mapped in batches.
 
 The library is mainly intended for use in domain-specific scientific modeling, but can easily be applied to broader applications.
+
+## Example
 
 ## Example
 

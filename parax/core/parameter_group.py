@@ -11,22 +11,29 @@ class ParameterGroup:
     A metadata class that groups a set of named flat parameters and defines 
     any joint relationships, distributions, or transforms between them.
 
+    Attributes
+    ----------
+    param_names : list of str
+        The names of the parameters included in this group.
+    name : str or None, optional
+        An optional identifier for the group itself (e.g., 'covariance_matrix').
+    distribution : AbstractDistribution or None, optional
+        An optional joint distribution over the grouped parameters.
+    bijector : AbstractBijector or None, optional
+        An optional joint bijector applied to the grouped parameters.
+    info : dict
+        Arbitrary user-defined metadata associated with the group. Marked as static.
     """
-    #: The names of the parameters included in this group.
     param_names: list[str]
-    #: An optional identifier for the group itself (e.g., 'covariance_matrix').
     name: str | None = None
-    #: An optional joint distribution over the grouped parameters.
     distribution: AbstractDistribution | None = None
-    #: An optional joint bijector applied to the grouped parameters.
     bijector: AbstractBijector | None = None
-    #: Arbitrary user-defined metadata associated with the group.
     info: dict = field(default_factory=dict, static=True)
     
     @property
     def num_params(self) -> int:
         """
-        Number of flattened parameters in the group.
+        Get the number of flattened parameters in the group.
 
         Returns
         -------
@@ -47,7 +54,7 @@ class ParameterGroup:
         Returns
         -------
         ParameterGroup
-            A copy of this object with `distribution` replaced.
+            A copy of this object with the `distribution` replaced.
 
         Raises
         ------
@@ -63,7 +70,8 @@ class ParameterGroup:
         """
         Return a copy of this parameter group transformed by an additional joint bijector.
 
-        Chains the new bijector with any existing group-level bijector.
+        This method chains the new bijector with any existing group-level bijector,
+        applying the transformations sequentially.
 
         Parameters
         ----------

@@ -338,6 +338,8 @@ class Parameter(eqx.Module):
         """
         if not isinstance(bijector, AbstractBijector):
             raise TypeError("The provided transformation must be a distreqx AbstractBijector.")
+        if self.latent_value is None:
+            raise Exception("Cannot transform a parameter with a None latent value")
 
         # 1. Transform the distribution
         new_dist = self.distribution
@@ -670,7 +672,7 @@ def is_free_param(x: Any) -> bool:
     bool
         True if the object is a non-fixed Parameter, False otherwise.
     """
-    return isinstance(x, Parameter) and not x.fixed
+    return is_valid_param(x) and not x.fixed
 
 def is_fixed_param(x: Any) -> bool:
     """
@@ -686,7 +688,7 @@ def is_fixed_param(x: Any) -> bool:
     bool
         True if the object is a fixed Parameter, False otherwise.
     """
-    return isinstance(x, Parameter) and x.fixed
+    return is_valid_param(x) and x.fixed
 
 def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
     """

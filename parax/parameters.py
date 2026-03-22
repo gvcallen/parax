@@ -58,7 +58,7 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
         The relative radius of the distribution bounds as a fraction of the mean.
         e.g., 0.1 results in bounds of [0.9 * mean, 1.1 * mean].
     **kwargs
-        Additional keyword arguments passed to :func:`Uniform`.
+        Additional keyword arguments passed to [`parax.Uniform`][].
 
     Returns
     -------
@@ -83,7 +83,7 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
     half_width : float | Sequence[float]
         The half-width value of the distribution. Can be a sequence for a multi-valued Parameter.
     **kwargs
-        Additional keyword arguments passed to :func:`Uniform`.
+        Additional keyword arguments passed to [`parax.Uniform`][].
 
     Returns
     -------
@@ -110,7 +110,7 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], n: int |
     value : optional
         The initial value. If None, the mean of the distribution is used. Defaults to None.
     **kwargs
-        Additional keyword arguments passed to the `Parameter` constructor.
+        Additional keyword arguments forward to the `Parameter` constructor.
 
     Returns
     -------
@@ -145,7 +145,7 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
         (also known as the coefficient of variation).
         e.g., 0.1 results in a distribution with sigma = 0.1 * mean.
     **kwargs
-        Additional keyword arguments passed to the `Normal` constructor.
+        Additional keyword arguments passed to [`parax.Normal`][].
 
     Returns
     -------

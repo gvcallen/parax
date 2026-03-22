@@ -1,7 +1,7 @@
 """
 The main module class.
 
-This module defines :class:`parax.Module`, a frozen, JAX-compatible, Equinox module.
+This module defines [`parax.Module`][], a frozen, JAX-compatible, Equinox module.
 
 """
 
@@ -88,134 +88,109 @@ class ModuleMeta(type(eqx.Module)):
 # 2. Assign the metaclass to your base Module
 class Module(eqx.Module, metaclass=ModuleMeta):
     """
-    The main module class.
+    An extension of an Equinox ``Module``.
 
-    Derive from this class to define your parametric Model.
-
-    The module is an Equinox ``Module`` (immutable, dataclass-like) and is
-    treated as a JAX PyTree. Parameters are declared using standard dataclass
-    field syntax with types like :class:`parax.Parameter`.
-
+    This class extends an Equinox ``Module`` with additional helpful features and methods.
+    
+    One feature includes the ability to inspect and modify parameters use strings based
+    on their module path. This is helpful for modifying deep, hierachical modules
+    using a single identifiy.
+    
+    Another feature is the fact that attributes marked with the `Parameter` type
+    are automatically given parameter-converters. This ensures that they remain parameters after construction
+    (e.g. when initializing them with a float).
+    
     Usage
     -----
     - Define your model by sub-classing the module and adding custom parameters and/or sub-modules.
     - Construct modules by passing parameters and/or submodules to the initializer (like a dataclass).
-    - Retrieve parameter information via methods such as :meth:`.named_params`, :meth:`.param_names`, :meth:`.flat_params`, etc..
-    - Use `with_xxx` functions to modify fields, modules and parameters within the module e.g. :meth:`.with_params`, :meth:`.with_fields`.
+    - Retrieve parameter information via methods such as [`parax.Module.named_params`][], [`parax.Module.param_names`][], [`parax.Module.flat_params`][], etc..
+    - Use `with_xxx` functions to modify fields, modules and parameters within the module e.g. [`parax.Module.with_params`][], [`parax.Module.with_fields`][].
 
     Methods & Properties Summary
     ----------------------------
 
     **Introspection Properties**
-    
-    ================================= ====================================================================
-    Method / Property                 Description
-    ================================= ====================================================================
-    :attr:`DEFAULT_NAMED_PARAMS`      Mapping from parax.Parameter name to :class:`Parameter`.
-    :attr:`DEFAULT_PARAM_NAMES`       Default parameter names for the module.
-    :attr:`DEFAULT_PARAMS`            Default parameters for the module.
-    :attr:`num_params`                Number of free parameters.
-    :attr:`num_flat_params`           Number of free, flattened parameters.
-    ================================= ====================================================================
-
-    **Function Tools**
-
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`func_jacobian`             Calculate the Jacobian of a function w.r.t parameters.
-    :meth:`func_sensitivity`          Calculate the sensitivity of a function w.r.t parameters.
-    :meth:`func_samples`              Evaluate a function over parameter samples.
-    ================================= ====================================================================
 
     **Module Inspection & Manipulation**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`children`                  Returns the immediate submodules.
-    :meth:`submodules`                Returns all nested submodules (depth-first).
-    :meth:`partition`                 Partition module into parameters and static trees.
-    :meth:`sampled`                   Return a new module with parameters drawn from this module's distribution.
-    ================================= ====================================================================
+    | Method | Description |
+    |---|---|
+    | [`children`][parax.Module.children] | Returns the immediate submodules. |
+    | [`submodules`][parax.Module.submodules] | Returns all nested submodules (depth-first). |
+    | [`sampled`][parax.Module.sampled] | Return a new module with parameters drawn from this module's distribution. |
 
     **Parameter Inspection**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`named_params`              Named module parameter objects as a dict.
-    :meth:`named_param_values`        Named module parameter values as a dict of jax arrays.
-    :meth:`param_names`               Module parameter names as a list.
-    :meth:`param`                     A single module parameter object by name.
-    :meth:`params`                    Module parameters as a list.
-    :meth:`param_value`               A single module parameter value by name.
-    :meth:`param_values`              Module parameter values as a list of jax arrays.
-    :meth:`named_flat_params`         Named flattened module parameter objects as a dict.
-    :meth:`named_flat_param_values`   Named flattened module parameter values as a dict.
-    :meth:`flat_param_names`          Flattened parameter names as a list.
-    :meth:`flat_params`               Flattened parameters as a list.
-    :meth:`flat_param_values`         Flattened module parameter values as a flat array.
-    :meth:`param_groups`              Return all parameter groups relevant to this module.
-    :meth:`distribution`              Joint distribution over (flattened) parameters.
-    ================================= ====================================================================
+    | Method | Description |
+    |---|---|
+    | [`named_params`][parax.Module.named_params] | Named module parameter objects as a dict. |
+    | [`named_param_values`][parax.Module.named_param_values] | Named module parameter values as a dict of jax arrays. |
+    | [`param_names`][parax.Module.param_names] | Module parameter names as a list. |
+    | [`param`][parax.Module.param] | A single module parameter object by name. |
+    | [`params`][parax.Module.params] | Module parameters as a list. |
+    | [`param_value`][parax.Module.param_value] | A single module parameter value by name. |
+    | [`param_values`][parax.Module.param_values] | Module parameter values as a list of jax arrays. |
+    | [`named_flat_params`][parax.Module.named_flat_params] | Named flattened module parameter objects as a dict. |
+    | [`named_flat_param_values`][parax.Module.named_flat_param_values] | Named flattened module parameter values as a dict. |
+    | [`flat_param_names`][parax.Module.flat_param_names] | Flattened parameter names as a list. |
+    | [`flat_params`][parax.Module.flat_params] | Flattened parameters as a list. |
+    | [`flat_param_values`][parax.Module.flat_param_values] | Flattened module parameter values as a flat array. |
+    | [`param_groups`][parax.Module.param_groups] | Return all parameter groups relevant to this module. |
 
     **Parameter Manipulation**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`with_params`               Return a module with parameters updated.
-    :meth:`with_mapped_params`        Apply a map function to parameters.
-    :meth:`with_transformed_params`   Apply a map function to parameters.
-    :meth:`with_fixed_params`         Return a module with specified parameters fixed.
-    :meth:`with_free_params`          Return a module with specified parameters free.
-    :meth:`with_free_params_only`     Return a module with ONLY the specified parameters free.
-    :meth:`with_all_params_fixed`     Return a module with all parameters fixed.
-    :meth:`with_all_params_free`      Return a module with all parameters free.
-    ================================= ====================================================================
+    | Method | Description |
+    |---|---|
+    | [`with_params`][parax.Module.with_params] | Return a module with parameters updated. |
+    | [`with_mapped_params`][parax.Module.with_mapped_params] | Apply a map function to parameters. |
+    | [`with_transformed_params`][parax.Module.with_transformed_params] | Apply a map function to parameters. |
+    | [`with_fixed_params`][parax.Module.with_fixed_params] | Return a module with specified parameters fixed. |
+    | [`with_free_params`][parax.Module.with_free_params] | Return a module with specified parameters free. |
+    | [`with_free_params_only`][parax.Module.with_free_params_only] | Return a module with ONLY the specified parameters free. |
+    | [`with_all_params_fixed`][parax.Module.with_all_params_fixed] | Return a module with all parameters fixed. |
+    | [`with_all_params_free`][parax.Module.with_all_params_free] | Return a module with all parameters free. |
 
     **Parameter Group Manipulation**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`with_param_groups`         Return a module with parameter groups appended.
-    :meth:`with_demoted_param_groups` Recursively demote parameter groups to deepest submodule.
-    :meth:`with_no_param_groups`      Return a module with all parameter groups removed.
-    ================================= ====================================================================
+    | Method | Description |
+    |---|---|
+    | [`with_param_groups`][parax.Module.with_param_groups] | Return a module with parameter groups appended. |
+    | [`with_demoted_param_groups`][parax.Module.with_demoted_param_groups] | Recursively demote parameter groups to deepest submodule. |
+    | [`with_no_param_groups`][parax.Module.with_no_param_groups] | Return a module with all parameter groups removed. |
 
     **Distribution Manipulation**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`with_mapped_distributions` Apply a map function to the parameter distributions.
-    :meth:`with_uniform_distributions` Return a module with uniform distributions set.
-    ================================= ====================================================================
-    
+    | Method | Description |
+    |---|---|
+    | [`with_mapped_distributions`][parax.Module.with_mapped_distributions] | Apply a map function to the parameter distributions. |
+    | [`with_uniform_distributions`][parax.Module.with_uniform_distributions] | Return a module with uniform distributions set. |
+
     **Field & Module Manipulation**
 
-    ================================= ====================================================================
-    Method                            Description
-    ================================= ====================================================================
-    :meth:`with_defaults`             Return this module type with default initialization args.
-    :meth:`with_modules`              Combines this module with free parameters in other modules.
-    :meth:`with_fields`               Return a copy with dataclass-style field replacements.
-    :meth:`with_name`                 Return a copy of this module with a different name.
-    :meth:`with_submodule_fields`     Dataclass-style field replacements on a nested sub-module.
-    :meth:`with_free_submodules`      Free all parameters in the given submodules.
-    :meth:`with_free_submodules_only` Returns a module with ONLY the specified submodules freed.
-    :meth:`with_fixed_submodules`     Fix all parameters in the given submodules.
-    ================================= ====================================================================
+    | Method | Description |
+    |---|---|
+    | [`with_defaults`][parax.Module.with_defaults] | Return this module type with default initialization args. |
+    | [`with_modules`][parax.Module.with_modules] | Combines this module with free parameters in other modules. |
+    | [`with_fields`][parax.Module.with_fields] | Return a copy with dataclass-style field replacements. |
+    | [`with_name`][parax.Module.with_name] | Return a copy of this module with a different name. |
+    | [`with_submodule_fields`][parax.Module.with_submodule_fields] | Dataclass-style field replacements on a nested sub-module. |
+    | [`with_free_submodules`][parax.Module.with_free_submodules] | Free all parameters in the given submodules. |
+    | [`with_free_submodules_only`][parax.Module.with_free_submodules_only] | Returns a module with ONLY the specified submodules freed. |
+    | [`with_fixed_submodules`][parax.Module.with_fixed_submodules] | Fix all parameters in the given submodules. |
+    
+    **Function Tools**
+
+    | Method | Description |
+    |---|---|
+    | [`func_jacobian`][parax.Module.func_jacobian] | Calculate the Jacobian of a function w.r.t parameters. |
+    | [`func_sensitivity`][parax.Module.func_sensitivity] | Calculate the sensitivity of a function w.r.t parameters. |
+    | [`func_samples`][parax.Module.func_samples] | Evaluate a function over parameter samples. |    
 
     Attributes
     ----------
     name : str or None
         An optional name for the module instance.
-    param_groups : str
-        Parameter groups to initialize the module with.
-
     """
     # Public init fields
     name: str | None = field(default=None, kw_only=True, static=True)
@@ -542,14 +517,14 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def named_param_values(self, scaled=False, **kwargs) -> dict[str, jnp.ndarray]:
         """Named module parameter values as a dict of jax arrays.
 
-        See :meth:`.named_params`.
+        See [`parax.Module.named_params`][].
 
         Parameters
         ----------
         scaled : bool, default=False
             Whether or not to scale the returned values by the parameter scales.
         **kwargs
-            Additional key-word arguments as in  :meth:`.named_params`.
+            Additional key-word arguments as in  [`parax.Module.named_params`][].
 
         Returns
         -------
@@ -564,7 +539,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return module parameter names as a list.
 
-        See :meth:`.named_params`.
+        See [`parax.Module.named_params`][].
         """
         return list(self.named_params(*args, **kwargs).keys())
 
@@ -572,7 +547,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return a single module parameter by name.
 
-        See :meth:`.named_params`.
+        See [`parax.Module.named_params`][].
         """
         return self.named_params(*args, **kwargs)[name]
     
@@ -580,7 +555,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return module parameters as a list.
 
-        See :meth:`.named_params`.
+        See [`parax.Module.named_params`][].
         """
         return list(self.named_params(*args, **kwargs).values())
     
@@ -588,7 +563,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return a single module parameter value by name as a single jax array.
 
-        See :meth:`.named_param_values`.
+        See [`parax.Module.named_param_values`][].
         """
         return self.named_param_values(*args, **kwargs)[name]
 
@@ -596,7 +571,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return module parameter values as a list of jax arrays.
 
-        See :meth:`.named_param_values`.
+        See [`parax.Module.named_param_values`][].
         """
         return list(self.named_param_values(*args, **kwargs).values())
     
@@ -628,14 +603,14 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def named_flat_param_values(self, scaled=False, return_floats=False, **kwargs) -> dict[str, jnp.ndarray]:
         """Named flattened module parameter values as a dict of jax arrays.
 
-        See :meth:`.named_flat_params`.
+        See [`parax.Module.named_flat_params`][].
 
         Parameters
         ----------
         scaled : bool, default=False
             Whether or not to scale the returned values by the parameter scales.
         **kwargs
-            Additional key-word arguments as in  :meth:`.named_params`.
+            Additional key-word arguments as in  [`parax.Module.named_params`][].
 
         Returns
         -------
@@ -655,7 +630,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return flattened parameter names as a list.
 
-        See :meth:`.named_flat_params`.
+        See [`parax.Module.named_flat_params`][].
         """
         return list(self.named_flat_params(*args, **kwargs).keys())    
     
@@ -663,7 +638,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return flattened parameters as a list.
 
-        See :meth:`.named_flat_params`.
+        See [`parax.Module.named_flat_params`][].
         """
         return list(self.named_flat_params(*args, **kwargs).values())
     
@@ -671,7 +646,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return flattened module parameter values as a jax arrays.
 
-        See :meth:`.named_flat_param_values`.
+        See [`parax.Module.named_flat_param_values`][].
         """
         return jnp.array(list(self.named_flat_param_values(*args, **kwargs).values())).reshape(-1)
 
@@ -986,9 +961,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.
 
-        This maps each parameter in the filter, calling :meth:`Parameter.as_fixed` on each.
+        This maps each parameter in the filter, calling [`parax.Parameter.as_fixed`][] on each.
 
-        See :meth:`.with_mapped_params`.
+        See [`parax.Module.with_mapped_params`][].
 
         Parameters
         ----------
@@ -1010,9 +985,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_free_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], *, fix_others: bool = False, **kwargs) -> Self:
         """Free the specified parameters.
 
-        This maps each parameter in the filter, calling :meth:`Parameter.as_free` on each.
+        This maps each parameter in the filter, calling [`parax.Parameter.as_free`][] on each.
 
-        See :meth:`.with_mapped_params`.
+        See [`parax.Module.with_mapped_params`][].
 
         Parameters
         ----------
@@ -1034,10 +1009,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_free_params_only(self: Self, param_filter: str | list[str] | Callable[[str], bool], **kwargs) -> Self:
         """Returns a module with only the specified parameters freed.
         
-        This is an alias for calling :meth:`.with_free_params`
+        This is an alias for calling [`parax.Module.with_free_params`][]
         with `fix_others=True`.
 
-        See :meth:`.`with_free_params``.
+        See [`parax.Module.with_free_params`][].
         """
         kwargs.setdefault('fix_others', True)
         if kwargs['fix_others'] == False:
@@ -1047,10 +1022,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_all_params_fixed(self: Self, **kwargs) -> Self:
         """Returns a module with all parameters fixed.
         
-        This is an alias for calling :meth:`.with_free_params`
+        This is an alias for calling [`parax.Module.with_free_params`][]
         with `fix_others=True` and no parameters passed.
 
-        See :meth:`.`with_free_params``.
+        See [`parax.Module.with_free_params`][].
         """
         kwargs.setdefault('fix_others', True)
         if kwargs['fix_others'] == False:
@@ -1060,10 +1035,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_all_params_free(self: Self, **kwargs) -> Self:
         """Returns a module with all parameters free.
         
-        This is an alias for calling :meth:`.with_free_params`
+        This is an alias for calling [`parax.Module.with_free_params`][]
         with all parameters passed.
 
-        See :meth:`.`with_free_params``.
+        See [`parax.Module.with_free_params`][].
         """
         kwargs.setdefault('include_fixed', True)
         if kwargs['include_fixed'] == False:
@@ -1219,7 +1194,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         of individual parameters (flattened).
 
         If ``param_groups`` is True, the mapping is applied to the distributions 
-        of :class:`ParameterGroup` objects. This mode is recursive: it will traverse 
+        of [`parax.ParameterGroup`][] objects. This mode is recursive: it will traverse 
         the module tree and apply the mapping to all explicit parameter groups in all submodules.
 
         Parameters
@@ -1400,7 +1375,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return a copy of this module with dataclass-style field replacements.
 
-        Parameters are forwarded to :func:`dataclasses.replace`.
+        Parameters are forwarded to `dataclasses.replace`.
         """
         new_module = dataclasses.replace(self, *args, **kwargs)
         
@@ -1421,7 +1396,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         Return a copy of this module with dataclass-style field replacements on a nested sub-module.
 
-        Parameters are forwarded to :func:`dataclasses.replace`.
+        Parameters are forwarded to `dataclasses.replace`.
 
         Parameters
         ----------
@@ -1451,8 +1426,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_free_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str], fix_others=False, include_fixed=True) -> Self:
         """Free all parameters in the given submodules.
 
-        Submodules parameters are obtained using :meth:`.param_names`.,
-        and subsequently freed using :meth:`.`with_free_params``.
+        Submodules parameters are obtained using [`parax.Module.param_names`][].,
+        and subsequently freed using [`parax.Module.with_free_params`][].
         
         Parameters
         ----------
@@ -1473,10 +1448,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_free_submodules_only(self: Self, *args, include_fixed=False, **kwargs) -> Self:
         """Returns a module with only the specified submodules freed.
         
-        This is an alias for calling :meth:`.with_free_submodules`
+        This is an alias for calling [`parax.Module.with_free_submodules`][]
         with `fix_others=True` and `include_fixed=False` by default.
 
-        See :meth:`.`with_free_params``.
+        See [`parax.Module.with_free_params`][].
         """     
         kwargs.setdefault('fix_others', True)
         if kwargs['fix_others'] == False:
@@ -1486,8 +1461,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     def with_fixed_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str]) -> Self:
         """Fix all parameters in the given submodules.
 
-        Submodules parameters are obtained using :meth:`.param_names`.,
-        and subsequently fixed using :meth:`.`with_fixed_params``.
+        Submodules parameters are obtained using [`parax.Module.param_names`][].,
+        and subsequently fixed using [`parax.Module.with_fixed_params`][].
         
         Parameters
         ----------

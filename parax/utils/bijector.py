@@ -52,7 +52,7 @@ def deserialize_bijector(dct: dict | None) -> AbstractBijector | None:
     Parameters
     ----------
     dct : dict or None
-        A dictionary produced by :func:`serialize_bijector`.
+        A dictionary produced by [`serialize_bijector`][].
 
     Returns
     -------

@@ -71,7 +71,7 @@ class Parameter(eqx.Module):
             Pre-constructed metadata object, by default None.
         **kwargs
             Additional metadata (e.g., name, distribution, bijector, bounds, scale).
-            See :class:`parax.ParameterMetadata`.
+            See [`parax.ParameterMetadata`][].
         """
         latent_value = kwargs.pop('latent_value', None)
         

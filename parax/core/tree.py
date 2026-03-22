@@ -40,7 +40,7 @@ def partition(
                 return True
             else:
                 false_param = jax.tree_util.tree_map(lambda _: False, node)
-                return eqx.tree_at(lambda p: p.value, false_param, True)
+                return eqx.tree_at(lambda p: p.latent_value, false_param, True)
         
         # 2. Raw Array Logic (The Escape Hatch)
         if include_arrays and eqx.is_array(node):

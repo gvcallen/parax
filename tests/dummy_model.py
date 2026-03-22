@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-import numpyro.distributions as dist
+from distreqx.distributions import Normal
 from parax import Module, Parameter, ParameterGroup, Fixed
 
 class Affine(Module):
@@ -17,7 +17,7 @@ class Quadratic(Module):
         # Assign a dummy joint distribution to test group extraction
         group = ParameterGroup(
             param_names=['a', 'b'], 
-            distribution=dist.Normal(jnp.zeros(2), jnp.ones(2))
+            distribution=Normal(jnp.zeros(2), jnp.ones(2))
         )
         self._param_groups = [group]
 

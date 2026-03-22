@@ -1,6 +1,6 @@
 [project]
 name = "parax"
-version = "0.2.2"
+version = "0.3.0"
 description = "Declarative, parametric modelling in JAX"
 readme = "README.md"
 authors = [
@@ -10,7 +10,7 @@ dependencies = [
     "equinox",
     "jax",
     "jaxtyping",
-    "numpyro",
+    "distreqx",
     "jsonpickle",
 ]
 

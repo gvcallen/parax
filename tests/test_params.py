@@ -9,15 +9,15 @@ def test_with_params_array(base_model: MathModel):
     updated_model = base_model.with_params(new_vals)
     
     # Direct access inspection
-    assert jnp.allclose(updated_model.affine.loc.value, 51.5)
-    assert jnp.allclose(updated_model.quadratic.a.value, 2.7)
-    assert jnp.allclose(updated_model.vector.value, jnp.array([11.5, 1.5, -8.5]))
+    assert jnp.allclose(updated_model.affine.loc.latent_value, 51.5)
+    assert jnp.allclose(updated_model.quadratic.a.latent_value, 2.7)
+    assert jnp.allclose(updated_model.vector.latent_value, jnp.array([11.5, 1.5, -8.5]))
 
 def test_with_params_dict(base_model: MathModel):
     """Tests updating parameters via dictionary mapping."""
     updates = {'affine_loc': base_model.affine.loc.with_value(100.0)}
     updated_model = base_model.with_params(updates)
-    assert jnp.allclose(updated_model.affine.loc.value, 100.0)
+    assert jnp.allclose(updated_model.affine.loc.latent_value, 100.0)
 
 def test_with_params_size_mismatch(base_model: MathModel):
     """Ensures the array path catches shape mismatches."""
@@ -28,14 +28,14 @@ def test_with_params_size_mismatch(base_model: MathModel):
 def test_with_mapped_params(base_model: MathModel):
     """Tests native JAX tree mapping over parameters."""
     updated_model = base_model.with_mapped_params(
-        mapper=lambda p: p.with_value(p.value * 2.0), 
+        mapper=lambda p: p.with_value(p.latent_value * 2.0), 
         param_filter=['affine'], 
         prefixes=True
     )
     
-    assert jnp.allclose(updated_model.affine.loc.value, 100.0)
-    assert jnp.allclose(updated_model.affine.scale.value, 0.0)
-    assert jnp.allclose(updated_model.quadratic.a.value, 1.2)
+    assert jnp.allclose(updated_model.affine.loc.latent_value, 100.0)
+    assert jnp.allclose(updated_model.affine.scale.latent_value, 0.0)
+    assert jnp.allclose(updated_model.quadratic.a.latent_value, 1.2)
 
 def test_fixed_and_free_params(base_model: MathModel):
     """Tests fixing and freeing parameter utilities via direct attribute inspection."""

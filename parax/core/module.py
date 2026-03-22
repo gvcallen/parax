@@ -17,8 +17,8 @@ import jax.numpy as jnp
 from jax import flatten_util
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 import equinox as eqx
-import numpyro.distributions as dist
-from numpyro.distributions import Distribution
+from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
+from distreqx.bijectors import AbstractBijector
 
 from parax.core.parameter import Parameter, is_valid_param, as_param
 from parax.core.parameter_group import ParameterGroup
@@ -168,6 +168,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     ================================= ====================================================================
     :meth:`with_params`               Return a module with parameters updated.
     :meth:`with_mapped_params`        Apply a map function to parameters.
+    :meth:`with_transformed_params`   Apply a map function to parameters.
     :meth:`with_fixed_params`         Return a module with specified parameters fixed.
     :meth:`with_free_params`          Return a module with specified parameters free.
     :meth:`with_free_params_only`     Return a module with ONLY the specified parameters free.
@@ -207,9 +208,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     :meth:`with_free_submodules`      Free all parameters in the given submodules.
     :meth:`with_free_submodules_only` Returns a module with ONLY the specified submodules freed.
     :meth:`with_fixed_submodules`     Fix all parameters in the given submodules.
-    :meth:`with_tied_submodules`      Tie submodules structurally to a shared module.
-    :meth:`tied`                      Return the module with self tied to a shared module.
-    :meth:`with_injected_params`      Inject parameters from a shared module into target submodules.
     ================================= ====================================================================
 
     Attributes
@@ -437,150 +435,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         int
         """
-        return len(self.flat_params())      
-    
-    # ---- Function tools --------------------------------------------------        
-
-    @eqx.filter_jit
-    def func_jacobian(
-        self: Self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any
-    ) -> dict[str, jnp.ndarray]:
-        """Calculate the Jacobian of an arbitrary function with respect to free parameters.
-
-        This uses forward-mode automatic differentiation to compute the gradients 
-        of the provided function with respect to each free parameter in the module.
-
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            Function to differentiate. Must take a Module and args
-            and return a jnp.ndarray of any shape.
-        args : Any
-            The args to pass to `func`.
-
-        Returns
-        -------
-        dict[str, jnp.ndarray]
-            A dictionary mapping flat parameter names to their gradient 
-            arrays. Each array has the same shape as the output of `func`.
-        """
-        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
-
-        jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
-        jac_moved = jnp.moveaxis(jac_array, -1, 0)
-        param_names = self.flat_param_names()
-        
-        return {name: jac_moved[i] for i, name in enumerate(param_names)}
-    
-    @eqx.filter_jit
-    def func_sensitivity(
-        self: Self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any,
-        kind: str = 'relative',
-        norm: int | str | None = None
-    ) -> dict[str, jnp.ndarray] | jnp.ndarray:
-        r"""Calculate the sensitivity of an arbitrary function w.r.t parameters.
-
-        Supported kinds:
-        - 'relative': (dy/dtheta) * (theta/y). Fractional change in output per 
-          fractional change in parameter. Blows up if y is zero.
-        - 'semi-relative': (dy/dtheta) * theta. Change in output per 
-          fractional change in parameter. Stable if y is zero.
-        - 'absolute': (dy/dtheta). Raw gradient.
-
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            Function to evaluate.
-        args : Any
-            The args to pass to `func`.
-        kind : str, default='relative'
-            The type of sensitivity to calculate ('relative', 'semi-relative', 'absolute').
-        norm : int | str | None, default=None
-            If provided, aggregates the parameter sensitivities into a single scalar 
-            metric using the specified norm (e.g., 2 for L2 norm, jnp.inf for max norm).
-
-        Returns
-        -------
-        dict[str, jnp.ndarray] | jnp.ndarray
-            If `norm` is None, returns a dictionary mapping flat parameter names 
-            to sensitivity arrays.
-            If `norm` is specified, returns a 0D scalar jax array representing 
-            the global sensitivity metric.
-        """
-        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
-
-        theta = self.flat_param_values()
-        jac_array = jax.jacfwd(func_from_flat)(theta)
-        
-        if kind == 'absolute':
-            sens_array = jac_array
-            
-        elif kind == 'semi-relative':
-            sens_array = jac_array * theta
-            
-        elif kind == 'relative':
-            y_nom = func(self, args)
-            y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
-            sens_array = jac_array * (theta / y_safe[..., None])
-            
-        else:
-            raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
-                             f"Supported: 'relative', 'semi-relative', 'absolute'") 
-        
-        if norm is not None:
-            return jnp.linalg.norm(sens_array, ord=norm)
-            
-        sens_moved = jnp.moveaxis(sens_array, -1, 0)
-        param_names = self.flat_param_names()
-        
-        return {name: sens_moved[i] for i, name in enumerate(param_names)}
-
-    @eqx.filter_jit
-    def func_samples(
-        self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any,
-        *,
-        key: jax.Array, 
-        num_samples: int = 1000
-    ) -> jnp.ndarray:
-        """
-        Evaluates an arbitrary function over samples drawn from the 
-        module's distribution.
-
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            A function that takes a Module instance and returns a JAX array.
-        args : Any
-            The args to pass to `func`.            
-        key : jax.Array
-            JAX random key for sampling.
-        num_samples : int, default=1000
-            Number of modules to sample from the joint distribution.
-
-        Returns
-        -------
-        jnp.ndarray
-            The function evaluated over all samples. Shape will be 
-            (num_samples, *func_output_shape).
-        """
-        dist = self.flat_distribution()
-        flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
-
-        def evaluate_single(flat_params_array):
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
-
-        return jax.vmap(evaluate_single)(flat_param_samples)  
+        return len(self.flat_params())          
     
     # ---- Magic methods and copying --------------------------------------------------
 
@@ -704,7 +559,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if scaled:
             return {n: jnp.array(p) for n, p in (self.iter_params(**kwargs))}
         else:
-            return {n: p.value for n, p in (self.iter_params(**kwargs))}    
+            return {n: p.latent_value for n, p in (self.iter_params(**kwargs))}    
 
     def param_names(self, *args, **kwargs) -> list[str]:
         """
@@ -790,7 +645,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if scaled:
             retval = {n: jnp.array(p) for n, p in (self.iter_params(flatten=True, **kwargs))}
         else:
-            retval = {n: p.value for n, p in (self.iter_params(flatten=True, **kwargs))}
+            retval = {n: p.latent_value for n, p in (self.iter_params(flatten=True, **kwargs))}
             
         if return_floats:
             import numpy as np
@@ -1004,11 +859,11 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                             del params[flat_name]
                             updates_found = True
                         else:
-                            new_sub_values.append(sub_p.value)
+                            new_sub_values.append(sub_p.latent_value)
                     
                     if updates_found:
                         new_val_flat = jnp.array(new_sub_values)
-                        new_val_shaped = new_val_flat.reshape(parent_param.value.shape)
+                        new_val_shaped = new_val_flat.reshape(parent_param.latent_value.shape)
                         params[parent_name] = dataclasses.replace(parent_param, value=new_val_shaped)            
     
         unknown_params = set(params.keys() - new_params.keys())
@@ -1120,6 +975,36 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             return node
             
         return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
+    
+    def with_transformed_params(
+        self: Self, 
+        bijector: AbstractBijector, 
+        param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] | None = None, 
+        **kwargs
+    ) -> Self:
+        """
+        Return a module with a distreqx bijector applied to the specified parameters.
+
+        This utilizes the underlying `transformed` method on the matched Parameters, 
+        which updates their physical values, bounds, and distributions simultaneously 
+        while preserving the unconstrained latent values.
+
+        Parameters
+        ----------
+        bijector : distreqx.bijectors.AbstractBijector
+            The bijector to apply.
+        param_filter : str | Sequence[str] | Callable[[str], bool] | None, default=None
+            Parameter names to transform. If None, applies to all parameters.
+
+        Returns
+        -------
+        Self
+        """
+        return self.with_mapped_params(
+            mapper=lambda p: p.transformed(bijector), 
+            param_filter=param_filter, 
+            **kwargs
+        )    
         
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.
@@ -1342,10 +1227,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
     def with_mapped_distributions(
         self: Self, 
-        mapper: Callable[[Distribution], Distribution], 
-        dist_filter: Callable[[Distribution], bool] | None = None, 
+        mapper: Callable[[AbstractDistribution], AbstractDistribution], 
+        dist_filter: Callable[[AbstractDistribution], bool] | None = None, 
         *, 
-        map_others: Callable[[Distribution], Distribution] | None = None,
+        map_others: Callable[[AbstractDistribution], AbstractDistribution] | None = None,
         param_groups: bool = False
     ) -> Self:
         """Return a module with a function applied to its parameter distributions.
@@ -1362,12 +1247,12 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         Parameters
         ----------
-        mapper : Callable[[Distribution], Distribution]
+        mapper : Callable[[AbstractDistribution], AbstractDistribution]
             Function that takes a distribution and returns a new one.
-        dist_filter : Callable[[Distribution], bool] | None, default=None
+        dist_filter : Callable[[AbstractDistribution], bool] | None, default=None
             A predicate function. If provided, the mapping is only applied to 
             distributions where ``dist_filter(dist)`` is True. If None, applies to all.
-        map_others : Callable[[Distribution], Distribution] | None, default=None
+        map_others : Callable[[AbstractDistribution], AbstractDistribution] | None, default=None
             An optional map to apply to all distributions NOT in the filter.
         param_groups : bool, default=False
             If True, map distributions on parameter groups (recursively). 
@@ -1443,7 +1328,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """        
         current_param_names = set(self.param_names(param_filter, **kwargs))
         
-        def map_fn(path, param):
+        def map_fn(path, param: Parameter):
             if is_valid_param(param):
                 name = self.path_to_param_name(path)
                 if name in current_param_names:
@@ -1465,7 +1350,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                         new_min = jnp.maximum(new_min, param_min)
                         new_max = jnp.minimum(new_max, param_max)
 
-                    distribution = dist.Uniform(new_min, new_max)
+                    distribution = UniformDistribution(new_min, new_max)
                     return param.with_distribution(distribution)
             return param
 
@@ -1605,7 +1490,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         -------
         Self
         """        
-        # FIX: include_fixed now defaults to True so we can find parameters that are already fixed
         module_param_names = self.param_names(include_fixed=include_fixed, submodules=submodules)
         return self.with_free_params(module_param_names, fix_others=fix_others)
     
@@ -1639,3 +1523,146 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """        
         module_param_names = self.param_names(include_fixed=True, submodules=submodules)
         return self.with_fixed_params(module_param_names)
+    
+    # ---- Function tools --------------------------------------------------        
+
+    @eqx.filter_jit
+    def func_jacobian(
+        self: Self, 
+        func: Callable[['Module'], jnp.ndarray], 
+        args: Any
+    ) -> dict[str, jnp.ndarray]:
+        """Calculate the Jacobian of an arbitrary function with respect to free parameters.
+
+        This uses forward-mode automatic differentiation to compute the gradients 
+        of the provided function with respect to each free parameter in the module.
+
+        Parameters
+        ----------
+        func : Callable[[Module], jnp.ndarray]
+            Function to differentiate. Must take a Module and args
+            and return a jnp.ndarray of any shape.
+        args : Any
+            The args to pass to `func`.
+
+        Returns
+        -------
+        dict[str, jnp.ndarray]
+            A dictionary mapping flat parameter names to their gradient 
+            arrays. Each array has the same shape as the output of `func`.
+        """
+        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
+            sampled_module = self.with_params(flat_params_array)
+            return func(sampled_module, args)
+
+        jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
+        jac_moved = jnp.moveaxis(jac_array, -1, 0)
+        param_names = self.flat_param_names()
+        
+        return {name: jac_moved[i] for i, name in enumerate(param_names)}
+    
+    @eqx.filter_jit
+    def func_sensitivity(
+        self: Self, 
+        func: Callable[['Module'], jnp.ndarray], 
+        args: Any,
+        kind: str = 'relative',
+        norm: int | str | None = None
+    ) -> dict[str, jnp.ndarray] | jnp.ndarray:
+        r"""Calculate the sensitivity of an arbitrary function w.r.t parameters.
+
+        Supported kinds:
+        - 'relative': (dy/dtheta) * (theta/y). Fractional change in output per 
+          fractional change in parameter. Blows up if y is zero.
+        - 'semi-relative': (dy/dtheta) * theta. Change in output per 
+          fractional change in parameter. Stable if y is zero.
+        - 'absolute': (dy/dtheta). Raw gradient.
+
+        Parameters
+        ----------
+        func : Callable[[Module], jnp.ndarray]
+            Function to evaluate.
+        args : Any
+            The args to pass to `func`.
+        kind : str, default='relative'
+            The type of sensitivity to calculate ('relative', 'semi-relative', 'absolute').
+        norm : int | str | None, default=None
+            If provided, aggregates the parameter sensitivities into a single scalar 
+            metric using the specified norm (e.g., 2 for L2 norm, jnp.inf for max norm).
+
+        Returns
+        -------
+        dict[str, jnp.ndarray] | jnp.ndarray
+            If `norm` is None, returns a dictionary mapping flat parameter names 
+            to sensitivity arrays.
+            If `norm` is specified, returns a 0D scalar jax array representing 
+            the global sensitivity metric.
+        """
+        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
+            sampled_module = self.with_params(flat_params_array)
+            return func(sampled_module, args)
+
+        theta = self.flat_param_values()
+        jac_array = jax.jacfwd(func_from_flat)(theta)
+        
+        if kind == 'absolute':
+            sens_array = jac_array
+            
+        elif kind == 'semi-relative':
+            sens_array = jac_array * theta
+            
+        elif kind == 'relative':
+            y_nom = func(self, args)
+            y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
+            sens_array = jac_array * (theta / y_safe[..., None])
+            
+        else:
+            raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
+                             f"Supported: 'relative', 'semi-relative', 'absolute'") 
+        
+        if norm is not None:
+            return jnp.linalg.norm(sens_array, ord=norm)
+            
+        sens_moved = jnp.moveaxis(sens_array, -1, 0)
+        param_names = self.flat_param_names()
+        
+        return {name: sens_moved[i] for i, name in enumerate(param_names)}
+
+    @eqx.filter_jit
+    def func_samples(
+        self, 
+        func: Callable[['Module'], jnp.ndarray], 
+        args: Any,
+        *,
+        key: jax.Array, 
+        num_samples: int = 1000
+    ) -> jnp.ndarray:
+        """
+        Evaluates an arbitrary function over samples drawn from the 
+        module's distribution.
+
+        Parameters
+        ----------
+        func : Callable[[Module], jnp.ndarray]
+            A function that takes a Module instance and returns a JAX array.
+        args : Any
+            The args to pass to `func`.            
+        key : jax.Array
+            JAX random key for sampling.
+        num_samples : int, default=1000
+            Number of modules to sample from the joint distribution.
+
+        Returns
+        -------
+        jnp.ndarray
+            The function evaluated over all samples. Shape will be 
+            (num_samples, *func_output_shape).
+        """
+        dist = self.flat_distribution()
+        flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
+
+        def evaluate_single(flat_params_array):
+            sampled_module = self.with_params(flat_params_array)
+            return func(sampled_module, args)
+
+        return jax.vmap(evaluate_single)(flat_param_samples)  

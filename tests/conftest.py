@@ -1,5 +1,5 @@
 import pytest
-from tests.dummy_model import MathModel, Affine, Quadratic
+from .dummy_model import MathModel, Affine, Quadratic
 
 @pytest.fixture
 def base_model() -> MathModel:

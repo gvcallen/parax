@@ -9,7 +9,7 @@ def test_with_modules(base_model: MathModel):
     alt_model = MathModel(affine=alt_match, quadratic=alt_res)
     
     combined_model = base_model.with_modules(alt_model)
-    assert jnp.allclose(combined_model.affine.loc.value, 75.0)
+    assert jnp.allclose(combined_model.affine.loc.latent_value, 75.0)
 
 def test_with_fields_and_name(base_model: MathModel):
     """Tests standard dataclass replacement utilities."""
@@ -18,7 +18,7 @@ def test_with_fields_and_name(base_model: MathModel):
     
     alt_match = Affine(loc=99.0)
     replaced_model = base_model.with_fields(affine=alt_match)
-    assert jnp.allclose(replaced_model.affine.loc.value, 99.0)
+    assert jnp.allclose(replaced_model.affine.loc.latent_value, 99.0)
 
 def test_with_submodule_fields(base_model: MathModel):
     """Tests nested field replacement using dot notation."""
@@ -28,7 +28,7 @@ def test_with_submodule_fields(base_model: MathModel):
     # Target 'affine' and swap its 'loc' keyword argument
     updated = base_model.with_submodule_fields('affine', loc=new_param)
     
-    assert jnp.allclose(updated.affine.loc.value, 42.0)
+    assert jnp.allclose(updated.affine.loc.latent_value, 42.0)
 
 def test_submodule_fixing_and_freeing(base_model: MathModel):
     """Tests bulk submodule fixing via direct access."""

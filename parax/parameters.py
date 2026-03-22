@@ -5,8 +5,7 @@ Parameter factories with pre-defined probability distributions.
 from typing import Sequence
 
 import jax.numpy as jnp
-import numpyro.distributions as dist
-from numpyro.distributions import constraints
+import distreqx.distributions as dist
 
 from parax.core.parameter import Parameter
 
@@ -69,7 +68,6 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
     frac_arr = jnp.array(deviation_fraction)
     
     # Calculate the absolute deviation (radius)
-    # delta = 10% of mean
     delta = jnp.abs(mean_arr * frac_arr)
     
     return Uniform(mean_arr - delta, mean_arr + delta, *args, **kwargs)
@@ -161,7 +159,6 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
     frac_arr = jnp.array(std_fraction)
     
     # Calculate absolute standard deviation
-    # sigma = 10% of mean
     sigma = jnp.abs(mean_arr * frac_arr)
     
     return Normal(mean=mean_arr, std=sigma, **kwargs)
@@ -170,9 +167,7 @@ def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` that is marked as fixed.
     
-    This sets the `fixed` flag of the parameter to `True`,
-    and assigned an infinitely wide improper normal distribution
-    if a distribution is not passed.
+    This sets the `fixed` flag of the parameter to `True`.
 
     Parameters
     ----------
@@ -198,11 +193,9 @@ def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
 
 def Free(value, n: int | None = None, **kwargs) -> Parameter:
     r"""
-    Create a `Parameter` that is marked as not free (i.e., free to vary).
+    Create a `Parameter` that is marked as free (i.e., free to vary).
     
-    This sets the `fixed` flag of the parameter to `False`,
-    and assigned an infinitely wide improper normal distribution
-    if a distribution is not passed.
+    This sets the `fixed` flag of the parameter to `False`.
 
     Parameters
     ----------
@@ -224,4 +217,4 @@ def Free(value, n: int | None = None, **kwargs) -> Parameter:
     else:
         value = jnp.array(value)
         
-    return Parameter(value=value, **kwargs)
+    return Parameter(value=value, fixed=False, **kwargs)

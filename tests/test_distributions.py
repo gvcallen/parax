@@ -1,6 +1,6 @@
 import pytest
 import jax.numpy as jnp
-import numpyro.distributions as dist
+from distreqx.distributions import Uniform, Normal
 from tests.dummy_model import MathModel
 
 def test_with_uniform_distributions_mixed_array(base_model: MathModel):
@@ -8,7 +8,7 @@ def test_with_uniform_distributions_mixed_array(base_model: MathModel):
     updated_model = base_model.with_uniform_distributions(percentage=0.1, zero_values='keep')
     
     vector_param = updated_model.vector
-    assert isinstance(vector_param.distribution, dist.Uniform)
+    assert isinstance(vector_param.distribution, Uniform)
     
     # Original vector: [10.0, 0.0, -10.0]
     # Expected low:  [9.0, 0.0, -11.0]
@@ -19,8 +19,8 @@ def test_with_uniform_distributions_mixed_array(base_model: MathModel):
 def test_with_mapped_distributions(base_model: MathModel):
     """Tests custom distribution mapping across the tree."""
     def to_normal(d):
-        return dist.Normal(0.0, 1.0)
+        return Normal(0.0, 1.0)
         
     updated_model = base_model.with_mapped_distributions(to_normal)
     
-    assert isinstance(updated_model.affine.loc.distribution, dist.Normal)
+    assert isinstance(updated_model.affine.loc.distribution, Normal)

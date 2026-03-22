@@ -1,74 +1,100 @@
 import dataclasses
 from dataclasses import dataclass
 
-import jax.numpy as jnp
-import numpyro.distributions as dist
-from numpyro.distributions.distribution import Distribution
-
+from distreqx.distributions import AbstractDistribution
+from distreqx.bijectors import AbstractBijector, Chain
 from parax.core.field import field
-from parax.core.parameter import Parameter
 
 @dataclass
 class ParameterGroup:
-    r"""
-    A metadata class that groups a set of named flat parameters and defines any relationships between them.
+    """
+    A metadata class that groups a set of named flat parameters and defines 
+    any joint relationships, distributions, or transforms between them.
 
     Attributes
     ----------
     param_names : list[str]
         The names of the parameters included in this group.
-    distribution : dist.Distribution or None
-        An optional joint distribution over the flattened parameters.
+    name : str or None, optional
+        An optional identifier for the group itself (e.g., 'covariance_matrix').
+    distribution : distreqx.distributions.AbstractDistribution or None, optional
+        An optional joint distribution over the grouped parameters.
+    bijector : distreqx.bijectors.AbstractBijector or None, optional
+        An optional joint bijector applied to the grouped parameters.
+    info : dict, optional
+        Arbitrary user-defined metadata associated with the group.
     """
     param_names: list[str]
-    distribution: dist.Distribution | None = field(default=None)
     
-    def __init__(self, param_names: list[str], distribution: dist.Distribution | None = None):
-        r"""
-        Construct a :class:`ParameterGroup`.
-
-        Parameters
-        ----------
-        param_names : list[str]
-            The names of the flattened parameters (or a mapping to parameters).
-        dist : numpyro.distributions.Distribution, optional
-            An optional joint distribution over the flattened parameters.
-        """
-        self.param_names = param_names
-        self.distribution = distribution
-        
+    name: str | None = None
+    distribution: AbstractDistribution | None = None
+    bijector: AbstractBijector | None = None
+    info: dict = field(default_factory=dict, static=True)
+    
     @property
-    def num_params(self):
-        r"""
+    def num_params(self) -> int:
+        """
         Number of flattened parameters in the group.
 
         Returns
         -------
         int
-            The count of names in ``parameter_names``.
+            The count of names in `param_names`.
         """
         return len(self.param_names)        
     
-    def with_distribution(self, distribution: Distribution) -> 'Parameter':
-        r"""
-        Return a copy of the parameter group with a new distribution.
+    def with_distribution(self, distribution: AbstractDistribution) -> 'ParameterGroup':
+        """
+        Return a copy of the parameter group with a new joint distribution.
 
         Parameters
         ----------
-        distribution : numpyro.distributions.Distribution
-            The distribution to associate with this parameter.
+        distribution : distreqx.distributions.AbstractDistribution
+            The joint distribution to associate with this parameter group.
 
         Returns
         -------
-        Parameter
-            A copy of this object with ``distribution`` replaced.
+        ParameterGroup
+            A copy of this object with `distribution` replaced.
 
         Raises
         ------
-        Exception
-            If ``dist`` is not a numpyro Distribution.
+        TypeError
+            If `distribution` is not a distreqx AbstractDistribution.
         """
-        if not isinstance(distribution, Distribution):
-            raise Exception('Only numpyro distributions are supported as parameter distributions')
+        if not isinstance(distribution, AbstractDistribution):
+            raise TypeError('Only distreqx distributions are supported as parameter distributions')
         
         return dataclasses.replace(self, distribution=distribution)
+    
+    def transformed(self, bijector: AbstractBijector) -> 'ParameterGroup':
+        """
+        Return a copy of this parameter group transformed by an additional joint bijector.
+
+        Chains the new bijector with any existing group-level bijector.
+
+        Parameters
+        ----------
+        bijector : distreqx.bijectors.AbstractBijector
+            The bijector to apply to the group.
+
+        Returns
+        -------
+        ParameterGroup
+            A dynamically transformed ParameterGroup object.
+            
+        Raises
+        ------
+        TypeError
+            If the provided bijector is not a distreqx AbstractBijector.
+        """
+        if not isinstance(bijector, AbstractBijector):
+            raise TypeError("The provided transformation must be a distreqx AbstractBijector.")
+
+        new_bij = self.bijector
+        if new_bij is not None:
+            new_bij = Chain([bijector, new_bij])
+        else:
+            new_bij = bijector
+            
+        return dataclasses.replace(self, bijector=new_bij)

@@ -1,4 +1,4 @@
-![Parax Logo](https://raw.githubusercontent.com/parax/parax/main/assets/logo.png)
+![Parax Logo](assets/logo.png)
 
 # Parax: Parametric modeling in JAX
 

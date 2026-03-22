@@ -115,6 +115,9 @@ class Parameter(eqx.Module):
             latent_value = jnp.asarray(value)
             if self.metadata is not None and self.metadata.bijector is not None:
                 latent_value = self.metadata.bijector.inverse(latent_value)
+                
+                if jnp.any(jnp.isnan(latent_value)):
+                    raise ValueError(f"Got nan while applying bijector inverse in parameter init. Input value: {value}, bijector: {bijector}")
             
         self.latent_value = latent_value
         self.fixed = fixed
@@ -131,7 +134,7 @@ class Parameter(eqx.Module):
         """
         raw_val = self.latent_value
         if self.bijector is not None:
-            raw_val = self.bijector(raw_val)
+            raw_val = self.bijector.forward(raw_val)
             
         return jnp.asarray(raw_val)
     
@@ -321,7 +324,7 @@ class Parameter(eqx.Module):
         Parameters
         ----------
         bijector : distreqx.bijectors.AbstractBijector
-            The bijector to apply to the parameter's physical space.
+            The bijector to apply to the parameter's unscaled physical space.
 
         Returns
         -------
@@ -342,17 +345,17 @@ class Parameter(eqx.Module):
             new_dist = Transformed(new_dist, bijector)
             
         # 2. Chain the bijectors (applied right-to-left: first old, then new)
-        new_bij = self.bijector
-        if new_bij is not None:
-            new_bij = Chain([bijector, new_bij])
+        old_bij = self.bijector
+        if old_bij is not None:
+            new_bij = Chain([bijector, old_bij])
         else:
             new_bij = bijector
             
         # 3. Transform the bounds
         new_bounds = self.bounds
         if new_bounds is not None:
-            new_bounds = bijector(new_bounds)
-            
+            new_bounds = bijector.forward(new_bounds)
+        
         # 4. Update metadata
         if self.metadata is None:
             new_meta = ParameterMetadata(

@@ -9,11 +9,11 @@ from parax.core import *
 from parax.parameters import Uniform, RelativeUniform, CenteredUniform, Normal, RelativeNormal, Fixed, Free
 
 import parax.core as core
-import parax.transforms as transforms
+import parax.bijectors as bijectors
 
 __all__= [
     "Uniform", "RelativeUniform", "CenteredUniform", "Normal", "RelativeNormal", "Fixed", "Free",
     "core",
-    "transforms",
+    "bijectors",
 ]
 __all__.extend(core.__all__)

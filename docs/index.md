@@ -35,9 +35,20 @@ Further, `Parax` also provides an extended version of Equinox's `Module` in `par
 
 The library is mainly intended for use in domain-specific scientific modeling, but can easily be applied to broader applications.
 
-## Example
+## Example 1: Enforcing positivity
 
-## Example
+The following example creates a `parax.Parameter` that is strictly positive and whose physical value follows a normal distribution.
+
+```python
+import parax as prx
+from parax.bijectors import Exponential
+
+normal_param = prx.Normal(1.0, 0.1, bijector=Exponential())
+print(normal_param.latent_value) # prints 0.0
+print(normal_param.value) # prints 1.0
+```
+
+## Example 2: Optimizing a model
 
 In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and ``optimistix`` to fit the model to some noisy data.
 

@@ -1,9 +1,9 @@
 import pytest
-from tests.dummy_model import CircuitModel, MatchingNetwork, Resonator
+from tests.dummy_model import MathModel, Affine, Quadratic
 
 @pytest.fixture
-def base_model() -> CircuitModel:
+def base_model() -> MathModel:
     """Fixture to provide a fresh model for each test."""
-    match = MatchingNetwork()
-    res = Resonator()
-    return CircuitModel(input_match=match, resonator=res)
+    match = Affine()
+    res = Quadratic()
+    return MathModel(affine=match, quadratic=res)

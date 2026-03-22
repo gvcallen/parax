@@ -1,28 +1,29 @@
 import jax.numpy as jnp
 import numpyro.distributions as dist
-from parax import Module, Parameter, ParameterGroup
+from parax import Module, Parameter, ParameterGroup, Fixed
 
-class MatchingNetwork(Module):
+class Affine(Module):
     """A simple leaf module."""
-    resistance: Parameter = 50.0
-    reactance: Parameter = 0.0
+    loc: Parameter = 50.0
+    scale: Parameter = 0.0
 
-class Resonator(Module):
+class Quadratic(Module):
     """A nested module with its own parameter group."""
-    inductance: Parameter = 1.2
-    capacitance: Parameter = 0.8
+    a: Parameter = 1.2
+    b: Parameter = 0.8
+    c: Parameter = Fixed(0.0)
 
     def __post_init__(self):
         # Assign a dummy joint distribution to test group extraction
         group = ParameterGroup(
-            param_names=['inductance', 'capacitance'], 
+            param_names=['a', 'b'], 
             distribution=dist.Normal(jnp.zeros(2), jnp.ones(2))
         )
-        object.__setattr__(self, '_param_groups', [group])
+        self._param_groups = [group]
 
-class CircuitModel(Module):
+class MathModel(Module):
     """The root model containing submodules and a vectorized parameter."""
-    input_match: MatchingNetwork
-    resonator: Resonator
-    # Vectorized parameter (e.g., gain at different frequency points) to test array logic
-    gain: Parameter = jnp.array([10.0, 0.0, -10.0])
+    affine: Affine
+    quadratic: Quadratic
+    # Vectorized parameter (e.g., vector at different frequency points) to test array logic
+    vector: Parameter = jnp.array([10.0, 0.0, -10.0])

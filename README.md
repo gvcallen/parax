@@ -12,6 +12,14 @@ At its core, the library provides a `Parameter` class which can be set as fixed 
 | **Homepage** | [github.com/parax/parax](https://github.com/parax/parax) |
 | **Docs** | [gvcallen.github.io/parax](https://gvcallen.github.io/parax) |
 
+## Features
+
+- Encapsulated Parameters: Abstract unscaled, unconstrained latent values for optimization while behaving exactly like standard JAX arrays in math operations, complete with fixed/free states, scales, and physical bounds.
+- Distributions & Bijectors: Native distreqx integration allows you to attach probability distributions and invertible transforms (bijectors) to individual parameters or joint ParameterGroups.
+- Auto-Casting Modules: Equinox-powered modules automatically convert raw floats or arrays into full Parameter objects during initialization based purely on your type hints.
+- Hierarchical Manipulation: Easily update, fix, free, or map parameters deep within complex models using simple string paths (e.g., layer.gain) and bulk with_* methods.
+- Optimization & Math Tools: Includes a custom parax.partition function to seamlessly route only the free latent arrays to optimizers, plus built-in methods for Jacobians, parameter sensitivities, and sampling.
+
 ## Installation
 Parax can be installed using pip directly:
 

@@ -2,7 +2,7 @@
 Additional bijectors not present in distreqx.
 """
 import jax.numpy as jnp
-from jaxtyping import PyTree
+from jaxtyping import PyTree, Array
 
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -30,6 +30,59 @@ class Identity(
 
     def same_as(self, other) -> bool:
         return isinstance(other, Identity)
+
+class Inverse(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector, strict=True):
+    """Inverted version of a given bijector.
+    """
+
+    bijector: bij.AbstractBijector
+    _is_constant_jacobian: bool
+    _is_constant_log_det: bool
+
+    def __init__(self, bijectors: bij.AbstractBijector):
+        """Initializes an Inverted bijector.
+
+        **Arguments:**
+
+        - `bijector`: The bijector to invert.
+        """
+        self.bijector = bijectors
+
+        is_constant_jacobian = self.bijector.is_constant_jacobian
+        is_constant_log_det = self.bijector.is_constant_log_det
+        if is_constant_log_det is None:
+            is_constant_log_det = is_constant_jacobian
+        if is_constant_jacobian and not is_constant_log_det:
+            raise ValueError(
+                "The Jacobian is said to be constant, but its "
+                "determinant is said not to be, which is impossible."
+            )
+        self._is_constant_jacobian = is_constant_jacobian
+        self._is_constant_log_det = is_constant_log_det
+
+    def forward(self, x: Array) -> Array:
+        """Computes y = f(x)."""
+        return self.bijector.inverse(x)
+
+    def inverse(self, y: Array) -> Array:
+        """Computes x = f^{-1}(y)."""
+        return self.bijector.forward(y)
+
+    def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        return self.bijector.inverse_and_log_det(x)
+
+    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        return self.bijector.forward_and_log_det(y)
+
+    def same_as(self, other: bij.AbstractBijector) -> bool:
+        """Returns True if this bijector is guaranteed to be the same as `other`."""
+        if type(other) is Inverse:
+            return self.bijector.same_as(other.bijector)
+        else:
+            return self.bijector.same_as(other)
+
 
 class Exponential(
     bij.AbstractFowardInverseBijector,

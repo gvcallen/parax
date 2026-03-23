@@ -243,6 +243,27 @@ class Parameter(eqx.Module):
         """
         return self.latent_value.size
     
+    def with_name(self, name: str) -> 'Parameter':
+        """
+        Return a copy of the parameter with a new physical name.
+
+        Parameters
+        ----------
+        name : str
+            The new name.
+
+        Returns
+        -------
+        Parameter
+            A copy of this object with `name` updated.
+        """
+        if self.metadata is None:
+            new_meta = ParameterMetadata(name=name)
+        else:
+            new_meta = dataclasses.replace(self.metadata, name=name)
+            
+        return dataclasses.replace(self, metadata=new_meta)
+    
     def with_value(self, value: jnp.ndarray) -> 'Parameter':
         """
         Return a copy of the parameter with a new physical value.
@@ -579,12 +600,15 @@ class Parameter(eqx.Module):
         str
             A JSON-formatted string containing the parameter's data.
         """
-        unscaled_physical = self.value
         d = {
-            "value": unscaled_physical.tolist(),
             "fixed": self.fixed,
             "scale": self.scale
         }
+        
+        if self.latent_value is not None:
+            d["value"] = self.value.tolist()
+        else:
+            d["value"] = None
         
         if self.distribution is not None:
             d["distribution"] = serialize_distribution(self.distribution)
@@ -620,7 +644,7 @@ class Parameter(eqx.Module):
         """
         d = json.loads(s)
         
-        value = d.pop("value")
+        value = d.pop("value", None)
         fixed = d.pop("fixed", False)
         
         if "distribution" in d:

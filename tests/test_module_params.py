@@ -58,3 +58,22 @@ def test_fixed_and_free_params(base_model: MathModel):
     all_free = all_fixed.with_all_params_free()
     assert all_free.affine.loc.fixed is False
     assert all_free.quadratic.a.fixed is False
+
+def test_with_free_params_only_prefixes(base_model: MathModel):
+    """Tests freeing parameters by prefix while fixing all others."""
+    # Free ONLY parameters under the 'affine' prefix. 
+    # This should keep affine parameters free, but fix quadratic and vector parameters.
+    prefix_freed_model = base_model.with_free_params_only(
+        ['affine'], 
+        prefixes=True
+    )
+    
+    # Check that parameters matching the 'affine' prefix are free
+    assert prefix_freed_model.affine.loc.fixed is False
+    assert prefix_freed_model.affine.scale.fixed is False
+    
+    # Check that all other parameters were successfully fixed
+    assert prefix_freed_model.quadratic.a.fixed is True
+    assert prefix_freed_model.quadratic.b.fixed is True
+    assert prefix_freed_model.quadratic.c.fixed is True
+    assert prefix_freed_model.vector.fixed is True

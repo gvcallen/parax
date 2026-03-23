@@ -2,7 +2,7 @@
 
 # Parax: Parametric modeling in JAX
 
-**Parax**, is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
 At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata.
 

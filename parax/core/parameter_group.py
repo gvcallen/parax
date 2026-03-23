@@ -21,6 +21,7 @@ class ParameterGroup:
         An optional joint distribution over the grouped parameters.
     bijector : AbstractBijector or None, optional
         An optional joint bijector applied to the grouped parameters.
+        This is provided for future compatibility and is not yet used.
     info : dict
         Arbitrary user-defined metadata associated with the group. Marked as static.
     """

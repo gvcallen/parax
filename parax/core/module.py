@@ -92,9 +92,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
     This class extends an Equinox ``Module`` with additional helpful features and methods.
     
-    One feature includes the ability to inspect and modify parameters use strings based
+    One feature includes the ability to inspect and modify parameters using strings based
     on their module path. This is helpful for modifying deep, hierachical modules
-    using a single identifier.
+    using unique identifiers.
     
     Another feature is the fact that attributes marked with the `Parameter` type
     are automatically given parameter-converters. This ensures that they remain parameters after construction
@@ -816,13 +816,15 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     if updates_found:
                         new_val_flat = jnp.array(new_sub_values)
                         new_val_shaped = new_val_flat.reshape(parent_param.latent_value.shape)
-                        params[parent_name] = dataclasses.replace(parent_param, value=new_val_shaped)            
-    
+                        
+                        # UPDATED: Use .with_value() instead of dataclasses.replace
+                        params[parent_name] = parent_param.with_value(new_val_shaped)            
+        
         unknown_params = set(params.keys() - new_params.keys())
         if check_unknown and len(unknown_params) != 0:
             raise Exception(f"Error: the following parameters were passed but are not in the module: {unknown_params}")
         params = {k: v for k, v in params.items() if k not in unknown_params}
-    
+        
         if check_missing or fix_others:
             missing_params = set(new_params.keys() - params.keys())
             if check_missing and len(missing_params) != 0:
@@ -835,7 +837,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if isinstance(value, Parameter):
                 new_params[name] = value
             else:
-                new_params[name] = dataclasses.replace(new_params[name], value=jnp.asarray(value))
+                # UPDATED: Route primitive/array updates through .with_value()
+                new_params[name] = new_params[name].with_value(jnp.asarray(value))
                 
         # Fast tree mapping bypasses string iteration logic completely
         def map_fn(path, node):

@@ -9,7 +9,7 @@ import distreqx.distributions as dist
 
 from parax.core.parameter import Parameter
 
-def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, *, n: int | None = None, **kwargs) -> Parameter:
+def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
 
@@ -21,8 +21,6 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
         The upper value of the distribution. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the midpoint of the distribution is used. Defaults to None.
-    n : int, optional
-        The number of identical parameters to create in an array. Defaults to None.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -31,15 +29,7 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     Parameter
         The created Parameter object.
     """
-    if n is not None:
-        shape = (n,) if isinstance(n, int) else n
-        low = jnp.broadcast_to(jnp.array(low), shape)
-        high = jnp.broadcast_to(jnp.array(high), shape)
-        if value is not None:
-            value = jnp.broadcast_to(jnp.array(value), shape)
-    else:
-        low, high = jnp.array(low), jnp.array(high)
-    
+    low, high = jnp.array(low), jnp.array(high)
     dists = dist.Uniform(low, high)
     values = (low + high) / 2.0 if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
@@ -95,7 +85,7 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
     
     return Uniform(low, high, *args, **kwargs)
 
-def Normal(mean: float | Sequence[float], std: float | Sequence[float], n: int | None = None, value=None, **kwargs) -> Parameter:
+def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a normal (Gaussian) distribution.
 
@@ -105,8 +95,6 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], n: int |
         The mean of the distribution. Can be a sequence for a multi-valued Parameter.
     std : float | Sequence[float]
         The standard deviation of the distribution. Can be a sequence for a multi-valued Parameter.
-    n : int, optional
-        The number of identical parameters to create in an array. Defaults to None.
     value : optional
         The initial value. If None, the mean of the distribution is used. Defaults to None.
     **kwargs
@@ -117,15 +105,7 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], n: int |
     Parameter
         The created Parameter object.
     """
-    if n is not None:
-        shape = (n,) if isinstance(n, int) else n
-        mean = jnp.broadcast_to(jnp.array(mean), shape)
-        std = jnp.broadcast_to(jnp.array(std), shape)
-        if value is not None:
-            value = jnp.broadcast_to(jnp.array(value), shape)
-    else:
-        mean, std = jnp.array(mean), jnp.array(std)
-    
+    mean, std = jnp.array(mean), jnp.array(std)
     dists = dist.Normal(mean, std)
     values = mean if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
@@ -159,7 +139,7 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
     
     return Normal(mean=mean_arr, std=sigma, **kwargs)
 
-def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
+def Fixed(value, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` that is marked as fixed.
     
@@ -169,8 +149,6 @@ def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
     ----------
     value
         The value of the parameter.
-    n : int, optional
-        The number of identical parameters to create in an array. Defaults to None.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -179,15 +157,10 @@ def Fixed(value, n: int | None = None, **kwargs) -> Parameter:
     Parameter
         The created fixed Parameter object.
     """
-    if n is not None:
-        shape = (n,) if isinstance(n, int) else n
-        value = jnp.broadcast_to(jnp.array(value), shape)
-    else:
-        value = jnp.array(value)
-        
+    value = jnp.array(value)
     return Parameter(value=value, fixed=True, **kwargs)
 
-def Free(value, n: int | None = None, **kwargs) -> Parameter:
+def Free(value, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` that is marked as free (i.e., free to vary).
     
@@ -207,10 +180,5 @@ def Free(value, n: int | None = None, **kwargs) -> Parameter:
     Parameter
         The created free Parameter object.
     """
-    if n is not None:
-        shape = (n,) if isinstance(n, int) else n
-        value = jnp.broadcast_to(jnp.array(value), shape)
-    else:
-        value = jnp.array(value)
-        
+    value = jnp.array(value)
     return Parameter(value=value, fixed=False, **kwargs)

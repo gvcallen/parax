@@ -8,7 +8,7 @@ def test_with_modules(base_model: MathModel):
     alt_res = Quadratic()
     alt_model = MathModel(affine=alt_match, quadratic=alt_res)
     
-    combined_model = base_model.with_modules(alt_model)
+    combined_model = base_model.merged(alt_model)
     assert jnp.allclose(combined_model.affine.loc.latent_value, 75.0)
 
 def test_with_fields_and_name(base_model: MathModel):

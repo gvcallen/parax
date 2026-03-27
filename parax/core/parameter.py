@@ -52,6 +52,7 @@ class Parameter(eqx.Module):
         value: Any | None = None, 
         fixed: bool = False, 
         metadata: ParameterMetadata | None = None, 
+        n: int | None = None,
         **kwargs
     ):
         """
@@ -59,18 +60,39 @@ class Parameter(eqx.Module):
         hidden `ParameterMetadata` struct. If a bijector is provided, the input 
         `value` is assumed to be in the physical (constrained) space and is 
         automatically inverted to store the latent (unconstrained) value.
+        
+        The parameter `n` allows for vectorizing the input value and metadata 
+        across `n` dimensions.
         """
         latent_value = kwargs.pop('latent_value', None)
         
         if latent_value is None and value is None:
             raise Exception("Must pass one of either `latent_value` or `value` to Parameter constructor")
         
-        # 1. Extract known metadata keys from kwargs to differentiate them from arbitrary 'info'
+        # 1. Handle Vectorization (n)
+        if n is not None:
+            if value is not None:
+                value = jnp.broadcast_to(jnp.asarray(value), (n,) + jnp.shape(value))
+            if latent_value is not None:
+                latent_value = jnp.broadcast_to(jnp.asarray(latent_value), (n,) + jnp.shape(latent_value))
+
+        # 2. Extract known metadata keys
         updates = {}
         for key in ["name", "distribution", "bijector", "bounds", "scale"]:
             if key in kwargs:
                 updates[key] = kwargs.pop(key)
                 
+        # Handle vectorization for specific metadata fields
+        if n is not None and n != 1:
+            # Vectorize bounds: if shape is (2,), it becomes (n, 2)
+            if "bounds" in updates and updates["bounds"] is not None:
+                b = jnp.asarray(updates["bounds"])
+                updates["bounds"] = jnp.broadcast_to(b, (n,) + b.shape)
+            
+            # Vectorize name: if a string is passed, turn into a list of n strings
+            if "name" in updates and isinstance(updates["name"], str):
+                updates["name"] = [f"{updates['name']}_{i}" for i in range(n)]
+
         # Format specific fields
         if "name" in updates and isinstance(updates["name"], tuple):
             updates["name"] = list(updates["name"])
@@ -81,11 +103,9 @@ class Parameter(eqx.Module):
         # Any remaining kwargs belong in the custom 'info' dict
         info_updates = kwargs if len(kwargs) > 0 else {}
 
-        # 2. Reconcile metadata
+        # 3. Reconcile metadata
         if metadata is not None:
-            # We are modifying an existing metadata object (e.g., via dataclasses.replace)
             if updates or info_updates:
-                # Merge old info dict with new info overrides
                 new_info = dict(metadata.info) if metadata.info is not None else {}
                 new_info.update(info_updates)
                 
@@ -97,7 +117,6 @@ class Parameter(eqx.Module):
             else:
                 self.metadata = metadata
         else:
-            # We are creating a new metadata object from scratch
             name = updates.get("name", None)
             distribution = updates.get("distribution", None)
             bijector = updates.get("bijector", None)
@@ -117,14 +136,15 @@ class Parameter(eqx.Module):
                     info=info_updates if info_updates else None
                 )
                 
-        # 3. Handle latent value extraction/inversion
+        # 4. Handle latent value extraction/inversion
         if latent_value is None:
             latent_value = jnp.asarray(value)
             if self.metadata is not None and self.metadata.bijector is not None:
+                # The bijector in distreqx handles vectorized inputs automatically
                 latent_value = self.metadata.bijector.inverse(latent_value)
                 
                 if jnp.any(jnp.isnan(latent_value)):
-                    raise ValueError(f"Got nan while applying bijector inverse in parameter init. Input value: {value}, bijector: {self.metadata.bijector}")
+                    raise ValueError(f"Got nan while applying bijector inverse in parameter init.")
             
         self.latent_value = latent_value
         self.fixed = fixed

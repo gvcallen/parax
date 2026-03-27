@@ -11,6 +11,7 @@ from typing import Callable, Sequence, Iterator, Self, ClassVar, Any
 import dataclasses
 from dataclasses import fields, is_dataclass
 from typing_extensions import dataclass_transform
+import operator
 
 import jax
 import jax.numpy as jnp
@@ -489,6 +490,31 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         dist = self.flat_distribution()
         flat_param_samples = dist.sample(key, sample_shape=(1,))[0]
         return self.with_params(flat_param_samples)
+    
+    def merged(self: Self, modules: Self | Sequence[Self]) -> Self:
+        """Merge this module with free parameters and parameter groups
+        in other modules.
+        
+        This is useful to combine separate modules obtained from fitting
+        the same initial module with different free parameters.
+
+        Parameters
+        ----------
+        modules : Module or Sequence[Module]
+            The other modules to combine this module with.
+
+        Returns
+        -------
+        Module
+        """  
+        if not isinstance(modules, Sequence):
+            modules = [modules]
+
+        combined = self
+        for other in modules:
+            combined = combined.with_params(other.named_params())
+            combined = combined.with_param_groups(other.param_groups(explicit_only=True))
+        return combined    
         
     # ---- Parameter inspection -------------------------------------------------- 
     
@@ -861,6 +887,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         map_others: Callable[[Parameter], Parameter] | None = None,
         prefixes: bool = False,
         include_fixed: bool = False,
+        ignore_unknown: bool = False,
     ) -> Self:
         """Return a module with specified parameters mapped.
 
@@ -902,7 +929,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if param_filter and isinstance(param_filter[0], str) and prefixes:
                 for prefix in param_filter:
                     if not any(name.startswith(prefix) for name in current_param_names):
-                        raise ValueError(f"Specified prefix '{prefix}' does not match any parameters in the module")
+                        if not ignore_unknown:
+                            raise ValueError(f"Specified prefix '{prefix}' does not match any parameters in the module")
                 valid_prefixes = tuple(param_filter)
                 resolved_filter = {p for p in current_param_names if p.startswith(valid_prefixes)}
                 
@@ -1348,31 +1376,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 merged_kwargs = {**self.p.keywords, **new_kwargs} if self.p.keywords else new_kwargs
                 return DefaultsWrapper(partial(self.p.func, *merged_args, **merged_kwargs))
                 
-        return DefaultsWrapper(partial(cls, *args, **kwargs))
-    
-    def with_modules(self: Self, modules: Self | Sequence[Self]) -> Self:
-        """Combines this module with free parameters in other modules.
-        
-        This is useful to combine separate modules obtained from fitting
-        the same initial module with different free parameters.
-
-        Parameters
-        ----------
-        modules : Module or Sequence[Module]
-            The other modules to combine this module with.
-
-        Returns
-        -------
-        Module
-        """  
-        if not isinstance(modules, Sequence):
-            modules = [modules]
-
-        combined = self
-        for other in modules:
-            combined = combined.with_params(other.named_params())
-            combined = combined.with_param_groups(other.param_groups(explicit_only=True))
-        return combined
+        return DefaultsWrapper(partial(cls, *args, **kwargs))    
     
     def with_fields(self: Self, *args, **kwargs) -> Self:
         """
@@ -1388,6 +1392,143 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 object.__setattr__(new_module, f.name, deepcopy(val))
                 
         return new_module
+    
+    def with_attrs(self: Self, *args: Any, **kwargs: Any) -> Self:
+        """
+        Return a copy of the module with one or more attributes replaced.
+
+        This is similar to `eqx.tree_at` but uses string paths.
+
+        Usage
+        -----
+        # 1. Single attribute update (path, value)
+        model.with_attrs('a.b.c', 10)
+
+        # 2. Batch nested updates via dictionary
+        model.with_attrs({'a.b.c': 10, 'x.y.z': 20})
+        
+        # 3. Top-level attributes via keyword arguments
+        model.with_attrs(name="new_model", _transparent=True)
+        
+        # 4. Combined dict and kwargs
+        model.with_attrs({'a.b.c': 10}, name="new_model")
+        """
+        all_updates = {}
+
+        # Parse positional arguments
+        if len(args) == 2 and isinstance(args[0], str):
+            all_updates[args[0]] = args[1]
+        elif len(args) == 1 and isinstance(args[0], dict):
+            all_updates.update(args[0])
+        elif len(args) > 0:
+            raise ValueError(
+                "Invalid positional arguments. Please provide either a single "
+                "(path, value) pair or a dictionary of updates."
+            )
+
+        # Add any top-level kwargs
+        all_updates.update(kwargs)
+
+        # Fast exit if nothing to update
+        if not all_updates:
+            return self
+
+        # Extract paths and their corresponding values in a consistent order
+        paths = tuple(all_updates.keys())
+        values = tuple(all_updates.values())
+        
+        # CORRECTED: A single callable that returns a tuple of nodes
+        def where_fn(tree):
+            return tuple(operator.attrgetter(p)(tree) for p in paths)
+        
+        return eqx.tree_at(where_fn, self, values)
+    
+    def with_submodules(self: Self, *args: Any, **kwargs: Any) -> Self:
+        """
+        Return a copy of the module with one or more submodules replaced.
+
+        This method accepts paths formatted in the exact same way as parameter names 
+        (e.g. 'submodule1_submodule2_submodule3'), respecting transparency and custom names.
+
+        Usage
+        -----
+        # Single replacement
+        model.with_submodules('layer1_attention', new_attention_module)
+
+        # Batch replacement
+        model.with_submodules({
+            'layer1_attention': new_attn_1,
+            'layer2_attention': new_attn_2
+        })
+        """
+        all_updates = {}
+
+        # Parse positional arguments
+        if len(args) == 2 and isinstance(args[0], str):
+            all_updates[args[0]] = args[1]
+        elif len(args) == 1 and isinstance(args[0], dict):
+            all_updates.update(args[0])
+        elif len(args) > 0:
+            raise ValueError(
+                "Invalid positional arguments. Please provide either a single "
+                "(path, value) pair or a dictionary of updates."
+            )
+
+        # Add any top-level kwargs
+        all_updates.update(kwargs)
+
+        if not all_updates:
+            return self
+
+        # 1. Gather all submodules and map their string paths to absolute JAX paths
+        name_to_jax_path = {}
+        
+        def traverse(node, current_path):
+            # Flatten exactly one module-level deep to get paths to immediate submodules
+            leaves, _ = jax.tree_util.tree_flatten_with_path(
+                node, 
+                is_leaf=lambda x: isinstance(x, Module) and x is not node
+            )
+            for sub_path, leaf in leaves:
+                if isinstance(leaf, Module):
+                    full_path = current_path + sub_path
+                    # Map the absolute JAX path to your custom string format
+                    str_name = self.path_to_param_name(full_path)
+                    name_to_jax_path[str_name] = full_path
+                    # Recurse into the nested module
+                    traverse(leaf, full_path)
+                    
+        traverse(self, ())
+
+        # 2. Match requested updates to JAX paths
+        paths_to_update = []
+        values_to_update = []
+        
+        for str_name, new_module in all_updates.items():
+            if str_name not in name_to_jax_path:
+                raise ValueError(f"Submodule path '{str_name}' not found in module.")
+            paths_to_update.append(name_to_jax_path[str_name])
+            values_to_update.append(new_module)
+
+        # 3. Create an extractor callable for eqx.tree_at using the JAX paths
+        def where_fn(tree):
+            extracted = []
+            for jax_path in paths_to_update:
+                node = tree
+                for key in jax_path:
+                    if isinstance(key, GetAttrKey):
+                        node = getattr(node, key.name)
+                    elif isinstance(key, DictKey):
+                        node = node[key.key]
+                    elif isinstance(key, (SequenceKey, FlattenedIndexKey)):
+                        # Compatibility for different JAX versions
+                        idx = getattr(key, 'idx', getattr(key, 'key', None))
+                        node = node[idx]
+                extracted.append(node)
+            return tuple(extracted)
+            
+        # Execute the atomic replacement
+        return eqx.tree_at(where_fn, self, tuple(values_to_update))    
     
     def with_name(self: Self, name: str | None) -> Self:
         """

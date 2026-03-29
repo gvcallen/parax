@@ -15,9 +15,9 @@ from parax.utils import (
     serialize_distribution, 
     deserialize_distribution, 
     format_distribution,
-    serialize_bijector,
-    deserialize_bijector,
-    format_bijector,
+    serialize_transform,
+    deserialize_transform,
+    format_transform,
 )
 
 
@@ -36,7 +36,7 @@ class Parameter(eqx.Module):
     * Use in mathematical operations just like a JAX/numpy array.
     * `Parameter` objects are JAX PyTrees, compatible with JAX transformations (jit, grad).
     * Mark as `fixed` (honored by `parax.partition`).
-    * Associate distributions and bijectors using `distreqx`.
+    * Associate distributions and transforms/bijectors using `distreqx`.
     """
     #: The underlying unscaled, untransformed, latent value.
     latent_value: jnp.ndarray
@@ -57,7 +57,7 @@ class Parameter(eqx.Module):
     ):
         """
         During initialization, core metadata and arbitrary kwargs are automatically routed into the 
-        hidden `ParameterMetadata` struct. If a bijector is provided, the input 
+        hidden `ParameterMetadata` struct. If a transform/bijector is provided, the input 
         `value` is assumed to be in the physical (constrained) space and is 
         automatically inverted to store the latent (unconstrained) value.
         
@@ -78,7 +78,7 @@ class Parameter(eqx.Module):
 
         # 2. Extract known metadata keys
         updates = {}
-        for key in ["name", "distribution", "bijector", "bounds", "scale"]:
+        for key in ["name", "distribution", "transform", "bounds", "scale"]:
             if key in kwargs:
                 updates[key] = kwargs.pop(key)
                 
@@ -119,18 +119,18 @@ class Parameter(eqx.Module):
         else:
             name = updates.get("name", None)
             distribution = updates.get("distribution", None)
-            bijector = updates.get("bijector", None)
+            transform = updates.get("transform", None)
             bounds = updates.get("bounds", None)
             scale = updates.get("scale", 1.0)
             
-            if (distribution is None and bijector is None and bounds is None and 
+            if (distribution is None and transform is None and bounds is None and 
                 scale == 1.0 and name is None and not info_updates):
                 self.metadata = None
             else:
                 self.metadata = ParameterMetadata(
                     name=name,
                     distribution=distribution,
-                    bijector=bijector,
+                    transform=transform,
                     bounds=bounds,
                     scale=scale,
                     info=info_updates if info_updates else None
@@ -139,9 +139,9 @@ class Parameter(eqx.Module):
         # 4. Handle latent value extraction/inversion
         if latent_value is None:
             latent_value = jnp.asarray(value)
-            if self.metadata is not None and self.metadata.bijector is not None:
+            if self.metadata is not None and self.metadata.transform is not None:
                 # The bijector in distreqx handles vectorized inputs automatically
-                latent_value = self.metadata.bijector.inverse(latent_value)
+                latent_value = self.metadata.transform.inverse(latent_value)
                 
                 if jnp.any(jnp.isnan(latent_value)):
                     raise ValueError(f"Got nan while applying bijector inverse in parameter init.")
@@ -157,11 +157,11 @@ class Parameter(eqx.Module):
         Returns
         -------
         jnp.ndarray
-            The parameter value mapped through the bijector (if any), but unscaled.
+            The parameter value mapped through the transform (if any), but unscaled.
         """
         raw_val = self.latent_value
-        if self.bijector is not None:
-            raw_val = self.bijector.forward(raw_val)
+        if self.transform is not None:
+            raw_val = self.transform.forward(raw_val)
             
         return jnp.asarray(raw_val)
     
@@ -190,16 +190,16 @@ class Parameter(eqx.Module):
         return self.metadata.distribution if self.metadata is not None else None
 
     @property
-    def bijector(self) -> AbstractBijector | None:
+    def transform(self) -> AbstractBijector | None:
         """
-        Get the parameter bijector.
+        Get the parameter transform.
 
         Returns
         -------
         AbstractBijector or None
             The bijector used to map between latent and physical space.
         """
-        return self.metadata.bijector if self.metadata is not None else None
+        return self.metadata.transform if self.metadata is not None else None
 
     @property
     def bounds(self) -> jnp.ndarray | None:
@@ -292,7 +292,7 @@ class Parameter(eqx.Module):
         ----------
         value : jnp.ndarray
             The new unscaled physical value to set. It will be mapped through 
-            the bijector inverse if one exists.
+            the transform inverse if one exists.
 
         Returns
         -------
@@ -300,8 +300,8 @@ class Parameter(eqx.Module):
             A copy of this object with `value` updated.
         """
         latent_value = jnp.asarray(value)
-        if self.metadata is not None and self.metadata.bijector is not None:
-            latent_value = self.metadata.bijector.inverse(latent_value)        
+        if self.metadata is not None and self.metadata.transform is not None:
+            latent_value = self.metadata.transform.inverse(latent_value)        
         return dataclasses.replace(self, latent_value=latent_value)
     
     def with_distribution(self, distribution: AbstractDistribution) -> 'Parameter':
@@ -333,48 +333,48 @@ class Parameter(eqx.Module):
             
         return dataclasses.replace(self, metadata=new_meta)
     
-    def with_bijector(self, bijector: AbstractBijector) -> 'Parameter':
+    def with_transform(self, transform: AbstractBijector) -> 'Parameter':
         """
-        Return a copy of the parameter with a new bijector.
+        Return a copy of the parameter with a new transform.
 
         Parameters
         ----------
-        bijector : distreqx.bijectors.AbstractBijector
-            The bijector to associate with this parameter.
+        transform : distreqx.bijectors.AbstractBijector
+            The transform to associate with this parameter.
 
         Returns
         -------
         Parameter
-            A copy of this object with the `bijector` replaced.
+            A copy of this object with the `transform` replaced.
 
         Raises
         ------
         Exception
             If `distribution` is not a distreqx AbstractDistribution.
         """
-        if not isinstance(bijector, AbstractBijector):
-            raise Exception('Only distreqx bijectors are supported as parameter bijectors')
+        if not isinstance(transform, AbstractBijector):
+            raise Exception('Only distreqx bijectors are supported as parameter transforms')
         
         if self.metadata is None:
-            new_meta = ParameterMetadata(bijector=bijector)
+            new_meta = ParameterMetadata(transform=transform)
         else:
-            new_meta = dataclasses.replace(self.metadata, bijector=bijector)
+            new_meta = dataclasses.replace(self.metadata, transform=transform)
             
         return dataclasses.replace(self, metadata=new_meta)    
     
-    def transformed(self, bijector: AbstractBijector) -> 'Parameter':
+    def transformed(self, transform: AbstractBijector) -> 'Parameter':
         """
-        Return a copy of this parameter transformed by a bijector.
+        Return a copy of this parameter transformed.
 
-        This method applies the given bijector to the parameter's physical space. 
-        It holistically updates the parameter by chaining the new bijector with 
+        This method applies the given transform to the parameter's physical space. 
+        It holistically updates the parameter by chaining the new transform with 
         any existing one, transforming the probability distribution, and mapping 
         the bounds. The underlying latent unconstrained value remains unchanged.
 
         Parameters
         ----------
-        bijector : distreqx.bijectors.AbstractBijector
-            The bijector to apply to the parameter's unscaled physical space.
+        transform : distreqx.bijectors.AbstractBijector
+            The transform to apply to the parameter's unscaled physical space.
 
         Returns
         -------
@@ -384,9 +384,9 @@ class Parameter(eqx.Module):
         Raises
         ------
         TypeError
-            If the provided bijector is not an instance of AbstractBijector.
+            If the provided transform is not an instance of AbstractBijector.
         """
-        if not isinstance(bijector, AbstractBijector):
+        if not isinstance(transform, AbstractBijector):
             raise TypeError("The provided transformation must be a distreqx AbstractBijector.")
         if self.latent_value is None:
             raise Exception("Cannot transform a parameter with a None latent value")
@@ -394,36 +394,36 @@ class Parameter(eqx.Module):
         # 1. Transform the distribution
         new_dist = self.distribution
         if new_dist is not None:
-            new_dist = Transformed(new_dist, bijector)
+            new_dist = Transformed(new_dist, transform)
             
-        # 2. Chain the bijectors (applied right-to-left: first old, then new)
-        old_bij = self.bijector
-        if old_bij is not None:
-            new_bij = Chain([bijector, old_bij])
+        # 2. Chain the transforms (applied right-to-left: first old, then new)
+        old_transform = self.transform
+        if old_transform is not None:
+            new_transform = Chain([transform, old_transform])
         else:
-            new_bij = bijector
+            new_transform = transform
             
         # 3. Transform the bounds
         new_bounds = self.bounds
         if new_bounds is not None:
-            new_bounds = bijector.forward(new_bounds)
+            new_bounds = transform.forward(new_bounds)
         
         # 4. Update metadata
         if self.metadata is None:
             new_meta = ParameterMetadata(
                 distribution=new_dist,
-                bijector=new_bij,
+                transform=new_transform,
                 bounds=new_bounds
             )
         else:
             new_meta = dataclasses.replace(
                 self.metadata, 
                 distribution=new_dist,
-                bijector=new_bij,
+                transform=new_transform,
                 bounds=new_bounds
             )
             
-        # The latent value remains unchanged; the chained bijector handles the new physical mapping.
+        # The latent value remains unchanged; the chained transform handles the new physical mapping.
         return dataclasses.replace(self, metadata=new_meta)
     
     def flattened(self, separator='_') -> 'list[Parameter]':
@@ -473,7 +473,7 @@ class Parameter(eqx.Module):
                 value=val, 
                 fixed=self.fixed, 
                 distribution=p, 
-                bijector=self.bijector,
+                transform=self.transform,
                 bounds=self.bounds,
                 scale=self.scale, 
                 name=n,
@@ -551,8 +551,8 @@ class Parameter(eqx.Module):
         if self.distribution is not None:
             args.append(f"distribution={format_distribution(self.distribution)}")
             
-        if self.bijector is not None:
-            args.append(f"bijector={format_bijector(self.bijector)}")
+        if self.transform is not None:
+            args.append(f"transform={format_transform(self.transform)}")
             
         if self.bounds is not None:
             args.append(f"bounds={format_val(self.bounds)}")
@@ -633,8 +633,8 @@ class Parameter(eqx.Module):
         if self.distribution is not None:
             d["distribution"] = serialize_distribution(self.distribution)
             
-        if self.bijector is not None:
-            d["bijector"] = serialize_bijector(self.bijector)
+        if self.transform is not None:
+            d["transform"] = serialize_transform(self.transform)
             
         if self.bounds is not None:
             d["bounds"] = self.bounds.tolist()
@@ -670,8 +670,8 @@ class Parameter(eqx.Module):
         if "distribution" in d:
             d["distribution"] = deserialize_distribution(d["distribution"])
             
-        if "bijector" in d:
-            d["bijector"] = deserialize_bijector(d["bijector"])
+        if "transform" in d:
+            d["transform"] = deserialize_transform(d["transform"])
             
         info_dict = d.pop("info", {})
         d.update(info_dict)

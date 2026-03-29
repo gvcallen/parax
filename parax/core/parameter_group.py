@@ -19,8 +19,8 @@ class ParameterGroup:
         An optional identifier for the group itself (e.g., 'covariance_matrix').
     distribution : AbstractDistribution or None, optional
         An optional joint distribution over the grouped parameters.
-    bijector : AbstractBijector or None, optional
-        An optional joint bijector applied to the grouped parameters.
+    transform : AbstractBijector or None, optional
+        An optional joint transform applied to the grouped parameters.
         This is provided for future compatibility and is not yet used.
     info : dict
         Arbitrary user-defined metadata associated with the group. Marked as static.
@@ -28,7 +28,7 @@ class ParameterGroup:
     param_names: list[str]
     name: str | None = None
     distribution: AbstractDistribution | None = None
-    bijector: AbstractBijector | None = None
+    transform: AbstractBijector | None = None
     info: dict = field(default_factory=dict, static=True)
     
     @property
@@ -67,7 +67,7 @@ class ParameterGroup:
         
         return dataclasses.replace(self, distribution=distribution)
     
-    def transformed(self, bijector: AbstractBijector) -> 'ParameterGroup':
+    def transformed(self, transform: AbstractBijector) -> 'ParameterGroup':
         """
         Return a copy of this parameter group transformed by an additional joint bijector.
 
@@ -76,8 +76,8 @@ class ParameterGroup:
 
         Parameters
         ----------
-        bijector : distreqx.bijectors.AbstractBijector
-            The bijector to apply to the group.
+        transform : distreqx.bijectors.AbstractBijector
+            The transform to apply to the group.
 
         Returns
         -------
@@ -89,13 +89,13 @@ class ParameterGroup:
         TypeError
             If the provided bijector is not a distreqx AbstractBijector.
         """
-        if not isinstance(bijector, AbstractBijector):
+        if not isinstance(transform, AbstractBijector):
             raise TypeError("The provided transformation must be a distreqx AbstractBijector.")
 
-        new_bij = self.bijector
-        if new_bij is not None:
-            new_bij = Chain([bijector, new_bij])
+        new_transform = self.transform
+        if new_transform is not None:
+            new_transform = Chain([transform, new_transform])
         else:
-            new_bij = bijector
+            new_transform = transform
             
-        return dataclasses.replace(self, bijector=new_bij)
+        return dataclasses.replace(self, bijector=new_transform)

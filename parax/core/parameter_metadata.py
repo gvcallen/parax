@@ -18,11 +18,11 @@ class ParameterMetadata(eqx.Module):
     name : str, list, or None
         The identifier(s) for the parameter. Must either be a single string
         or a list matching the shape of the underlying array.
-    bijector : distreqx.bijectors.AbstractBijector or None
-        The bijector used to map from the latent space to the unscaled physical space.
     distribution : distreqx.distributions.AbstractDistribution or None
         The probability distribution associated with the parameter
         in unscaled physical space.
+    transform : distreqx.bijectors.AbstractBijector or None
+        The transform used to map from the latent space to the unscaled physical space.
     bounds : jnp.ndarray or None
         The boundaries of the parameter in unscaled physical space.
         Can be used as hard constraints for bounded optimizers.
@@ -35,8 +35,8 @@ class ParameterMetadata(eqx.Module):
     """
     name: str | list | None = field(default=None, static=True)
     
-    bijector: AbstractBijector | None = field(default=None)
     distribution: AbstractDistribution | None = field(default=None)
+    transform: AbstractBijector | None = field(default=None)
     bounds: jnp.ndarray | None = field(default=None)
     scale: float = field(default=1.0)
     

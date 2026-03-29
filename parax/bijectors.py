@@ -33,31 +33,26 @@ class Identity(
         return isinstance(other, Identity)
 
 class Invert(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector, strict=True):
-    """Inverted version of a given bijector.
-    """
+    """Inverted version of a given bijector."""
 
     bijector: bij.AbstractBijector
-    _is_constant_jacobian: bool
-    _is_constant_log_det: bool
+    # We set default values so Equinox doesn't demand them as init arguments
+    _is_constant_jacobian: bool = False 
+    _is_constant_log_det: bool = False
 
-    def __init__(self, bijectors: bij.AbstractBijector):
-        """Initializes an Inverted bijector.
-
-        **Arguments:**
-
-        - `bijector`: The bijector to invert.
-        """
-        self.bijector = bijectors
-
-        is_constant_jacobian = self.bijector.is_constant_jacobian
-        is_constant_log_det = self.bijector.is_constant_log_det
-        if is_constant_log_det is None:
-            is_constant_log_det = is_constant_jacobian
+    def __post_init__(self):
+        # self.bijector is already set by Equinox's auto-generated __init__
+        is_constant_jacobian = self.bijector._is_constant_jacobian
+        is_constant_log_det = getattr(self.bijector, '_is_constant_log_det', is_constant_jacobian)
+        
         if is_constant_jacobian and not is_constant_log_det:
             raise ValueError(
                 "The Jacobian is said to be constant, but its "
                 "determinant is said not to be, which is impossible."
             )
+            
+        # Object.__setattr__ is sometimes needed in __post_init__ if frozen=True, 
+        # but standard assignment usually works in Equinox modules.
         self._is_constant_jacobian = is_constant_jacobian
         self._is_constant_log_det = is_constant_log_det
 

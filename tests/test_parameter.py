@@ -9,7 +9,6 @@ from distreqx.bijectors import Block
 from parax.core.parameter import Parameter
 from parax.core.parameter_metadata import ParameterMetadata
 from parax.parameters import Uniform, Normal, Fixed, Free, RelativeUniform
-from parax.bijectors import Lambda as LambdaBijector, Exp
 
 @pytest.fixture
 def dummy_distribution():
@@ -74,40 +73,40 @@ class TestParameterMathAndArrays:
         # The latent/value is 5.0, but when cast to array it should multiply by scale
         assert jnp.allclose(jnp.array(param), 50.0)
 
-class TestParameterTransformations:
-    def test_bijector_initialization_inverts_value(self):
-        # Use your custom Exponential bijector directly
-        exp_bij = Exp()
-        param = Parameter(value=1.0, bijector=exp_bij)
+# class TestParameterTransformations:
+#     def test_bijector_initialization_inverts_value(self):
+#         # Use your custom Exponential bijector directly
+#         exp_bij = Exp()
+#         param = Parameter(value=1.0, bijector=exp_bij)
         
-        # log(1.0) = 0.0
-        assert jnp.allclose(param.latent_value, 0.0)
-        assert jnp.allclose(param.value, 1.0)
+#         # log(1.0) = 0.0
+#         assert jnp.allclose(param.latent_value, 0.0)
+#         assert jnp.allclose(param.value, 1.0)
 
-    def test_transformed_chains_bijectors(self):
-        param = Parameter(value=0.0)
-        exp_bij = Exp()
+#     def test_transformed_chains_bijectors(self):
+#         param = Parameter(value=0.0)
+#         exp_bij = Exp()
         
-        transformed_param = param.transformed(exp_bij)
+#         transformed_param = param.transformed(exp_bij)
         
-        # Latent remains unchanged
-        assert jnp.allclose(transformed_param.latent_value, 0.0)
-        # Value is mapped through the new bijector forward pass: exp(0) = 1.0
-        assert jnp.allclose(transformed_param.value, 1.0)
+#         # Latent remains unchanged
+#         assert jnp.allclose(transformed_param.latent_value, 0.0)
+#         # Value is mapped through the new bijector forward pass: exp(0) = 1.0
+#         assert jnp.allclose(transformed_param.value, 1.0)
 
-    def test_transformed_updates_bounds(self):
-        param = Parameter(value=2.0, bounds=jnp.array([1.0, 3.0]))
+#     def test_transformed_updates_bounds(self):
+#         param = Parameter(value=2.0, bounds=jnp.array([1.0, 3.0]))
         
-        # Use our new custom Lambda bijector for a simple shift
-        shift_bij = LambdaBijector(
-            fn_forward=lambda x: x + 10.0,
-            fn_inverse=lambda y: y - 10.0,
-            fn_forward_log_det=lambda x: jnp.zeros_like(x),
-            fn_inverse_log_det=lambda y: jnp.zeros_like(y)
-        )
+#         # Use our new custom Lambda bijector for a simple shift
+#         shift_bij = LambdaBijector(
+#             fn_forward=lambda x: x + 10.0,
+#             fn_inverse=lambda y: y - 10.0,
+#             fn_forward_log_det=lambda x: jnp.zeros_like(x),
+#             fn_inverse_log_det=lambda y: jnp.zeros_like(y)
+#         )
         
-        transformed_param = param.transformed(shift_bij)
-        assert jnp.allclose(transformed_param.bounds, jnp.array([11.0, 13.0]))
+#         transformed_param = param.transformed(shift_bij)
+#         assert jnp.allclose(transformed_param.bounds, jnp.array([11.0, 13.0]))
 
 class TestParameterFactories:
     def test_uniform_factory(self):

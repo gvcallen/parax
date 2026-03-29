@@ -32,7 +32,7 @@ class Identity(
     def same_as(self, other) -> bool:
         return isinstance(other, Identity)
 
-class Inverse(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector, strict=True):
+class Invert(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector, strict=True):
     """Inverted version of a given bijector.
     """
 
@@ -79,7 +79,7 @@ class Inverse(bij.AbstractFwdLogDetJacBijector, bij.AbstractInvLogDetJacBijector
 
     def same_as(self, other: bij.AbstractBijector) -> bool:
         """Returns True if this bijector is guaranteed to be the same as `other`."""
-        if type(other) is Inverse:
+        if type(other) is Invert:
             return self.bijector.same_as(other.bijector)
         else:
             return self.bijector.same_as(other)
@@ -131,7 +131,7 @@ class Lambda(
         )
 
 
-class Exponential(
+class Exp(
     bij.AbstractFowardInverseBijector,
     bij.AbstractInvLogDetJacBijector,
     bij.AbstractFwdLogDetJacBijector,
@@ -151,7 +151,7 @@ class Exponential(
         return x, -jnp.log(y)
 
     def same_as(self, other) -> bool:
-        return isinstance(other, Exponential)
+        return isinstance(other, Exp)
 
 class ProbabilityIntegralTransform(
     bij.AbstractFowardInverseBijector,

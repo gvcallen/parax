@@ -9,7 +9,7 @@ from distreqx.bijectors import Block
 from parax.core.parameter import Parameter
 from parax.core.parameter_metadata import ParameterMetadata
 from parax.parameters import Uniform, Normal, Fixed, Free, RelativeUniform
-from parax.bijectors import Lambda as LambdaBijector, Exponential
+from parax.bijectors import Lambda as LambdaBijector, Exp
 
 @pytest.fixture
 def dummy_distribution():
@@ -77,7 +77,7 @@ class TestParameterMathAndArrays:
 class TestParameterTransformations:
     def test_bijector_initialization_inverts_value(self):
         # Use your custom Exponential bijector directly
-        exp_bij = Exponential()
+        exp_bij = Exp()
         param = Parameter(value=1.0, bijector=exp_bij)
         
         # log(1.0) = 0.0
@@ -86,7 +86,7 @@ class TestParameterTransformations:
 
     def test_transformed_chains_bijectors(self):
         param = Parameter(value=0.0)
-        exp_bij = Exponential()
+        exp_bij = Exp()
         
         transformed_param = param.transformed(exp_bij)
         

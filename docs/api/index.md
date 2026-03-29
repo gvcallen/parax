@@ -17,5 +17,3 @@
 ::: parax.field
 
 ::: parax.parameters
-
-::: parax.bijectors

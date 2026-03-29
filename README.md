@@ -36,7 +36,7 @@ Further, `Parax` also provides an extended version of Equinox's `Module` in `par
 
 The library is mainly intended for use in domain-specific scientific modeling, but can easily be applied to broader applications.
 
-## Example 1: Enforcing positivity
+## Example 1: Enforcing bounds
 
 The following example creates a `parax.Parameter` that is strictly bounded between 0.0 and 1.0, and whose physical value follows a normal distribution.
 

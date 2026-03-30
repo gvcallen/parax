@@ -29,7 +29,7 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     Parameter
         The created Parameter object.
     """
-    low, high = jnp.array(low), jnp.array(high)
+    low, high = jnp.array(low, dtype=jnp.float64), jnp.array(high, dtype=jnp.float64)
     dists = dist.Uniform(low, high)
     values = (low + high) / 2.0 if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
@@ -54,8 +54,8 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
     -------
     Parameter
     """
-    mean_arr = jnp.array(mean)
-    frac_arr = jnp.array(deviation_fraction)
+    mean_arr = jnp.array(mean, dtype=jnp.float64)
+    frac_arr = jnp.array(deviation_fraction, dtype=jnp.float64)
     
     # Calculate the absolute deviation (radius)
     delta = jnp.abs(mean_arr * frac_arr)
@@ -105,7 +105,7 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
     Parameter
         The created Parameter object.
     """
-    mean, std = jnp.array(mean), jnp.array(std)
+    mean, std = jnp.array(mean, dtype=jnp.float64), jnp.array(std, dtype=jnp.float64)
     dists = dist.Normal(mean, std)
     values = mean if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
@@ -131,8 +131,8 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
     -------
     Parameter
     """
-    mean_arr = jnp.array(mean)
-    frac_arr = jnp.array(std_fraction)
+    mean_arr = jnp.array(mean, dtype=jnp.float64)
+    frac_arr = jnp.array(std_fraction, dtype=jnp.float64)
     
     # Calculate absolute standard deviation
     sigma = jnp.abs(mean_arr * frac_arr)
@@ -157,7 +157,7 @@ def Fixed(value, **kwargs) -> Parameter:
     Parameter
         The created fixed Parameter object.
     """
-    value = jnp.array(value)
+    value = jnp.array(value, dtype=jnp.float64)
     return Parameter(value=value, fixed=True, **kwargs)
 
 def Free(value, **kwargs) -> Parameter:
@@ -180,5 +180,5 @@ def Free(value, **kwargs) -> Parameter:
     Parameter
         The created free Parameter object.
     """
-    value = jnp.array(value)
+    value = jnp.array(value, dtype=jnp.float64)
     return Parameter(value=value, fixed=False, **kwargs)

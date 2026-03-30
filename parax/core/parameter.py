@@ -7,6 +7,8 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Transformed
 from distreqx.bijectors import AbstractBijector, Chain
 
+
+from parax._bijectors import Inverse
 from parax.core.field import field
 from parax.core.parameter_metadata import ParameterMetadata
 from parax.utils import (
@@ -262,6 +264,27 @@ class Parameter(eqx.Module):
             The total size of the latent array.
         """
         return self.latent_value.size
+    
+    @property
+    def latent_distribution(self) -> AbstractDistribution | None:
+        """
+        Get the parameter distribution in the latent space.
+
+        Returns
+        -------
+        AbstractDistribution or None
+            The physical probability distribution mapped back to the latent space 
+            via the inverse of the parameter's transform.
+        """
+        dist = self.distribution
+        transform = self.transform
+
+        if dist is None:
+            return None
+        if transform is None:
+            return dist
+        
+        return Transformed(dist, Inverse(transform))    
     
     def with_name(self, name: str) -> 'Parameter':
         """

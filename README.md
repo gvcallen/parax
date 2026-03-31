@@ -12,12 +12,12 @@ At its core, the library provides a `Parameter` class which inherits from ``eqx.
 
 ## Features
 
-- **Easy parameter fixing**: Parameters can be marked as *fixed* and the resultant modules partitioned using *parax.partition*.
-- **Encapsulated constraints and scaling**: Scaling and bijector transformations are abstracted away by applying them when the parameter object is cast to a JAX array. This can be used, for example, to enforce positivity or arbitrary constraints during optimization.
+- **Easy parameter fixing**: Parameters can be marked as ``fixed`` and the resultant modules partitioned using ``parax.partition``.
+- **Encapsulated constraints and scaling**: Optional scaling and transformations are abstracted away by applying them when the parameter object is cast to a JAX array. This can be used, for example, to enforce positivity or arbitrary constraints during optimization.
 - **Parameter transforms**: Arbitrary transforms can be applied to parameters using `myparam.transformed(bij)`. This applies a bijector to both the parameter and its underlying distribution.
-- **Arbitrary metadata support**: While Parax natively caters for distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling (for example, in the scientific domain it is common to want to attach units to a parameter).
-- **Extended Equinox module**: Parax provides `parax.Module`, which extends `eqx.Module` to allow for easy updating, fixing, freeing, or mapping of parameters deep within complex models using simple string paths and bulk `with_*` methods.
-- (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and bijections, Parax provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
+- **Arbitrary metadata support**: While **Parax** natively caters for common metadata such as distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling purposes (for example, in the scientific domain it is common to want to attach units to a parameter).
+- **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy updating, fixing, freeing, or mapping of parameters deep within complex models using simple string paths and bulk `with_*` methods.
+- (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
 
 ## Installation
 Parax can be installed using pip directly:

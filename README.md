@@ -1,8 +1,8 @@
 ![Parax Logo](assets/logo.png)
 
-**Parax** is a declarative, parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which can be set as fixed for training, as well as assigned arbitrary metadata.
+At its core, the library provides a `Parameter` class which inherits from ``eqx.Module`` and wraps a JAX array. A parameter can be marked as ``fixed`` for training, as well as assigned arbitrary metadata. When used in conjunction with ``parax.partition`` and/or ``parax.Module``, the end experience is similar to PyTorch's ``torch.nn.Parameter``, but in a more Equinox/JAX style and with some added features.
 
 | **Parax** |  |
 |-------------|-------|

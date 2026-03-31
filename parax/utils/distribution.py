@@ -110,8 +110,7 @@ def deserialize_distribution(dct: dict | None) -> AbstractDistribution | None:
         if isinstance(v, dict) and "class" in v:
             # Reconstruct nested distribution
             params[k] = deserialize_distribution(v)
-        elif isinstance(v, list):
-            # Convert python lists back to JAX arrays
+        else:
             params[k] = jnp.asarray(v)
             
     return cls(**params)

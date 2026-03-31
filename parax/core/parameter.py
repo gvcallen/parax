@@ -478,7 +478,10 @@ class Parameter(eqx.Module):
         flat_val = jnp.ravel(unscaled_physical)
         
         if self.distribution is not None:
-            dists_split = split_vectorized_distribution(self.distribution)
+            if not self.distribution.event_shape:
+                dists_split = [self.distribution] * flat_val.size
+            else:
+                dists_split = split_vectorized_distribution(self.distribution)
         else:
             dists_split = [None] * flat_val.size
 

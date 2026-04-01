@@ -5,7 +5,7 @@ from parax.core.parameter import Parameter, is_param, is_valid_param, is_free_pa
 from parax.core.parameter_metadata import ParameterMetadata
 from parax.core.parameter_group import ParameterGroup
 from parax.core.tree import partition
-from parax.core.operator import Operator
+from parax.core.operator import Operator, OpInputs, OpOutputs
 
 __all__ = [
     "Parameter", "is_param", "is_valid_param", "is_free_param", "is_fixed_param", "as_param",
@@ -16,5 +16,5 @@ __all__ = [
     "load",
     "save",
     "Module",
-    "Operator",
+    "Operator", "OpInputs", "OpOutputs"
 ]

@@ -4,80 +4,79 @@ Core evaluators.
 
 from __future__ import annotations
 import operator
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 import jax
 
-from parax.core import Operator, field
+from parax.core import Operator, OpInputs, OpOutputs, field
 
 
-class Lambda(Operator):
+class Lambda(Operator[OpInputs, OpOutputs]):
     """
-    Wraps a standard Python or JAX callable.
+    Wraps a standard Python or JAX callable with the same domain as the operator.
     """
-    fn: Callable
+    fn: Callable[OpInputs, OpOutputs]
 
-    def __call__(self, *args: Any, **kwargs) -> Any:
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
         return self.fn(*args, **kwargs)
 
 
-class Constant(Operator):
+class Constant(Operator[OpInputs, OpOutputs]):
     """
     Returns a fixed constant array or scalar.
     """
-    value: float | int | complex | Any
+    value: OpOutputs
     
-    def __call__(self, *args: Any, **kwargs) -> Any:
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
         return self.value
 
 
-class Binary(Operator):
+class Binary(Operator[OpInputs, OpOutputs]):
     """
-    Returns a the result of a callable that accepts the result of two operators.
+    Returns the result of a callable that accepts the result of two operators.
     
     The functional callable ``fn`` must have the signature ``f(left, right)``.
     """
-    fn: Callable
-    left: Operator
-    right: Operator
+    fn: Callable[[Any, Any], OpOutputs]
+    left: Union[Operator[OpInputs, Any], Any]
+    right: Union[Operator[OpInputs, Any], Any]
 
-    def __call__(self, *args: Any, **kwargs) -> Any:
-        val_left = self.left(*args, **kwargs)
-        val_right = self.right(*args, **kwargs)
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
+        val_left = self.left(*args, **kwargs) if isinstance(self.left, Operator) else self.left
+        val_right = self.right(*args, **kwargs) if isinstance(self.right, Operator) else self.right
         return self.fn(val_left, val_right)
 
 
-class Where(Operator):
+class Where(Operator[OpInputs, OpOutputs]):
     """
     A conditional branching node using `jax.lax.cond`.
 
     Evaluates a boolean condition (from an Operator) and returns the output
     of either `true_branch` or `false_branch` depending on the condition.
     """
-    condition: Operator
-    true_branch: Operator
-    false_branch: Operator
+    condition: Union[Operator[OpInputs, Any], Any]
+    true_branch: Union[Operator[OpInputs, OpOutputs], OpOutputs]
+    false_branch: Union[Operator[OpInputs, OpOutputs], OpOutputs]
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        cond_val = self.condition(*args, **kwargs)
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
+        cond_val = self.condition(*args, **kwargs) if isinstance(self.condition, Operator) else self.condition
         
-        def true_fn(_):
-            return self.true_branch(*args, **kwargs)
+        def true_fn(_: Any) -> OpOutputs:
+            return self.true_branch(*args, **kwargs) if isinstance(self.true_branch, Operator) else self.true_branch
         
-        def false_fn(_):
-            return self.false_branch(*args, **kwargs)
+        def false_fn(_: Any) -> OpOutputs:
+            return self.false_branch(*args, **kwargs) if isinstance(self.false_branch, Operator) else self.false_branch
         
         return jax.lax.cond(cond_val, true_fn, false_fn, operand=None)
-        
 
 
-class Method(Operator):
+class Method(Operator[OpInputs, OpOutputs]):
     """
     Dynamically accesses and executes a method on the first argument.
     """
     path: str = field(static=True)
 
-    def __call__(self, *args: Any, **kwargs) -> Any:
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
         if not args:
             raise ValueError(f"Method operator '{self.path}' requires at least one positional argument.")
             
@@ -88,12 +87,13 @@ class Method(Operator):
         return func(*method_args, **kwargs)
 
 
-class Map(Operator):
+class Map(Operator[OpInputs, OpOutputs]):
     """
     Applies an arbitrary function to a single operator's output.
     """
-    fn: Callable
-    operator: Operator
+    fn: Callable[[Any], OpOutputs]
+    operator: Union[Operator[OpInputs, Any], Any]
 
-    def __call__(self, *args: Any, **kwargs):
-        return self.fn(self.operator(*args, **kwargs))
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
+        val = self.operator(*args, **kwargs) if isinstance(self.operator, Operator) else self.operator
+        return self.fn(val)

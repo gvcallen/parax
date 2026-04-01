@@ -1,85 +1,110 @@
 """
-A class for composable, differentiable, parametric PyTree manipulation.
+Core evaluators.
 """
 
 from __future__ import annotations
 import operator
-from typing import Any
-import jax.numpy as jnp
+from typing import Callable, Any, TypeVar, Union
 
-import equinox as eqx
+import jax
 
-class Operator(eqx.Module):
+# Use typing_extensions for Python < 3.11 compatibility
+try:
+    from typing import TypeVarTuple, Unpack
+except ImportError:
+    from typing_extensions import TypeVarTuple, Unpack
+
+from parax.core import Operator, field
+
+# Re-define or import the TypeVars used in your base Operator
+OpInputs = TypeVarTuple("OpInputs")
+OpOutputs = TypeVar("OpOutputs")
+
+
+class Lambda(Operator[Unpack[OpInputs], OpOutputs]):
     """
-    A composable callable that applies some operation to input arguments.
-    
-    Supports standard Python operator overloading to seamlessly compose 
-    operators into complex graphs.
+    Wraps a standard Python or JAX callable with the same domain as the operator.
     """
+    fn: Callable[[Unpack[OpInputs]], OpOutputs]
+
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        return self.fn(*args, **kwargs)
+
+
+class Constant(Operator[Unpack[OpInputs], OpOutputs]):
+    """
+    Returns a fixed constant array or scalar.
+    """
+    value: OpOutputs
     
-    def __call__(self, *args: Any, **kwargs: Any) -> jnp.ndarray:
-        raise NotImplementedError("Operator nodes must implement __call__.")
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        return self.value
 
-    # --- Arithmetic Operators ---
 
-    def __add__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.add)
-
-    def __sub__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.sub)
-
-    def __mul__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.mul)
-
-    def __truediv__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.truediv)
-
-    def __pow__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.pow)
-
-    # --- Unary Operators ---
+class Binary(Operator[Unpack[OpInputs], OpOutputs]):
+    """
+    Returns the result of a callable that accepts the result of two operators.
     
-    def __neg__(self) -> Operator:
-        from parax.operators import Map
-        return Map(operator=self, fn=operator.neg)
+    The functional callable ``fn`` must have the signature ``f(left, right)``.
+    """
+    fn: Callable[[Any, Any], OpOutputs]
+    # Union handles the case where an operator is composed with a raw scalar/array
+    left: Union[Operator[Unpack[OpInputs], Any], Any]
+    right: Union[Operator[Unpack[OpInputs], Any], Any]
 
-    # --- Reverse Arithmetic (for <scalar> + <Operator>) ---
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        val_left = self.left(*args, **kwargs) if isinstance(self.left, Operator) else self.left
+        val_right = self.right(*args, **kwargs) if isinstance(self.right, Operator) else self.right
+        return self.fn(val_left, val_right)
 
-    def __radd__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=other, right=self, fn=operator.add)
 
-    def __rsub__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=other, right=self, fn=operator.sub)
+class Where(Operator[Unpack[OpInputs], OpOutputs]):
+    """
+    A conditional branching node using `jax.lax.cond`.
 
-    def __rmul__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=other, right=self, fn=operator.mul)
+    Evaluates a boolean condition (from an Operator) and returns the output
+    of either `true_branch` or `false_branch` depending on the condition.
+    """
+    condition: Union[Operator[Unpack[OpInputs], Any], Any]
+    true_branch: Union[Operator[Unpack[OpInputs], OpOutputs], OpOutputs]
+    false_branch: Union[Operator[Unpack[OpInputs], OpOutputs], OpOutputs]
+
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        cond_val = self.condition(*args, **kwargs) if isinstance(self.condition, Operator) else self.condition
         
-    def __rtruediv__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=other, right=self, fn=operator.truediv)
-
-    # --- Comparison Operators (Useful for custom logic) ---
-
-    def __gt__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.gt)
-
-    def __lt__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.lt)
+        def true_fn(_: Any) -> OpOutputs:
+            return self.true_branch(*args, **kwargs) if isinstance(self.true_branch, Operator) else self.true_branch
         
-    def __ge__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.ge)
+        def false_fn(_: Any) -> OpOutputs:
+            return self.false_branch(*args, **kwargs) if isinstance(self.false_branch, Operator) else self.false_branch
+        
+        return jax.lax.cond(cond_val, true_fn, false_fn, operand=None)
 
-    def __le__(self, other: Any) -> Operator:
-        from parax.operators import Binary
-        return Binary(left=self, right=other, fn=operator.le)
+
+class Method(Operator[Unpack[OpInputs], OpOutputs]):
+    """
+    Dynamically accesses and executes a method on the first argument.
+    """
+    path: str = field(static=True)
+
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        if not args:
+            raise ValueError(f"Method operator '{self.path}' requires at least one positional argument.")
+            
+        obj = args[0] 
+        method_args = args[1:]
+        
+        func = operator.attrgetter(self.path)(obj)
+        return func(*method_args, **kwargs)
+
+
+class Map(Operator[Unpack[OpInputs], OpOutputs]):
+    """
+    Applies an arbitrary function to a single operator's output.
+    """
+    fn: Callable[[Any], OpOutputs]
+    operator: Union[Operator[Unpack[OpInputs], Any], Any]
+
+    def __call__(self, *args: Unpack[OpInputs], **kwargs: Any) -> OpOutputs:
+        val = self.operator(*args, **kwargs) if isinstance(self.operator, Operator) else self.operator
+        return self.fn(val)

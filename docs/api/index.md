@@ -10,7 +10,7 @@
 
 ::: parax.Module
 
-::: parax.Evaluator
+::: parax.Operator
 
 ::: parax.load
 
@@ -20,4 +20,4 @@
 
 ::: parax.parameters
 
-::: parax.evaluators
+::: parax.operators

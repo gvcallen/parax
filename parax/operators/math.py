@@ -12,7 +12,7 @@ import jax
 import jax.numpy as jnp
 
 from parax.core import Operator
-from parax.evaluators.core import Map, Lambda, Binary
+from parax.operators.core import Map, Lambda, Binary
 
 
 def Stack(*evaluators: Operator, axis: int = -1) -> Operator:

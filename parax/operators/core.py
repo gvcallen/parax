@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from parax.core import Operator, field
 
 
-class Lambda(Operator):
+class Lambda(Operator, transparent=True):
     """
     Wraps a standard Python or JAX callable.
     """
@@ -23,7 +23,7 @@ class Lambda(Operator):
         return self.fn(*args, **kwargs)
 
 
-class Constant(Operator):
+class Constant(Operator, transparent=True):
     """
     Returns a fixed constant array or scalar.
     """
@@ -33,7 +33,7 @@ class Constant(Operator):
         return jnp.asarray(self.value)
 
 
-class Binary(Operator):
+class Binary(Operator, transparent=True):
     """
     Returns a the result of a callable that accepts the result of two operators.
     
@@ -49,7 +49,7 @@ class Binary(Operator):
         return self.fn(val_left, val_right)
 
 
-class Where(Operator):
+class Where(Operator, transparent=True):
     """
     A conditional branching node using `jnp.where`.
 
@@ -71,7 +71,7 @@ class Where(Operator):
         return jnp.where(cond_val, jnp.asarray(true_val), jnp.asarray(false_val))
 
 
-class Method(Operator):
+class Method(Operator, transparent=True):
     """
     Dynamically accesses and executes a method on the first argument.
     """
@@ -88,12 +88,12 @@ class Method(Operator):
         return func(*method_args, **kwargs)
 
 
-class Map(Operator):
+class Map(Operator, transparent=True):
     """
     Applies an arbitrary function to a single operator's output.
     """
     fn: Callable
-    operator: Operator
+    operator: Operator = field(transparent=True)
 
     def __call__(self, *args: Any, **kwargs):
         return self.fn(self.operator(*args, **kwargs))

@@ -1,25 +1,4 @@
-|tests_badge| |docs_badge|
-
-.. image:: https://raw.githubusercontent.com/gvcallen/parax/main/assets/logo.png
-   :align: center
-   :alt: Parax Logo
-
-:Version: |version_badge_text|
-:Author: Gary Allen
-:Homepage: https://github.com/gvcallen/paramrf
-:Docs: https://gvcallen.github.io/paramrf
-:Paper: https://doi.org/10.48550/arXiv.2510.15881
-
-.. |tests_badge| image:: https://github.com/gvcallen/parax/actions/workflows/tests.yml/badge.svg
-   :target: https://github.com/gvcallen/parax/actions/workflows/tests.yml
-   :alt: Tests Status
-
-.. |docs_badge| image:: https://github.com/gvcallen/parax/actions/workflows/docs.yml/badge.svg
-   :target: https://gvcallen.github.io/parax
-   :alt: Documentation Status
-
-.. |version_badge_text| image:: https://img.shields.io/github/v/release/gvcallen/parax
-   :alt: GitHub Release
+![Parax Logo](assets/logo.png)
 
 **Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 

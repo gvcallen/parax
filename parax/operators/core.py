@@ -4,16 +4,14 @@ Core evaluators.
 
 from __future__ import annotations
 import operator
-from typing import Callable
-import jax.numpy as jnp
+from typing import Callable, Any
 
-from typing import Any
-import jax.numpy as jnp
+import jax
 
 from parax.core import Operator, field
 
 
-class Lambda(Operator, transparent=True):
+class Lambda(Operator):
     """
     Wraps a standard Python or JAX callable.
     """
@@ -23,17 +21,17 @@ class Lambda(Operator, transparent=True):
         return self.fn(*args, **kwargs)
 
 
-class Constant(Operator, transparent=True):
+class Constant(Operator):
     """
     Returns a fixed constant array or scalar.
     """
     value: float | int | complex | Any
     
     def __call__(self, *args: Any, **kwargs) -> Any:
-        return jnp.asarray(self.value)
+        return self.value
 
 
-class Binary(Operator, transparent=True):
+class Binary(Operator):
     """
     Returns a the result of a callable that accepts the result of two operators.
     
@@ -49,29 +47,31 @@ class Binary(Operator, transparent=True):
         return self.fn(val_left, val_right)
 
 
-class Where(Operator, transparent=True):
+class Where(Operator):
     """
-    A conditional branching node using `jnp.where`.
+    A conditional branching node using `jax.lax.cond`.
 
-    Evaluates a boolean condition (from an Operator) and returns elements 
-    from the `true_branch` or `false_branch` accordingly. 
-    
-    Useful for applying argument-dependent logic or piecewise penalty functions.
+    Evaluates a boolean condition (from an Operator) and returns the output
+    of either `true_branch` or `false_branch` depending on the condition.
     """
     condition: Operator
     true_branch: Operator
     false_branch: Operator
 
-    def __call__(self, *args: Any, **kwargs) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         cond_val = self.condition(*args, **kwargs)
         
-        true_val = self.true_branch(*args, **kwargs)
-        false_val = self.false_branch(*args, **kwargs)
-            
-        return jnp.where(cond_val, jnp.asarray(true_val), jnp.asarray(false_val))
+        def true_fn(_):
+            return self.true_branch(*args, **kwargs)
+        
+        def false_fn(_):
+            return self.false_branch(*args, **kwargs)
+        
+        return jax.lax.cond(cond_val, true_fn, false_fn, operand=None)
+        
 
 
-class Method(Operator, transparent=True):
+class Method(Operator):
     """
     Dynamically accesses and executes a method on the first argument.
     """
@@ -88,12 +88,12 @@ class Method(Operator, transparent=True):
         return func(*method_args, **kwargs)
 
 
-class Map(Operator, transparent=True):
+class Map(Operator):
     """
     Applies an arbitrary function to a single operator's output.
     """
     fn: Callable
-    operator: Operator = field(transparent=True)
+    operator: Operator
 
     def __call__(self, *args: Any, **kwargs):
         return self.fn(self.operator(*args, **kwargs))

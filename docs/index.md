@@ -4,7 +4,7 @@
 
 At its core, the library provides a `Parameter` class which inherits from `eqx.Module` and wraps a JAX array. A parameter can be marked as `fixed` for training, as well as assigned arbitrary metadata.
 
-However, the library also provides additional helpers, including `parax.partition`, `parax.field`, `parax.Module` and `parax.Operator`. `Parameter` and `Module` provide an experience similar to PyTorch's `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Operator` caters for composable, parametric operations over arbitrary arguments, allowing for easy PyTree feature extraction.
+However, the library also provides additional helpers, including `parax.partition`, `parax.field`, `parax.Module` and `parax.Operator`. `parax.partition` caters for easy partitioning of module's that contain `Parameter` objects. `Parameter` and `Module` together provide an experience similar to PyTorch with `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Operator` caters for composable operations over arbitrary arguments, allowing for easy PyTree feature extraction.
 
 | **Parax** |  |
 |-------------|-------|

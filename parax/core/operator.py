@@ -7,9 +7,9 @@ import operator
 from typing import Any
 import jax.numpy as jnp
 
-from parax.core import Module
+import equinox as eqx
 
-class Operator(Module, transparent=True):
+class Operator(eqx.Module):
     """
     A composable callable that applies some operation to input arguments.
     

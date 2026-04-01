@@ -1,4 +1,4 @@
-![Parax Logo](assets/logo.png)
+![Parax Logo](../assets/logo.png)
 
 **Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
@@ -25,9 +25,9 @@ However, the library also provides additional helpers, including `parax.partitio
 ## Installation
 Parax can be installed using pip directly:
 
-`
+``
 pip install parax
-`
+``
 
 ## Overview
 
@@ -43,20 +43,20 @@ The library is mainly intended for use in domain-specific scientific modeling, b
 
 The following example creates a `parax.Parameter` that is strictly bounded between 0.0 and 1.0, and whose physical value follows a normal distribution.
 
-``python
+```python
 import parax as prx
 from distreqx.bijectors import Sigmoid
 
 normal_param = prx.Normal(0.5, 0.1, bijector=Sigmoid())
 print(normal_param.latent_value) # prints 0.0
 print(normal_param.value) # prints 0.5
-``
+```
 
 ## Example 2: Optimizing a model
 
 In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and `optimistix` to fit the model to some noisy data.
 
-``python
+```python
 
 import jax
 import jax.numpy as jnp
@@ -112,4 +112,4 @@ print(f"Fitted 'b': {jnp.array(fitted_model.b):.8f} (Expected ~-2.0)")
 print(f"Fixed 'c':  {jnp.array(fitted_model.c):.8f} (Remained 10.0)")
 print(f'Final loss: {loss_fn(fitted_model)}')
 print(solution.result)
-``
+```

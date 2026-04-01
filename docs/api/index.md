@@ -20,4 +20,4 @@
 
 ::: parax.parameters
 
-::: parax.operators
+::: parax.op

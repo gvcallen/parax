@@ -10,7 +10,6 @@ import jax
 
 from parax.core import Operator, OpInputs, OpOutputs, field
 
-
 class Lambda(Operator[OpInputs, OpOutputs]):
     """
     Wraps a standard Python or JAX callable with the same domain as the operator.

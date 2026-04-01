@@ -9,8 +9,10 @@ from parax.core import *
 from parax.parameters import Uniform, RelativeUniform, CenteredUniform, Normal, RelativeNormal, Fixed, Free
 
 import parax.core as core
+import parax.op as op
 
 __all__= [
     "Uniform", "RelativeUniform", "CenteredUniform", "Normal", "RelativeNormal", "Fixed", "Free",
+    "op",
 ]
 __all__.extend(core.__all__)

@@ -11,11 +11,11 @@ from typing import Any, Callable, Sequence
 import jax
 import jax.numpy as jnp
 
-from parax.core import Evaluator
+from parax.core import Operator
 from parax.evaluators.core import Map, Lambda, Binary
 
 
-def Stack(*evaluators: Evaluator, axis: int = -1) -> Evaluator:
+def Stack(*evaluators: Operator, axis: int = -1) -> Operator:
     def fn(*args: Any, **kwargs):
         results = [t(*args, **kwargs) for t in evaluators]
         return jnp.stack(results, axis=axis)
@@ -24,12 +24,12 @@ def Stack(*evaluators: Evaluator, axis: int = -1) -> Evaluator:
 
 
 def Derivative(
-    evaluator: Evaluator, 
+    evaluator: Operator, 
     step_attr: str,
     axis: int = 0, 
     order: int = 1, 
     arg_index: int = 1
-) -> Evaluator:
+) -> Operator:
     """
     Computes the discrete numerical derivative of the data.
     
@@ -69,7 +69,7 @@ def Derivative(
     )
 
 
-def Sum(evaluators: Sequence[Evaluator]) -> Evaluator:
+def Sum(evaluators: Sequence[Operator]) -> Operator:
     """
     Sums the outputs of multiple Evaluators into a single scalar or array.
     
@@ -79,7 +79,7 @@ def Sum(evaluators: Sequence[Evaluator]) -> Evaluator:
     return Map(evaluator=Stack(evaluators=evaluators, axis=0), fn=lambda data: jnp.sum(data, axis=0))
 
 
-def Flatness(evaluator: Evaluator, step_attr: str) -> Evaluator:
+def Flatness(evaluator: Operator, step_attr: str) -> Operator:
     """
     Computes the numerical derivative of the data with respect to frequency.
     
@@ -90,10 +90,10 @@ def Flatness(evaluator: Evaluator, step_attr: str) -> Evaluator:
 
 
 def Reduce(
-    evaluator: Evaluator, 
+    evaluator: Operator, 
     fn: Callable[..., jnp.ndarray], 
     axis: int | tuple[int, ...] | None = None
-) -> Evaluator:
+) -> Operator:
     """
     Applies a reduction operation (e.g., jnp.max, jnp.mean) over a specific axis.
     """
@@ -101,7 +101,7 @@ def Reduce(
     return Map(evaluator=evaluator, fn=lambda data: fn(data, axis=axis))
 
 
-def Index(evaluator: Evaluator, indices: Any) -> Evaluator:
+def Index(evaluator: Operator, indices: Any) -> Operator:
     """
     Slices or indexes the output of another Evaluator.
     
@@ -111,7 +111,7 @@ def Index(evaluator: Evaluator, indices: Any) -> Evaluator:
     return Map(evaluator=evaluator, fn=lambda data: data[indices])
 
 
-def Mask(evaluator: Evaluator, mask: jnp.ndarray) -> Evaluator:
+def Mask(evaluator: Operator, mask: jnp.ndarray) -> Operator:
     """
     Applies a boolean mask to the final dimension of the data.
     
@@ -123,14 +123,14 @@ def Mask(evaluator: Evaluator, mask: jnp.ndarray) -> Evaluator:
 
 
 
-def Diagonal(evaluator: Evaluator) -> Evaluator:
+def Diagonal(evaluator: Operator) -> Operator:
     """
     Extracts the diagonals of N-port scattering matrices.
     """
     return Map(evaluator=evaluator, fn=lambda data: jax.vmap(jnp.diag)(data))
 
 
-def OffDiagonal(evaluator: Evaluator, n_ports: int) -> Evaluator:
+def OffDiagonal(evaluator: Operator, n_ports: int) -> Operator:
     """
     Extracts the off-diagonals (transmission) of N-port matrices.
     """

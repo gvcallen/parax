@@ -1,5 +1,5 @@
 """
-The foundational class for composable, differentiable, parametric PyTree manipulation.
+A class for composable, differentiable, parametric PyTree manipulation.
 """
 
 from __future__ import annotations
@@ -7,16 +7,14 @@ import operator
 from typing import Any
 import jax.numpy as jnp
 
-from jaxtyping import PyTree
-
 from parax.core import Module
 
-class Evaluator(Module):
+class Operator(Module):
     """
-    A parametric, composable callable that transforms input arguments into arrays.
+    A composable callable that applies some operation to input arguments.
     
     Supports standard Python operator overloading to seamlessly compose 
-    transforms into complex graphs.
+    operators into complex graphs.
     """
     
     def __call__(self, *args: Any, **kwargs: Any) -> jnp.ndarray:
@@ -24,63 +22,64 @@ class Evaluator(Module):
 
     # --- Arithmetic Operators ---
 
-    def __add__(self, other: Any) -> Evaluator:
+    def __add__(self, other: Any) -> Operator:
         from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.add)
 
-    def __sub__(self, other: Any) -> Evaluator:
-
+    def __sub__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.sub)
 
-    def __mul__(self, other: Any) -> Evaluator:
-
+    def __mul__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.mul)
 
-    def __truediv__(self, other: Any) -> Evaluator:
-
+    def __truediv__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.truediv)
 
-    def __pow__(self, other: Any) -> Evaluator:
-
+    def __pow__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.pow)
 
     # --- Unary Operators ---
     
-    def __neg__(self) -> Evaluator:
+    def __neg__(self) -> Operator:
+        from parax.evaluators import Map
         return Map(operator=self, fn=operator.neg)
 
     # --- Reverse Arithmetic (for <scalar> + <Operator>) ---
 
-    def __radd__(self, other: Any) -> Evaluator:
-
+    def __radd__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=other, right=self, fn=operator.add)
 
-    def __rsub__(self, other: Any) -> Evaluator:
-
+    def __rsub__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=other, right=self, fn=operator.sub)
 
-    def __rmul__(self, other: Any) -> Evaluator:
-
+    def __rmul__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=other, right=self, fn=operator.mul)
         
-    def __rtruediv__(self, other: Any) -> Evaluator:
-
+    def __rtruediv__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=other, right=self, fn=operator.truediv)
 
     # --- Comparison Operators (Useful for custom logic) ---
 
-    def __gt__(self, other: Any) -> Evaluator:
-
+    def __gt__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.gt)
 
-    def __lt__(self, other: Any) -> Evaluator:
-
+    def __lt__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.lt)
         
-    def __ge__(self, other: Any) -> Evaluator:
-
+    def __ge__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.ge)
 
-    def __le__(self, other: Any) -> Evaluator:
-
+    def __le__(self, other: Any) -> Operator:
+        from parax.evaluators import Binary
         return Binary(left=self, right=other, fn=operator.le)

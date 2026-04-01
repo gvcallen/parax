@@ -1,10 +1,10 @@
-![Parax Logo](../assets/logo.png)
+![Parax Logo](https://raw.githubusercontent.com/gvcallen/parax/main/assets/logo.png)
 
 **Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
 At its core, the library provides a `Parameter` class which inherits from `eqx.Module` and wraps a JAX array. A parameter can be marked as `fixed` for training, as well as assigned arbitrary metadata.
 
-However, the library also provides additional helpers, including `parax.partition`, `parax.field`, `parax.Module` and `parax.Evaluator`. `Parameter` and `Module` provide an experience similar to PyTorch's `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Evaluator` caters for composable, parametric array computations over arbitrary arguments, allowing for easy model feature extraction.
+However, the library also provides additional helpers, including `parax.partition`, `parax.field`, `parax.Module` and `parax.Operator`. `Parameter` and `Module` provide an experience similar to PyTorch's `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Operator` caters for composable, parametric operations over arbitrary arguments, allowing for easy PyTree feature extraction.
 
 | **Parax** |  |
 |-------------|-------|
@@ -19,7 +19,7 @@ However, the library also provides additional helpers, including `parax.partitio
 - **Parameter transforms**: Arbitrary transforms can be applied to parameters using `myparam.transformed(bij)`. This applies a transform to both the parameter and its underlying distribution (if any).
 - **Arbitrary metadata support**: While **Parax** natively caters for common metadata such as distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling purposes (for example, in the scientific domain it is common to want to attach units to a parameter).
 - **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy inspection, updating, fixing, freeing, or mapping of parameters and their metadata deep within complex models using simple string paths and bulk `with_*` methods. For example, `parax.Module.named_params()` returns a dictionary of parameters with names based on string paths.
-- **Composable evaluations**: **Parax** provides `parax.Evaluator`, which caters for composable, parametric array evaluations over arbitrary PyTree arguments. This can be very useful in manipulating domain-specific `parax.Module` objects in a parameter-aware manner.
+- **Composable PyTree operations**: **Parax** provides `parax.Operator`, which caters for composable, parametric operations over arbitrary arguments. This can be very useful in manipulating domain-specific `parax.Module` objects in a parameter-aware manner.
 - (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
 
 ## Installation

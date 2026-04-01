@@ -1,8 +1,31 @@
-![Parax Logo](assets/logo.png)
+|tests_badge| |docs_badge|
+
+.. image:: https://raw.githubusercontent.com/gvcallen/parax/main/assets/logo.png
+   :align: center
+   :alt: Parax Logo
+
+:Version: |version_badge_text|
+:Author: Gary Allen
+:Homepage: https://github.com/gvcallen/paramrf
+:Docs: https://gvcallen.github.io/paramrf
+:Paper: https://doi.org/10.48550/arXiv.2510.15881
+
+.. |tests_badge| image:: https://github.com/gvcallen/parax/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/gvcallen/parax/actions/workflows/tests.yml
+   :alt: Tests Status
+
+.. |docs_badge| image:: https://github.com/gvcallen/parax/actions/workflows/docs.yml/badge.svg
+   :target: https://gvcallen.github.io/parax
+   :alt: Documentation Status
+
+.. |version_badge_text| image:: https://img.shields.io/github/v/release/gvcallen/parax
+   :alt: GitHub Release
 
 **Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which inherits from ``eqx.Module`` and wraps a JAX array. A parameter can be marked as ``fixed`` for training, as well as assigned arbitrary metadata. When used in conjunction with ``parax.partition`` and/or ``parax.Module``, the end experience is similar to PyTorch's ``torch.nn.Parameter``, but in a more Equinox/JAX style and with some added features.
+At its core, the library provides a `Parameter` class which inherits from `eqx.Module` and wraps a JAX array. A parameter can be marked as `fixed` for training, as well as assigned arbitrary metadata.
+
+However, the library also provides additional helpers, including `parax.partition`, `parax.field`, `parax.Module` and `parax.Evaluator`. `Parameter` and `Module` provide an experience similar to PyTorch's `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Evaluator` caters for composable, parametric array computations over arbitrary arguments, allowing for easy model feature extraction.
 
 | **Parax** |  |
 |-------------|-------|
@@ -12,19 +35,20 @@ At its core, the library provides a `Parameter` class which inherits from ``eqx.
 
 ## Features
 
-- **Easy parameter fixing**: Parameters can be marked as ``fixed`` and the resultant modules partitioned using ``parax.partition``.
+- **Easy parameter fixing**: Parameters can be marked as `fixed` and the resultant modules partitioned using `parax.partition`.
 - **Encapsulated constraints and scaling**: Optional scaling and transformations are abstracted away by applying them when the parameter object is cast to a JAX array. This can be used, for example, to enforce positivity or arbitrary constraints during optimization.
-- **Parameter transforms**: Arbitrary transforms can be applied to parameters using `myparam.transformed(bij)`. This applies a bijector to both the parameter and its underlying distribution (if any)
+- **Parameter transforms**: Arbitrary transforms can be applied to parameters using `myparam.transformed(bij)`. This applies a transform to both the parameter and its underlying distribution (if any).
 - **Arbitrary metadata support**: While **Parax** natively caters for common metadata such as distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling purposes (for example, in the scientific domain it is common to want to attach units to a parameter).
-- **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy inspection, updating, fixing, freeing, or mapping of parameters and their metadata deep within complex models using simple string paths and bulk `with_*` methods. For example, ``parax.Module.named_params()`` returns a dictionary of parameters with names based on string paths.
+- **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy inspection, updating, fixing, freeing, or mapping of parameters and their metadata deep within complex models using simple string paths and bulk `with_*` methods. For example, `parax.Module.named_params()` returns a dictionary of parameters with names based on string paths.
+- **Composable evaluations**: **Parax** provides `parax.Evaluator`, which caters for composable, parametric array evaluations over arbitrary PyTree arguments. This can be very useful in manipulating domain-specific `parax.Module` objects in a parameter-aware manner.
 - (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
 
 ## Installation
 Parax can be installed using pip directly:
 
-``
+`
 pip install parax
-``
+`
 
 ## Overview
 
@@ -40,20 +64,20 @@ The library is mainly intended for use in domain-specific scientific modeling, b
 
 The following example creates a `parax.Parameter` that is strictly bounded between 0.0 and 1.0, and whose physical value follows a normal distribution.
 
-```python
+``python
 import parax as prx
 from distreqx.bijectors import Sigmoid
 
 normal_param = prx.Normal(0.5, 0.1, bijector=Sigmoid())
 print(normal_param.latent_value) # prints 0.0
 print(normal_param.value) # prints 0.5
-```
+``
 
 ## Example 2: Optimizing a model
 
-In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and ``optimistix`` to fit the model to some noisy data.
+In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and `optimistix` to fit the model to some noisy data.
 
-```python
+``python
 
 import jax
 import jax.numpy as jnp
@@ -109,4 +133,4 @@ print(f"Fitted 'b': {jnp.array(fitted_model.b):.8f} (Expected ~-2.0)")
 print(f"Fixed 'c':  {jnp.array(fitted_model.c):.8f} (Remained 10.0)")
 print(f'Final loss: {loss_fn(fitted_model)}')
 print(solution.result)
-```
+``

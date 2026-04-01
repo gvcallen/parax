@@ -6,9 +6,11 @@
 
 ::: parax.ParameterGroup
 
+::: parax.partition
+
 ::: parax.Module
 
-::: parax.partition
+::: parax.Evaluator
 
 ::: parax.load
 
@@ -17,3 +19,5 @@
 ::: parax.field
 
 ::: parax.parameters
+
+::: parax.evaluators

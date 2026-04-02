@@ -11,6 +11,7 @@ import jsonpickle.handlers
 
 from parax.module import Module
 from parax.parameter import Parameter
+import equinox as eqx
 
 
 class ParameterHandler(jsonpickle.handlers.BaseHandler):
@@ -98,7 +99,7 @@ def load(source: str | os.PathLike | BinaryIO) -> Any:
             for i, v in enumerate(obj):
                 _verify_no_degraded_modules(v, f"{current_path}[{i}]")
                 
-        elif hasattr(obj, '__dataclass_fields__'):
+        elif isinstance(obj, eqx.Module):
             # Safely traverse Equinox/Parax modules and dataclasses
             for f in obj.__dataclass_fields__:
                 _verify_no_degraded_modules(getattr(obj, f), f"{current_path}.{f}")

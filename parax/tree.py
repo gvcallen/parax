@@ -1,7 +1,7 @@
 from typing import TypeVar, Any
 import jax
 import equinox as eqx
-from parax.core.parameter import is_valid_param
+from parax.parameter import is_valid_param
 
 T = TypeVar("T")
 

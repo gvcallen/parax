@@ -6,8 +6,8 @@ import distreqx.distributions as dist
 from distreqx.bijectors import Block
 
 # Assuming your library structure looks something like this:
-from parax.core.parameter import Parameter
-from parax.core.parameter_metadata import ParameterMetadata
+from parax.parameter import Parameter
+from parax.parameter_metadata import ParameterMetadata
 from parax.parameters import Uniform, Normal, Fixed, Free, RelativeUniform
 
 @pytest.fixture

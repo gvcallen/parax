@@ -21,10 +21,10 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
 from distreqx.bijectors import AbstractBijector
 
-from parax.core.parameter import Parameter, is_valid_param, as_param
-from parax.core.parameter_group import ParameterGroup
-from parax.core.field import field
-from parax.core.tree import partition
+from parax.parameter import Parameter, is_valid_param, as_param
+from parax.parameter_group import ParameterGroup
+from parax.field import field
+from parax.tree import partition
 from parax.utils import get_first_underlying_type, nodes_by_type
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))

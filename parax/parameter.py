@@ -9,8 +9,8 @@ from distreqx.bijectors import AbstractBijector, Chain
 
 
 from parax._bijectors import Inverse
-from parax.core.field import field
-from parax.core.parameter_metadata import ParameterMetadata
+from parax.field import field
+from parax.parameter_metadata import ParameterMetadata
 from parax.utils import (
     format_val, 
     split_vectorized_distribution, 

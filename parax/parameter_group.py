@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector, Chain
-from parax.core.field import field
+from parax.field import field
 
 @dataclass
 class ParameterGroup:

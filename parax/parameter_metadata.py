@@ -3,7 +3,7 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector
 
-from parax.core.field import field
+from parax.field import field
 
 class ParameterMetadata(eqx.Module):
     """

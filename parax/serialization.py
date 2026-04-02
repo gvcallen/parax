@@ -9,8 +9,8 @@ import jax.tree_util as jtu
 import jsonpickle
 import jsonpickle.handlers
 
-from parax.core.module import Module
-from parax.core.parameter import Parameter
+from parax.module import Module
+from parax.parameter import Parameter
 
 
 class ParameterHandler(jsonpickle.handlers.BaseHandler):
@@ -104,7 +104,7 @@ def load(source: str | os.PathLike | BinaryIO) -> Any:
                 _verify_no_degraded_modules(getattr(obj, f), f"{current_path}.{f}")
 
     _verify_no_degraded_modules(decoded)
-
+    
     return decoded
 
 

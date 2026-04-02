@@ -8,7 +8,8 @@ from typing import Callable, Any, Union
 
 import jax
 
-from parax.core import Operator, OpInputs, OpOutputs, field
+from parax.operator import Operator, OpInputs, OpOutputs
+from parax.field import field
 
 class Lambda(Operator[OpInputs, OpOutputs]):
     """

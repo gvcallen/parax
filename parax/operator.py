@@ -4,15 +4,8 @@ A class for composable, differentiable, parametric PyTree manipulation.
 
 from __future__ import annotations
 import operator
-from typing import Any, Generic, TypeVar, Union
-import jax.numpy as jnp
+from typing import Any, Generic, TypeVar, Union, ParamSpec
 import equinox as eqx
-
-# Use typing_extensions for Python < 3.10 compatibility
-try:
-    from typing import ParamSpec
-except ImportError:
-    from typing_extensions import ParamSpec
 
 OpInputs = ParamSpec("P")
 OpOutputs = TypeVar("OpOutputs")

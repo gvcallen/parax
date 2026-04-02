@@ -1,7 +1,8 @@
 import jax
 import jax.numpy as jnp
 from typing import Any, Callable, Union
-from parax.core import Operator, OpInputs, OpOutputs, field
+from parax.operator import Operator, OpInputs, OpOutputs
+from parax.field import field
 
 class Stack(Operator[OpInputs, OpOutputs]):
     """Stacks the results of multiple operators along an axis."""

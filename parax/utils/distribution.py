@@ -1,12 +1,11 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import equinox as eqx
 
 import distreqx.distributions as dists
 from distreqx.distributions import AbstractDistribution
 
-from parax.utils.string import format_val
+from parax.utils.array import format_array
 
 def split_vectorized_distribution(d: AbstractDistribution) -> list[AbstractDistribution]:
     """
@@ -124,7 +123,7 @@ def format_distribution(d: AbstractDistribution) -> str:
     for k, v in vars(d).items():
         if k.startswith("_"):
             continue
-        args.append(f"{k}={format_val(v)}")
+        args.append(f"{k}={format_array(v)}")
         
     if args:
         return f"{class_name}({', '.join(args)})"

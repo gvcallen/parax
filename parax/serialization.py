@@ -89,7 +89,7 @@ def load(source: str | os.PathLike | BinaryIO) -> Any:
                 failed_class = obj['py/object']
                 raise TypeError(
                     f"Degraded object found at path '{current_path}'. "
-                    f"jsonpickle failed to instantiate the class '{failed_class}' and reverted to a dictionary. "
+                    f"Failed to instantiate the class '{failed_class}'"
                     "Did you move or rename this class in your codebase?"
                 )
             for k, v in obj.items():

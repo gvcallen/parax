@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from distreqx import bijectors
 from distreqx.bijectors import AbstractBijector, Chain
 
-from parax.utils.string import format_val
+from parax.utils.array import format_array
 
 def serialize_transform(t: Any | None) -> dict | None:
     r"""
@@ -160,7 +160,7 @@ def format_transform(t: Any) -> str:
     for param_name in ["shift", "scale", "loc", "base", "concentration0", "concentration1"]:
         if hasattr(t, param_name):
             val = getattr(t, param_name)
-            args.append(f"{param_name}={format_val(val)}")
+            args.append(f"{param_name}={format_array(val)}")
             
     if args:
         return f"{class_name}({', '.join(args)})"

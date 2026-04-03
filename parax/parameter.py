@@ -7,12 +7,12 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Transformed
 from distreqx.bijectors import AbstractBijector, Chain
 
-
-from parax._bijectors import Inverse
 from parax.field import field
 from parax.parameter_metadata import ParameterMetadata
 from parax.utils import (
-    format_val, 
+    format_array, 
+    serialize_array,
+    deserialize_array,
     split_vectorized_distribution, 
     serialize_distribution, 
     deserialize_distribution, 
@@ -284,6 +284,7 @@ class Parameter(eqx.Module):
         if transform is None:
             return dist
         
+        from distreqx.bijectors import Inverse
         return Transformed(dist, Inverse(transform))    
     
     def with_name(self, name: str) -> 'Parameter':
@@ -566,7 +567,7 @@ class Parameter(eqx.Module):
         return len(self.latent_value)
     
     def __repr__(self):
-        args = [f"value={format_val(self.latent_value)}"]
+        args = [f"value={format_array(self.latent_value)}"]
         
         if self.scale != 1.0:
             args.append(f"scale={self.scale}")
@@ -581,7 +582,7 @@ class Parameter(eqx.Module):
             args.append(f"transform={format_transform(self.transform)}")
             
         if self.bounds is not None:
-            args.append(f"bounds={format_val(self.bounds)}")
+            args.append(f"bounds={format_array(self.bounds)}")
             
         if self.name is not None:
             args.append(f"name={repr(self.name)}")
@@ -651,10 +652,7 @@ class Parameter(eqx.Module):
             "scale": self.scale
         }
         
-        if self.latent_value is not None:
-            d["value"] = self.value.tolist()
-        else:
-            d["value"] = None
+        d["value"] = serialize_array(self.value) if self.latent_value is not None else None
         
         if self.distribution is not None:
             d["distribution"] = serialize_distribution(self.distribution)
@@ -690,7 +688,8 @@ class Parameter(eqx.Module):
         """
         d = json.loads(s)
         
-        value = d.pop("value", None)
+        raw_value = d.pop("value", None)
+        value = deserialize_array(raw_value)
         fixed = d.pop("fixed", False)
         
         if "distribution" in d:

@@ -1,9 +1,12 @@
 import inspect
 import importlib
 import builtins
-from typing import Any
+import functools
+import dataclasses
+from typing import Any, Callable
 
 import jax.numpy as jnp
+import jax.tree_util
 from distreqx import bijectors
 from distreqx.bijectors import AbstractBijector, Chain
 
@@ -17,7 +20,7 @@ def serialize_transform(t: Any | None) -> dict | None:
     ----------
     t : Any or None
         The transform to serialize. Can be a distreqx bijector, a standard function,
-        or a stateful callable class.
+        a Partial function, or a stateful callable class/Equinox module.
 
     Returns
     -------
@@ -39,9 +42,19 @@ def serialize_transform(t: Any | None) -> dict | None:
             "module": "distreqx.bijectors",
             "transforms": [serialize_transform(p) for p in t.bijectors]
         }
+
+    # Handle Partial functions (extremely common in JAX/Equinox workflows)
+    if isinstance(t, (functools.partial, jax.tree_util.Partial)):
+        return {
+            "class": "Partial",
+            "module": "functools",
+            "func": serialize_transform(t.func),
+            "args": [serialize_transform(arg) if callable(arg) else arg for arg in t.args],
+            "keywords": {k: serialize_transform(v) if callable(v) else v for k, v in t.keywords.items()}
+        }
         
-    # Handle stateless functions / standard callables
-    if inspect.isfunction(t) or inspect.isbuiltin(t):
+    # Handle stateless functions / standard callables / JAX primitives
+    if inspect.isfunction(t) or inspect.isbuiltin(t) or (callable(t) and not hasattr(t, '__dict__')):
         name = getattr(t, "__name__", "unknown")
         if name == "<lambda>":
             raise ValueError("Cannot serialize lambda functions. Please use named functions.")
@@ -52,21 +65,29 @@ def serialize_transform(t: Any | None) -> dict | None:
             "name": name
         }
         
-    # Handle stateful instances (like distreqx Bijectors or custom callable classes)
+    # Handle stateful instances (Equinox modules, distreqx Bijectors, custom callable classes)
     params = {}
-    if hasattr(t, '__dict__'):
-        for k, v in t.__dict__.items():
-            # Skip private attributes and cached inverses
-            if k.startswith("_") or k == "inv":
-                continue
-                
-            if isinstance(v, jnp.ndarray):
-                params[k] = v.tolist()
-            elif isinstance(v, AbstractBijector) or callable(v):
-                # Recursively serialize nested transforms if they exist
-                params[k] = serialize_transform(v)
-            else:
-                params[k] = v
+    
+    # Equinox modules are dataclasses; we use fields to safely extract their state
+    if dataclasses.is_dataclass(t):
+        attributes = {f.name: getattr(t, f.name) for f in dataclasses.fields(t)}
+    elif hasattr(t, '__dict__'):
+        attributes = t.__dict__
+    else:
+        attributes = {}
+
+    for k, v in attributes.items():
+        # Skip private attributes and cached inverses
+        if k.startswith("_") or k == "inv":
+            continue
+            
+        if isinstance(v, jnp.ndarray):
+            params[k] = v.tolist()
+        elif isinstance(v, AbstractBijector) or callable(v):
+            # Recursively serialize nested transforms if they exist
+            params[k] = serialize_transform(v)
+        else:
+            params[k] = v
             
     return {
         "class": t.__class__.__name__, 
@@ -104,6 +125,13 @@ def deserialize_transform(dct: dict | None) -> Any | None:
     if cls_name == "Chain":
         parts = [deserialize_transform(p) for p in dct.get("transforms", [])]
         return Chain(parts)
+
+    # Reconstruct Partials safely using jax.tree_util
+    if cls_name == "Partial":
+        func = deserialize_transform(dct["func"])
+        args = [deserialize_transform(a) if isinstance(a, dict) and "class" in a else a for a in dct.get("args", [])]
+        keywords = {k: deserialize_transform(v) if isinstance(v, dict) and "class" in v else v for k, v in dct.get("keywords", {}).items()}
+        return jax.tree_util.Partial(func, *args, **keywords)
         
     # Handle stateless functions
     if cls_name == "function":
@@ -114,9 +142,13 @@ def deserialize_transform(dct: dict | None) -> Any | None:
             mod = importlib.import_module(mod_name)
             return getattr(mod, func_name)
         except (ImportError, AttributeError) as e:
+            # Fallback: JAX internal paths (e.g., jax._src.numpy.lax_numpy) can be brittle.
+            # If the standard import fails, check if the function exists on the top-level jnp module.
+            if hasattr(jnp, func_name):
+                return getattr(jnp, func_name)
             raise ValueError(f"Could not deserialize function {func_name} from {mod_name}") from e
 
-    # Handle stateful instances (Bijectors / Custom Callables)
+    # Handle stateful instances (Bijectors / Custom Callables / Equinox Modules)
     cls = None
     if mod_name and mod_name != "builtins":
         try:
@@ -143,13 +175,16 @@ def deserialize_transform(dct: dict | None) -> Any | None:
 
 def format_transform(t: Any) -> str:
     """
-    Format a transform or bijector dynamically for string representation.
+    Format a transform, callable, or bijector dynamically for string representation.
     """
     if isinstance(t, Chain):
         parts_str = ", ".join([format_transform(p) for p in t.bijectors])
         return f"Chain([{parts_str}])"
+
+    if isinstance(t, (functools.partial, jax.tree_util.Partial)):
+        return f"Partial({format_transform(t.func)})"
         
-    if inspect.isfunction(t) or inspect.isbuiltin(t):
+    if inspect.isfunction(t) or inspect.isbuiltin(t) or (callable(t) and not hasattr(t, '__dict__')):
         return getattr(t, "__name__", "callable")
         
     class_name = t.__class__.__name__

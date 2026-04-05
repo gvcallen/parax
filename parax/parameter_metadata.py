@@ -1,3 +1,5 @@
+from typing import Callable
+
 import jax.numpy as jnp
 import equinox as eqx
 from distreqx.distributions import AbstractDistribution
@@ -21,8 +23,9 @@ class ParameterMetadata(eqx.Module):
     distribution : distreqx.distributions.AbstractDistribution or None
         The probability distribution associated with the parameter
         in unscaled physical space.
-    transform : distreqx.bijectors.AbstractBijector or None
+    transform : distreqx.bijectors.AbstractBijector or Callable or None
         The transform used to map from the latent space to the unscaled physical space.
+        If only a callable is provided, some features are limited.
     bounds : jnp.ndarray or None
         The boundaries of the parameter in unscaled physical space.
         Can be used as hard constraints for bounded optimizers.
@@ -36,7 +39,7 @@ class ParameterMetadata(eqx.Module):
     name: str | list | None = field(default=None, static=True)
     
     distribution: AbstractDistribution | None = field(default=None)
-    transform: AbstractBijector | None = field(default=None)
+    transform: AbstractBijector | Callable | None = field(default=None)
     bounds: jnp.ndarray | None = field(default=None)
     scale: float = field(default=1.0)
     

@@ -1,6 +1,6 @@
 import json
 import dataclasses
-from typing import Any
+from typing import Any, Callable
 
 import jax.numpy as jnp
 import equinox as eqx
@@ -142,11 +142,22 @@ class Parameter(eqx.Module):
         if latent_value is None:
             latent_value = jnp.asarray(value)
             if self.metadata is not None and self.metadata.transform is not None:
-                # The bijector in distreqx handles vectorized inputs automatically
-                latent_value = self.metadata.transform.inverse(latent_value)
+                if isinstance(self.metadata.transform, AbstractBijector):
+                    # We can invert bijectors safely
+                    latent_value = self.metadata.transform.inverse(latent_value)
+                elif callable(self.metadata.transform):
+                    # We cannot invert a generic callable
+                    raise ValueError(
+                        "Cannot automatically infer `latent_value` from a physical `value` "
+                        "when using a non-invertible transform (Callable). You must provide "
+                        "`latent_value` explicitly."
+                    )
                 
                 if jnp.any(jnp.isnan(latent_value)):
                     raise ValueError(f"Got nan while applying bijector inverse in parameter init.")
+        else:
+            if value is not None:
+                raise Exception("Both `latent_value` and `value` cannot be passed")
             
         self.latent_value = latent_value
         self.fixed = fixed
@@ -163,7 +174,10 @@ class Parameter(eqx.Module):
         """
         raw_val = self.latent_value
         if self.transform is not None:
-            raw_val = self.transform.forward(raw_val)
+            if isinstance(self.transform, AbstractBijector):
+                raw_val = self.transform.forward(raw_val)
+            elif callable(self.transform):
+                raw_val = self.transform(raw_val)
             
         return jnp.asarray(raw_val)
     
@@ -284,8 +298,13 @@ class Parameter(eqx.Module):
         if transform is None:
             return dist
         
+        if not isinstance(transform, AbstractBijector):
+            raise NotImplementedError(
+                "Cannot compute latent_distribution for non-bijective transforms."
+            )
+        
         from distreqx.bijectors import Inverse
-        return Transformed(dist, Inverse(transform))    
+        return Transformed(dist, Inverse(transform))
     
     def with_name(self, name: str) -> 'Parameter':
         """
@@ -325,7 +344,10 @@ class Parameter(eqx.Module):
         """
         latent_value = jnp.asarray(value)
         if self.metadata is not None and self.metadata.transform is not None:
-            latent_value = self.metadata.transform.inverse(latent_value)        
+            if isinstance(self.metadata.transform, AbstractBijector):
+                latent_value = self.metadata.transform.inverse(latent_value)        
+            else:
+                raise ValueError("Cannot use `with_value` on a parameter with a non-bijective transform.")
         return dataclasses.replace(self, latent_value=latent_value)
     
     def with_distribution(self, distribution: AbstractDistribution) -> 'Parameter':
@@ -386,19 +408,20 @@ class Parameter(eqx.Module):
             
         return dataclasses.replace(self, metadata=new_meta)    
     
-    def transformed(self, transform: AbstractBijector) -> 'Parameter':
+    def transformed(self, transform: AbstractBijector | Callable) -> 'Parameter':
         """
         Return a copy of this parameter transformed.
 
         This method applies the given transform to the parameter's physical space. 
-        It holistically updates the parameter by chaining the new transform with 
+        It updates the parameter by chaining the new transform with 
         any existing one, transforming the probability distribution, and mapping 
         the bounds. The underlying latent unconstrained value remains unchanged.
 
         Parameters
         ----------
-        transform : distreqx.bijectors.AbstractBijector
+        transform : distreqx.bijectors.AbstractBijector | Callable
             The transform to apply to the parameter's unscaled physical space.
+            If a callable is passed, some functionality is limited.
 
         Returns
         -------
@@ -423,7 +446,11 @@ class Parameter(eqx.Module):
         # 2. Chain the transforms (applied right-to-left: first old, then new)
         old_transform = self.transform
         if old_transform is not None:
-            new_transform = Chain([transform, old_transform])
+            if isinstance(transform, AbstractBijector) and isinstance(old_transform, AbstractBijector):
+                new_transform = Chain([transform, old_transform])
+            else:
+                # Fallback for chaining callables
+                new_transform = lambda x: transform(old_transform(x)) if callable(old_transform) else transform(old_transform.forward(x))
         else:
             new_transform = transform
             

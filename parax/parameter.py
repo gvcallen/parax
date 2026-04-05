@@ -158,6 +158,22 @@ class Parameter(eqx.Module):
         else:
             if value is not None:
                 raise Exception("Both `latent_value` and `value` cannot be passed")
+        
+        # 5. Safe-guard for non-invertible transforms
+        if self.metadata is not None and self.metadata.transform is not None:
+            if not isinstance(self.metadata.transform, AbstractBijector):
+                if self.metadata.distribution is not None:
+                    raise ValueError(
+                        "Cannot apply a physical `distribution` to a parameter with a "
+                        "non-bijective callable transform. The probability volume change cannot "
+                        "be calculated. Define distributions on the latent inputs instead."
+                    )
+                if self.metadata.bounds is not None:
+                    raise ValueError(
+                        "Cannot apply physical `bounds` to a parameter with a "
+                        "non-bijective callable transform. Optimizers cannot map physical bounds "
+                        "back to the latent space through arbitrary functions."            
+                    )
             
         self.latent_value = jnp.asarray(latent_value, dtype=float)
         self.fixed = fixed
@@ -594,7 +610,14 @@ class Parameter(eqx.Module):
         return len(self.latent_value)
     
     def __repr__(self):
-        args = [f"value={format_array(self.latent_value)}"]
+        args = []
+        
+        # Display 'value' if untransformed, 'latent_value' if transformed,
+        # perfectly matching the JSON serialization and constructor logic.
+        if self.transform is None:
+            args.append(f"value={format_array(self.value)}")
+        else:
+            args.append(f"latent_value={format_array(self.latent_value)}")
         
         if self.scale != 1.0:
             args.append(f"scale={self.scale}")

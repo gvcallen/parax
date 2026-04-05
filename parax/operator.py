@@ -41,6 +41,19 @@ def tree_op(op_fn):
 class Operator(eqx.Module, Generic[OpInputs, OpOutputs]):
     r"""
     A composable callable for building delayed computation graphs over PyTrees.
+    
+    ### Overview
+    This class is useful when you want to easily combine mappings over the
+    same input/output space. For example, you may have a `Loss` class
+    with a number of child classes (MSE, RMSE etc.) that accepts (y_true, y_pred)
+    and outputs an error. By simply inheriting from `prx.Operator`,
+    you can now combine loss functions into a new loss function using
+    addition, subtraction etc.
+    
+    Semantically, it makes sense to inherit from `prx.Operator`
+    if operators on your input space reflection the same operators
+    on your output space. For the above example, since "adding loss functions"
+    equivalently means "adding loss values", the "Operator" semantics hold.
 
     ### Mathematical Formulation
     This class constructs an algebra over a field for the space of mappings 

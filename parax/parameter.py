@@ -74,9 +74,9 @@ class Parameter(eqx.Module):
         # 1. Handle Vectorization (n)
         if n is not None:
             if value is not None:
-                value = jnp.broadcast_to(jnp.asarray(value), (n,) + jnp.shape(value))
+                value = jnp.broadcast_to(jnp.asarray(value, dtype=float), (n,) + jnp.shape(value))
             if latent_value is not None:
-                latent_value = jnp.broadcast_to(jnp.asarray(latent_value), (n,) + jnp.shape(latent_value))
+                latent_value = jnp.broadcast_to(jnp.asarray(latent_value, dtype=float), (n,) + jnp.shape(latent_value))
 
         # 2. Extract known metadata keys
         updates = {}
@@ -88,7 +88,7 @@ class Parameter(eqx.Module):
         if n is not None and n != 1:
             # Vectorize bounds: if shape is (2,), it becomes (n, 2)
             if "bounds" in updates and updates["bounds"] is not None:
-                b = jnp.asarray(updates["bounds"])
+                b = jnp.asarray(updates["bounds"], dtype=float)
                 updates["bounds"] = jnp.broadcast_to(b, (n,) + b.shape)
             
             # Vectorize name: if a string is passed, turn into a list of n strings
@@ -100,7 +100,7 @@ class Parameter(eqx.Module):
             updates["name"] = list(updates["name"])
             
         if "bounds" in updates and updates["bounds"] is not None:
-            updates["bounds"] = jnp.asarray(updates["bounds"])
+            updates["bounds"] = jnp.asarray(updates["bounds"], dtype=float)
             
         # Any remaining kwargs belong in the custom 'info' dict
         info_updates = kwargs if len(kwargs) > 0 else {}
@@ -140,7 +140,7 @@ class Parameter(eqx.Module):
                 
         # 4. Handle latent value extraction/inversion
         if latent_value is None:
-            latent_value = jnp.asarray(value)
+            latent_value = jnp.asarray(value, dtype=float)
             if self.metadata is not None and self.metadata.transform is not None:
                 if isinstance(self.metadata.transform, AbstractBijector):
                     # We can invert bijectors safely
@@ -159,7 +159,7 @@ class Parameter(eqx.Module):
             if value is not None:
                 raise Exception("Both `latent_value` and `value` cannot be passed")
             
-        self.latent_value = latent_value
+        self.latent_value = jnp.asarray(latent_value, dtype=float)
         self.fixed = fixed
 
     @property

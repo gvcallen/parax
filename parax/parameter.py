@@ -668,6 +668,8 @@ class Parameter(eqx.Module):
         Serialize the parameter to a JSON string.
         
         Omits any fields that are None or empty to keep the payload lightweight.
+        For readability, standard parameters serialize their 'value'. Transformed 
+        parameters serialize their 'latent_value' to safely support non-bijective mappings.
 
         Returns
         -------
@@ -679,7 +681,13 @@ class Parameter(eqx.Module):
             "scale": self.scale
         }
         
-        d["value"] = serialize_array(self.value) if self.latent_value is not None else None
+        # Serialize 'value' for readability if no transform exists, 
+        # otherwise serialize 'latent_value' for architectural safety.
+        if self.latent_value is not None:
+            if self.transform is None:
+                d["value"] = serialize_array(self.value)
+            else:
+                d["latent_value"] = serialize_array(self.latent_value)
         
         if self.distribution is not None:
             d["distribution"] = serialize_distribution(self.distribution)
@@ -715,8 +723,15 @@ class Parameter(eqx.Module):
         """
         d = json.loads(s)
         
+        # Safely extract either 'value' or 'latent_value' depending on how it was saved
         raw_value = d.pop("value", None)
-        value = deserialize_array(raw_value)
+        raw_latent = d.pop("latent_value", None)
+        
+        if raw_latent is not None:
+            d["latent_value"] = deserialize_array(raw_latent)
+        elif raw_value is not None:
+            d["value"] = deserialize_array(raw_value)
+            
         fixed = d.pop("fixed", False)
         
         if "distribution" in d:
@@ -728,7 +743,7 @@ class Parameter(eqx.Module):
         info_dict = d.pop("info", {})
         d.update(info_dict)
         
-        return cls(value=value, fixed=fixed, **d)
+        return cls(fixed=fixed, **d)
     
 
 def is_param(x: Any) -> bool:

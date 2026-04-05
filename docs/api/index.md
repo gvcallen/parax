@@ -6,11 +6,11 @@
 
 ::: parax.ParameterGroup
 
-::: parax.partition
-
 ::: parax.Module
 
 ::: parax.Operator
+
+::: parax.partition
 
 ::: parax.load
 

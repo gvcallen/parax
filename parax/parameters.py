@@ -9,6 +9,7 @@ import distreqx.distributions as dist
 
 from parax.parameter import Parameter
 
+
 def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
@@ -31,8 +32,13 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     """
     low, high = jnp.array(low, dtype=float), jnp.array(high, dtype=float)
     dists = dist.Uniform(low, high)
+    
+    if 'latent_value' in kwargs:
+        return Parameter(distribution=dists, **kwargs)
+        
     values = (low + high) / 2.0 if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
+
 
 def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | Sequence[float], *args, **kwargs) -> Parameter:
     r"""
@@ -62,6 +68,7 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
     
     return Uniform(mean_arr - delta, mean_arr + delta, *args, **kwargs)
 
+
 def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[float], *args, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
@@ -85,6 +92,7 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
     
     return Uniform(low, high, *args, **kwargs)
 
+
 def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a normal (Gaussian) distribution.
@@ -107,8 +115,13 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
     """
     mean, std = jnp.array(mean, dtype=float), jnp.array(std, dtype=float)
     dists = dist.Normal(mean, std)
+    
+    if 'latent_value' in kwargs:
+        return Parameter(distribution=dists, **kwargs)
+        
     values = mean if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)
+
 
 def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence[float], **kwargs) -> Parameter:
     r"""
@@ -139,7 +152,8 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
     
     return Normal(mean=mean_arr, std=sigma, **kwargs)
 
-def Fixed(value, **kwargs) -> Parameter:
+
+def Fixed(value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` that is marked as fixed.
     
@@ -147,8 +161,8 @@ def Fixed(value, **kwargs) -> Parameter:
 
     Parameters
     ----------
-    value
-        The value of the parameter.
+    value : optional
+        The value of the parameter. If None, `latent_value` must be provided in kwargs.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -157,10 +171,17 @@ def Fixed(value, **kwargs) -> Parameter:
     Parameter
         The created fixed Parameter object.
     """
+    if 'latent_value' in kwargs:
+        return Parameter(fixed=True, **kwargs)
+        
+    if value is None:
+        raise ValueError("Must provide either `value` or `latent_value`.")
+        
     value = jnp.array(value, dtype=float)
     return Parameter(value=value, fixed=True, **kwargs)
 
-def Free(value, **kwargs) -> Parameter:
+
+def Free(value=None, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` that is marked as free (i.e., free to vary).
     
@@ -168,8 +189,8 @@ def Free(value, **kwargs) -> Parameter:
 
     Parameters
     ----------
-    value
-        The value of the parameter.
+    value : optional
+        The value of the parameter. If None, `latent_value` must be provided in kwargs.
     n : int, optional
         The number of identical parameters to create in an array. Defaults to None.
     **kwargs
@@ -180,5 +201,11 @@ def Free(value, **kwargs) -> Parameter:
     Parameter
         The created free Parameter object.
     """
+    if 'latent_value' in kwargs:
+        return Parameter(fixed=False, **kwargs)
+        
+    if value is None:
+        raise ValueError("Must provide either `value` or `latent_value`.")
+        
     value = jnp.array(value, dtype=float)
     return Parameter(value=value, fixed=False, **kwargs)

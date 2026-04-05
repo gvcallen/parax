@@ -7,8 +7,6 @@ from distreqx.distributions import AbstractDistribution
 
 from parax.utils.array import format_array
 
-from distrax import SplitCoupling
-
 def split_vectorized_distribution(d: AbstractDistribution) -> list[AbstractDistribution]:
     """
     Split an arbitrarily shaped batch of univariate distreqx distributions into a list of scalar distributions.

@@ -122,8 +122,8 @@ class Operator(eqx.Module, Generic[OpInputs, OpOutputs]):
     # --- Unary Operators ---
     
     def __neg__(self) -> Operator[OpInputs, OpOutputs]:
-        from parax.op import Map
-        return Map(operator=self, fn=tree_op(operator.neg))
+        from parax.op import Negate
+        return Negate(self)
 
     # --- Reverse Arithmetic (for <scalar> + <Operator>) ---
 

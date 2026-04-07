@@ -1,7 +1,10 @@
+import operator
+
 import jax
 import jax.numpy as jnp
 from typing import Any, Callable, Union
-from parax.operator import Operator, OpInputs, OpOutputs
+from parax.operator import Operator, OpInputs, OpOutputs, tree_op
+from parax.op import Map
 from parax.field import field
 
 class Stack(Operator[OpInputs, OpOutputs]):
@@ -43,6 +46,13 @@ class Reduce(Operator[OpInputs, OpOutputs]):
 class Sum(Reduce):
     """Convenience class for summing an operator's output."""
     fn: Callable = field(default=jnp.sum, static=True)
+    
+class Negate(Map):
+    """
+    Applies an arbitrary function to a single operator's output.
+    """
+    def __init__(self, other):
+        return super().__init__(fn=tree_op(operator.neg), operator=other)
 
 class Derivative(Operator[OpInputs, OpOutputs]):
     """Computes numerical derivative with respect to a context attribute."""

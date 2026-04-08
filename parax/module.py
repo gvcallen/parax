@@ -740,7 +740,46 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         return final_groups
     
+    def validate_params(self: Self) -> None:
+        """
+        Validates that all parameters in the module hierarchy have unique names.
+        
+        Raises
+        ------
+        ValueError
+            If duplicate parameter names or flattened parameter names are detected.
+        """
+        seen_names = set()
+        duplicates = set()
+        
+        # 1. Check standard parameter names
+        for name, _ in self.iter_params(flatten=False):
+            if name in seen_names:
+                duplicates.add(name)
+            seen_names.add(name)
 
+        seen_flat = set()
+        flat_duplicates = set()
+        
+        # 2. Check flattened parameter names (suffix collisions)
+        for name, _ in self.iter_params(flatten=True):
+            if name in seen_flat:
+                flat_duplicates.add(name)
+            seen_flat.add(name)
+
+        # 3. Aggregate errors and report
+        error_msgs = []
+        if duplicates:
+            error_msgs.append(f"- Duplicate standard names: {', '.join(duplicates)}")
+        if flat_duplicates:
+            error_msgs.append(f"- Duplicate flattened names: {', '.join(flat_duplicates)}")
+
+        if error_msgs:
+            raise ValueError(
+                f"Parameter name collision detected in {self.__class__.__name__}!\n"
+                + "\n".join(error_msgs)
+                + "\nEnsure that custom 'name' attributes on submodules and parameters are unique within their scope."
+            )
     
     # ---- Parameter Manipulation --------------------------------------------------            
 

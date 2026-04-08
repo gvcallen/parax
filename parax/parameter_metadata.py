@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Any
 
 import jax.numpy as jnp
 import equinox as eqx
@@ -44,3 +44,11 @@ class ParameterMetadata(eqx.Module):
     scale: float = field(default=1.0)
     
     info: dict = field(default_factory=dict, static=True)
+
+    def __getitem__(self, key: str) -> Any:
+        """Allows reading from the `info` dictionary using meta['key']."""
+        return self.info[key]
+    
+    def __contains__(self, key: str) -> bool:
+        """Allows checking for keys using `key in meta`."""
+        return key in self.info

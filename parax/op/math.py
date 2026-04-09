@@ -43,9 +43,13 @@ class Reduce(Operator[OpInputs, OpOutputs]):
     def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
         return self.fn(self.operator(*args, **kwargs), axis=self.axis)
 
-class Sum(Reduce):
-    """Convenience class for summing an operator's output."""
-    fn: Callable = field(default=jnp.sum, static=True)
+class Sum(Operator[OpInputs, OpOutputs]):
+    """Evaluates multiple operators and sums their outputs together."""
+    operators: tuple[Operator, ...] | list[Operator]
+
+    def __call__(self, *args: OpInputs.args, **kwargs: OpInputs.kwargs) -> OpOutputs:
+        results = [op(*args, **kwargs) for op in self.operators]
+        return sum(results[1:], start=results[0])
     
 class Negate(Map):
     """

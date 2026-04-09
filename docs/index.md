@@ -20,7 +20,7 @@ However, the library also provides additional helpers, including `parax.partitio
 - **Arbitrary metadata support**: While **Parax** natively caters for common metadata such as distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling purposes (for example, in the scientific domain it is common to want to attach units to a parameter).
 - **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy inspection, updating, fixing, freeing, or mapping of parameters and their metadata deep within complex models using simple string paths and bulk `with_*` methods. For example, `parax.Module.named_params()` returns a dictionary of parameters with names based on string paths.
 - (experimental) **Composable PyTree operations**: **Parax** provides `parax.Operator`, which caters for composable, parametric operations over arbitrary arguments. This can be very useful in manipulating domain-specific `parax.Module` objects in a parameter-aware manner.
-- (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
+- (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and transformation/bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
 
 ## Installation
 Parax can be installed using pip directly:
@@ -31,7 +31,7 @@ pip install parax
 
 ## Overview
 
-The `Parameter` class is designed to be used as if it was a JAX array. The raw `value` inside a parameter is therefore stored in "latent" space i.e. *untransformed* and *unscaled*. However, parameters eagerly cast to JAX arrays, at which point the bijection and scaling is applied. This completely abstracts the underlying latent value (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
+The `Parameter` class is designed to be used as if it was a JAX array. The raw `value` inside a parameter is therefore stored in "latent" space i.e. *untransformed* and *unscaled*. However, parameters eagerly cast to JAX arrays, at which point any transformation/bijection and scaling is applied. This completely abstracts the underlying latent value (to be used in optimization) from the user, bypassing the need to explicitly apply the transform.
 
 To make optimization easy, `Parax` also comes with a built-in `parax.partition` function, which partitions a model into trainable parameters. If a model is built purely using `Parameter`'s, this removes the need for any conditional logical that would usually be done manually during `eqx.partition`.
 
@@ -52,9 +52,52 @@ print(normal_param.latent_value) # prints 0.0
 print(normal_param.value) # prints 0.5
 ```
 
-## Example 2: Optimizing a model
+## Example 2: Manipulating parameters
 
-In this example, we define a simple quadratic model ($y = ax^2 + bx + c$). We fix the y-intercept, leave the other coefficients free, and use JAX and `optimistix` to fit the model to some noisy data.
+`parax.Module` is designed as a lightweight add-on to `equinox.Module` with added parameter manipulation, mapping and inspection routines.
+
+The following example defines a nested module, and then fixes one of the parameters, and adds a probability distribution to another.
+
+Notice how parameters can be initialized with floats or default parameters - `parax.Module` automatically applies the `as_param` converter, and also deep-copies any mutatable parameter objects to avoid the Python "mutable default" trap.
+
+```python
+import jax.numpy as jnp
+import parax as prx
+
+class Quadratic(prx.Module):
+    a: prx.Parameter = 0.0
+    b: prx.Parameter = 0.0
+    c: prx.Parameter = prx.Fixed(0.0)
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        return self.a * (x ** 2) + self.b * x + self.c
+
+class NthRootOfModule(prx.Module):
+    # Create a module that takes the n'th root of another module
+    nth_root: prx.Parameter
+
+    # Define the module we are wrapping and mark its parameters
+    # as "transparent" in the hierachy (so we dont have an "of_" prefix)
+    of: prx.Module = prx.field(transparent=True)
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        return jnp.power(self.of(x), 1.0/self.n)
+
+# Create a module and print its parameter names
+cube_root_quadratic = NthRootOfModule(3, Quadratic(2.0, -3.0))
+print(cube_root_quadratic.param_names()) # prints ['nth_root', 'a', 'b']
+
+# Updated 'a' to have a normal distribution and 'nth_root' to be fixed to 2.5.
+# prx.Normal is a factory that creates a `distreqx.distribution.Normal`
+statistical_2p5_root_quadratic = cube_root_quadratic.with_params(
+    nth_root=prx.Fixed(2.5),
+    a=prx.Normal(3.0, 1.0),
+)
+```
+
+## Example 3: Optimizing a model
+
+In this example, we define a simple quadratic model ($y = ax^2 + bx + c$) and derive directly from `eqx.Module`. We fix the y-intercept, leave the other coefficients free, partition using `prx.partition`, and use `optimistix` to fit the model to some noisy data.
 
 ```python
 

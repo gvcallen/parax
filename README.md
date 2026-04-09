@@ -56,46 +56,48 @@ print(normal_param.value) # prints 0.5
 
 `parax.Module` is designed as a lightweight add-on to `equinox.Module` with added parameter manipulation, mapping and inspection routines.
 
-The following example defined a nested module, and then fixed one parameter and adds a probability distribution to the other.
+The following example defines a nested module, and then fixes one of the parameters, and adds a probability distribution to another.
+
+Note how parameters can be initialized with other parameters or floats - `parax.Module` automatically applies the `as_param` converter and deepcopies and mutatable objects to avoid the Python "mutable default" trap.
 
 ```python
 import jax.numpy as jnp
 import parax as prx
 
 class Quadratic(prx.Module):
-    a: prx.Parameter
-    b: prx.Parameter
-    c: prx.Parameter = prx.field(default=prx.Fixed(0.0))
+    a: prx.Parameter = 0.0
+    b: prx.Parameter = 0.0
+    c: prx.Parameter = prx.Fixed(0.0)
 
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         return self.a * (x ** 2) + self.b * x + self.c
 
 class NthRootOfModule(prx.Module):
     # Create a module that takes the n'th root of another module
-    n: prx.Parameter
+    nth_root: prx.Parameter
 
     # Define the module we are wrapping and mark its parameters
-    # as "transparent" in the hierachy
+    # as "transparent" in the hierachy (so we dont have an "of_" prefix)
     of: prx.Module = prx.field(transparent=True)
 
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        return jnp.power(self.of(x), 1/self.n)
+        return jnp.power(self.of(x), 1.0/self.n)
 
 # Create a module and print its parameter names
 cube_root_quadratic = NthRootOfModule(3, Quadratic(2.0, -3.0))
-print(cube_root_quadratic.param_names()) # print ['n', 'a', 'b']
+print(cube_root_quadratic.param_names()) # prints ['nth_root', 'a', 'b']
 
-# Updated 'a' to have a normal distribution and 'n' to be fixed to 2.5.
+# Updated 'a' to have a normal distribution and 'nth_root' to be fixed to 2.5.
 # prx.Normal is a factory that creates a `distreqx.distribution.Normal`
 statistical_2p5_root_quadratic = cube_root_quadratic.with_params(
-    n=prx.Fixed(2.5),
+    nth_root=prx.Fixed(2.5),
     a=prx.Normal(3.0, 1.0),
 )
 ```
 
 ## Example 3: Optimizing a model
 
-In this example, we define a simple quadratic model ($y = ax^2 + bx + c$) but only derive from `eqx.Module`. We fix the y-intercept, leave the other coefficients free, and use JAX and `optimistix` to fit the model to some noisy data.
+In this example, we define a simple quadratic model ($y = ax^2 + bx + c$) and derive directly from `eqx.Module`. We fix the y-intercept, leave the other coefficients free, partition using `prx.partition`, and use `optimistix` to fit the model to some noisy data.
 
 ```python
 

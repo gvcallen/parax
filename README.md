@@ -58,7 +58,7 @@ print(normal_param.value) # prints 0.5
 
 The following example defines a nested module, and then fixes one of the parameters, and adds a probability distribution to another.
 
-Note how parameters can be initialized with other parameters or floats - `parax.Module` automatically applies the `as_param` converter and deepcopies and mutatable objects to avoid the Python "mutable default" trap.
+Notice how parameters can be initialized with floats or default parameters - `parax.Module` automatically applies the `as_param` converter, and also deep-copies any mutatable parameter objects to avoid the Python "mutable default" trap.
 
 ```python
 import jax.numpy as jnp

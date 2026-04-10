@@ -47,7 +47,7 @@ The following example creates a `parax.Parameter` that is strictly bounded betwe
 import parax as prx
 from distreqx.bijectors import Sigmoid
 
-normal_param = prx.Normal(0.5, 0.1, bijector=Sigmoid())
+normal_param = prx.Normal(0.5, 0.1, transform=Sigmoid())
 print(normal_param.latent_value) # prints 0.0
 print(normal_param.value) # prints 0.5
 ```

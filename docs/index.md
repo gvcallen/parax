@@ -44,12 +44,14 @@ The library is mainly intended for use in domain-specific scientific modeling, b
 The following example creates a `parax.Parameter` that is strictly bounded between 0.0 and 1.0, and whose physical value follows a normal distribution.
 
 ```python
+import jax.numpy as jnp
 import parax as prx
 from distreqx.bijectors import Sigmoid
 
 normal_param = prx.Normal(0.5, 0.1, transform=Sigmoid())
-print(normal_param.latent_value) # prints 0.0
-print(normal_param.value) # prints 0.5
+assert normal_param.latent_value == 0.0
+assert normal_param.value == 0.5
+assert jnp.array(normal_param) == 0.5
 ```
 
 ## Example 2: Manipulating parameters

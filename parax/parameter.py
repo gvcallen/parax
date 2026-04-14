@@ -55,6 +55,7 @@ class Parameter(eqx.Module):
         fixed: bool = False, 
         metadata: ParameterMetadata | None = None, 
         n: int | None = None,
+        shape: tuple[int, ...] | int | None = None,
         **kwargs
     ):
         """
@@ -71,12 +72,23 @@ class Parameter(eqx.Module):
         if latent_value is None and value is None:
             raise Exception("Must pass one of either `latent_value` or `value` to Parameter constructor")
         
-        # 1. Handle Vectorization (n)
+        if n is not None and shape is not None:
+            raise ValueError("Cannot specify both `n` and `shape`.")
+
+        if isinstance(shape, int):
+            shape = (shape,)
+
+        # 1. Handle Vectorization (n) & Broadcasting (shape)
         if n is not None:
             if value is not None:
                 value = jnp.broadcast_to(jnp.asarray(value, dtype=float), (n,) + jnp.shape(value))
             if latent_value is not None:
                 latent_value = jnp.broadcast_to(jnp.asarray(latent_value, dtype=float), (n,) + jnp.shape(latent_value))
+        elif shape is not None:
+            if value is not None:
+                value = jnp.broadcast_to(jnp.asarray(value, dtype=float), shape)
+            if latent_value is not None:
+                latent_value = jnp.broadcast_to(jnp.asarray(latent_value, dtype=float), shape)
 
         # 2. Extract known metadata keys
         updates = {}

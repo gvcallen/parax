@@ -4,7 +4,7 @@ The main module class.
 This module defines [`parax.Module`][], a frozen, JAX-compatible, Equinox module.
 
 """
-
+from operator import attrgetter
 from functools import partial
 from copy import copy, deepcopy
 from typing import Callable, Sequence, Iterator, Self, ClassVar, Any
@@ -326,7 +326,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if isinstance(submodules, (Module, str)):
                 submodules = [submodules]
                 
-            resolved_submodules = [getattr(self, sm) if isinstance(sm, str) else sm for sm in submodules]
+            # resolved_submodules = [getattr(self, sm) if isinstance(sm, str) else sm for sm in submodules]
+            resolved_submodules = [attrgetter(sm)(self) if isinstance(sm, str) else sm for sm in submodules]
             if not isinstance(resolved_submodules[0], Module):
                 raise Exception(f"Got unknown type when expecting a module or string. Type was: {type(resolved_submodules[0])}")
 
@@ -532,7 +533,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             Include fixed parameters.
         submodules : Module | Sequence[Module] | str | Sequence[str] | None, optional
             Restrict to parameters used by the given submodule(s). If strings are
-            provided, ``getattr(self, name)`` is used.
+            provided, ``operator.attrgetter(submodules)(self)`` is used.
 
         Returns
         -------

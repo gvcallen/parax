@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jax import flatten_util
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 import equinox as eqx
-from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution, Joint
+from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
 from distreqx.bijectors import AbstractBijector
 
 from parax.parameter import Parameter, is_valid_param, as_param
@@ -822,11 +822,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         return final_groups
     
-    def grouped_distribution(self) -> Joint:
+    def grouped_distribution(self) -> AbstractDistribution:
         """
         (experimental) Returns a distreqx.Joint distribution where the PyTree structure 
         matches `self.grouped_param_values()`.
         """
+        from distreqx.distributions import Joint
+        
         groups = self.param_groups(include_fixed=False)
         
         dist_dict = {}

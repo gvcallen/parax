@@ -1,12 +1,11 @@
 import dataclasses
-from dataclasses import dataclass
 
+import equinox as eqx
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector, Chain
 from parax.field import field
 
-@dataclass
-class ParameterGroup:
+class ParameterGroup(eqx.Module):
     """
     A metadata class that groups a set of named flat parameters and defines 
     any joint relationships, distributions, or transforms between them.

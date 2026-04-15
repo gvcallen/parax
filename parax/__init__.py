@@ -8,6 +8,7 @@ except PackageNotFoundError:
 from parax.field import field
 from parax.serialization import load, save
 from parax.module import Module
+from parax.module_distribution import ModuleDistribution
 from parax.parameter import Parameter, is_param, is_valid_param, is_free_param, is_fixed_param, as_param
 from parax.parameter_metadata import ParameterMetadata
 from parax.parameter_group import ParameterGroup
@@ -26,6 +27,7 @@ __all__= [
     "load",
     "save",
     "Module",
+    "ModuleDistribution",
     "Operator", "OpInputs", "OpOutputs",
     "Uniform", "RelativeUniform", "CenteredUniform", "Normal", "RelativeNormal", "Fixed", "Free",
 ]

@@ -13,6 +13,23 @@ from parax.module import Module
 from parax.parameter import Parameter
 import equinox as eqx
 
+def _eqx_getstate(self):
+    """Strip out JAX's mangled ghosts before serialization."""
+    return {
+        k: v for k, v in self.__dict__.items()
+        if not k.startswith(f"_{self.__class__.__name__}__") and k != "__orig_class__"
+    }
+
+def _eqx_setstate(self, state):
+    """Bypass Equinox's frozen lock during deserialization."""
+    for k, v in state.items():
+        if not k.startswith("py/"):
+            object.__setattr__(self, k, v)
+
+# Patch Equinox modules so jsonpickle handles them smoothly
+eqx.Module.__getstate__ = _eqx_getstate
+eqx.Module.__setstate__ = _eqx_setstate
+
 
 class ParameterHandler(jsonpickle.handlers.BaseHandler):
     """
@@ -126,10 +143,12 @@ def save(target: str | os.PathLike | BinaryIO, tree: Any):
             return node.saveable()
         return node
         
+    # NB: we treat all equinox Modules as leafs so JAX doesnt mangle their internals.
+    # Note however that if there is a parax module inside an equinox module this wont work
     tree_save = jtu.tree_map(
         to_saveable, 
         tree, 
-        is_leaf=lambda x: isinstance(x, Module)
+        is_leaf=lambda x: isinstance(x, (Module, eqx.Module))
     )
     
     # 2. Encode the standardized tree

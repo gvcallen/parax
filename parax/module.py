@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jax import flatten_util
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 import equinox as eqx
-from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
+from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution, Joint
 from distreqx.bijectors import AbstractBijector
 
 from parax.parameter import Parameter, is_valid_param, as_param
@@ -675,6 +675,88 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         See [`parax.Module.named_flat_param_values`][].
         """
         return jnp.array(list(self.named_flat_param_values(*args, **kwargs).values())).reshape(-1)
+    
+    # ---- Grouped Parameter Inspection -----------------------------------------
+
+    def named_grouped_params(self, include_fixed=False) -> dict[str, dict[str, Parameter]]:
+        """
+        Returns a dictionary of parameter groups, where each group is a 
+        dictionary mapping parameter names to their Parameter objects.
+        
+        The outer dictionary keys are the ParameterGroup's `name` attribute. 
+        If the group has no name, its index in `param_groups()` is used.
+        """
+        groups = self.param_groups(include_fixed=include_fixed)
+        flat_params = self.named_flat_params(include_fixed=include_fixed)
+        
+        result = {}
+        for i, group in enumerate(groups):
+            group_key = getattr(group, 'name', None)
+            if group_key is None:
+                group_key = str(i)
+                
+            result[group_key] = {name: flat_params[name] for name in group.param_names}
+            
+        return result
+
+    def named_grouped_param_values(self, scaled=False, include_fixed=False, **kwargs) -> dict[str, dict[str, jax.Array]]:
+        """
+        Returns a dictionary of parameter groups, where each group is a 
+        dictionary mapping parameter names to their physical JAX array values.
+        """
+        groups = self.param_groups(include_fixed=include_fixed)
+        flat_vals = self.named_flat_param_values(scaled=scaled, include_fixed=include_fixed, **kwargs)
+        
+        result = {}
+        for i, group in enumerate(groups):
+            group_key = getattr(group, 'name', None)
+            if group_key is None:
+                group_key = str(i)
+                
+            result[group_key] = {name: flat_vals[name] for name in group.param_names}
+            
+        return result
+
+    def grouped_params(self, include_fixed=False) -> dict[str, Parameter | list[Parameter]]:
+        """
+        Returns a dictionary of parameter groups mapping to their Parameter objects.
+        
+        If a group contains multiple parameters, they are returned as a list.
+        If a group contains a single parameter, the Parameter object is returned directly.
+        """
+        named_grouped = self.named_grouped_params(include_fixed=include_fixed)
+        
+        result = {}
+        for group_key, param_dict in named_grouped.items():
+            param_list = list(param_dict.values())
+            # Squeeze single-element lists to match statistical event shapes
+            result[group_key] = param_list[0] if len(param_list) == 1 else param_list
+            
+        return result
+
+    def grouped_param_values(self, scaled=False, include_fixed=False, **kwargs) -> dict[str, jax.Array]:
+        """
+        Returns a dictionary of parameter groups mapping to their stacked JAX arrays.
+        
+        This structure mathematically matches the `event_shape` of `.distribution()` 
+        and is the required format for evaluating log-probabilities and sampling.
+        """
+        named_grouped = self.named_grouped_param_values(scaled=scaled, include_fixed=include_fixed, **kwargs)
+        
+        result = {}
+        for group_key, val_dict in named_grouped.items():
+            array_list = list(val_dict.values())
+            
+            # Stack into a single array for Multivariate distributions
+            stacked_array = jnp.stack(array_list)
+            
+            # Squeeze scalar parameters back to shape () for Univariate distributions
+            if len(array_list) == 1:
+                stacked_array = jnp.squeeze(stacked_array, axis=0)
+                
+            result[group_key] = stacked_array
+            
+        return result    
 
     def param_groups(self, include_fixed=False, explicit_only=False) -> list[ParameterGroup]:
         """Return all parameter groups relevant to this module, including submodules.
@@ -739,6 +821,20 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 seen_params.add(name)
 
         return final_groups
+    
+    def grouped_distribution(self) -> Joint:
+        """
+        (experimental) Returns a distreqx.Joint distribution where the PyTree structure 
+        matches `self.grouped_param_values()`.
+        """
+        groups = self.param_groups(include_fixed=False)
+        
+        dist_dict = {}
+        for i, group in enumerate(groups):
+            group_key = getattr(group, 'name', None) or str(i)
+            dist_dict[group_key] = group.distribution
+            
+        return Joint(dist_dict)
     
     def validate_params(self: Self) -> None:
         """

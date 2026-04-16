@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from distreqx.distributions import Normal
-from parax.module_distribution import ModuleDistribution
+from parax.distributions import ModuleDistribution
 from tests.dummy_model import MathModel
 
 @pytest.fixture

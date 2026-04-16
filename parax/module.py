@@ -180,13 +180,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     | [`with_free_submodules_only`][parax.Module.with_free_submodules_only] | Returns a module with ONLY the specified submodules freed. |
     | [`with_fixed_submodules`][parax.Module.with_fixed_submodules] | Fix all parameters in the given submodules. |
     
-    **Function Tools**
-
-    | Method | Description |
-    |---|---|
-    | [`func_jacobian`][parax.Module.func_jacobian] | Calculate the Jacobian of a function w.r.t parameters. |
-    | [`func_sensitivity`][parax.Module.func_sensitivity] | Calculate the sensitivity of a function w.r.t parameters. |
-    | [`func_samples`][parax.Module.func_samples] | Evaluate a function over parameter samples. |    
 
     Attributes
     ----------
@@ -1760,143 +1753,143 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     
     # ---- Function tools --------------------------------------------------        
 
-    @eqx.filter_jit
-    def func_jacobian(
-        self: Self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any
-    ) -> dict[str, jnp.ndarray]:
-        """Calculate the Jacobian of an arbitrary function with respect to free parameters.
+    # @eqx.filter_jit
+    # def func_jacobian(
+    #     self: Self, 
+    #     func: Callable[['Module'], jnp.ndarray], 
+    #     args: Any
+    # ) -> dict[str, jnp.ndarray]:
+    #     """Calculate the Jacobian of an arbitrary function with respect to free parameters.
 
-        This uses forward-mode automatic differentiation to compute the gradients 
-        of the provided function with respect to each free parameter in the module.
+    #     This uses forward-mode automatic differentiation to compute the gradients 
+    #     of the provided function with respect to each free parameter in the module.
 
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            Function to differentiate. Must take a Module and args
-            and return a jnp.ndarray of any shape.
-        args : Any
-            The args to pass to `func`.
+    #     Parameters
+    #     ----------
+    #     func : Callable[[Module], jnp.ndarray]
+    #         Function to differentiate. Must take a Module and args
+    #         and return a jnp.ndarray of any shape.
+    #     args : Any
+    #         The args to pass to `func`.
 
-        Returns
-        -------
-        dict[str, jnp.ndarray]
-            A dictionary mapping flat parameter names to their gradient 
-            arrays. Each array has the same shape as the output of `func`.
-        """
-        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
+    #     Returns
+    #     -------
+    #     dict[str, jnp.ndarray]
+    #         A dictionary mapping flat parameter names to their gradient 
+    #         arrays. Each array has the same shape as the output of `func`.
+    #     """
+    #     def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
+    #         sampled_module = self.with_params(flat_params_array)
+    #         return func(sampled_module, args)
 
-        jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
-        jac_moved = jnp.moveaxis(jac_array, -1, 0)
-        param_names = self.flat_param_names()
+    #     jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
+    #     jac_moved = jnp.moveaxis(jac_array, -1, 0)
+    #     param_names = self.flat_param_names()
         
-        return {name: jac_moved[i] for i, name in enumerate(param_names)}
+    #     return {name: jac_moved[i] for i, name in enumerate(param_names)}
     
-    @eqx.filter_jit
-    def func_sensitivity(
-        self: Self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any,
-        kind: str = 'relative',
-        norm: int | str | None = None
-    ) -> dict[str, jnp.ndarray] | jnp.ndarray:
-        r"""Calculate the sensitivity of an arbitrary function w.r.t parameters.
+    # @eqx.filter_jit
+    # def func_sensitivity(
+    #     self: Self, 
+    #     func: Callable[['Module'], jnp.ndarray], 
+    #     args: Any,
+    #     kind: str = 'relative',
+    #     norm: int | str | None = None
+    # ) -> dict[str, jnp.ndarray] | jnp.ndarray:
+    #     r"""Calculate the sensitivity of an arbitrary function w.r.t parameters.
 
-        Supported kinds:
-        - 'relative': (dy/dtheta) * (theta/y). Fractional change in output per 
-          fractional change in parameter. Blows up if y is zero.
-        - 'semi-relative': (dy/dtheta) * theta. Change in output per 
-          fractional change in parameter. Stable if y is zero.
-        - 'absolute': (dy/dtheta). Raw gradient.
+    #     Supported kinds:
+    #     - 'relative': (dy/dtheta) * (theta/y). Fractional change in output per 
+    #       fractional change in parameter. Blows up if y is zero.
+    #     - 'semi-relative': (dy/dtheta) * theta. Change in output per 
+    #       fractional change in parameter. Stable if y is zero.
+    #     - 'absolute': (dy/dtheta). Raw gradient.
 
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            Function to evaluate.
-        args : Any
-            The args to pass to `func`.
-        kind : str, default='relative'
-            The type of sensitivity to calculate ('relative', 'semi-relative', 'absolute').
-        norm : int | str | None, default=None
-            If provided, aggregates the parameter sensitivities into a single scalar 
-            metric using the specified norm (e.g., 2 for L2 norm, jnp.inf for max norm).
+    #     Parameters
+    #     ----------
+    #     func : Callable[[Module], jnp.ndarray]
+    #         Function to evaluate.
+    #     args : Any
+    #         The args to pass to `func`.
+    #     kind : str, default='relative'
+    #         The type of sensitivity to calculate ('relative', 'semi-relative', 'absolute').
+    #     norm : int | str | None, default=None
+    #         If provided, aggregates the parameter sensitivities into a single scalar 
+    #         metric using the specified norm (e.g., 2 for L2 norm, jnp.inf for max norm).
 
-        Returns
-        -------
-        dict[str, jnp.ndarray] | jnp.ndarray
-            If `norm` is None, returns a dictionary mapping flat parameter names 
-            to sensitivity arrays.
-            If `norm` is specified, returns a 0D scalar jax array representing 
-            the global sensitivity metric.
-        """
-        def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
+    #     Returns
+    #     -------
+    #     dict[str, jnp.ndarray] | jnp.ndarray
+    #         If `norm` is None, returns a dictionary mapping flat parameter names 
+    #         to sensitivity arrays.
+    #         If `norm` is specified, returns a 0D scalar jax array representing 
+    #         the global sensitivity metric.
+    #     """
+    #     def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
+    #         sampled_module = self.with_params(flat_params_array)
+    #         return func(sampled_module, args)
 
-        theta = self.flat_param_values()
-        jac_array = jax.jacfwd(func_from_flat)(theta)
+    #     theta = self.flat_param_values()
+    #     jac_array = jax.jacfwd(func_from_flat)(theta)
         
-        if kind == 'absolute':
-            sens_array = jac_array
+    #     if kind == 'absolute':
+    #         sens_array = jac_array
             
-        elif kind == 'semi-relative':
-            sens_array = jac_array * theta
+    #     elif kind == 'semi-relative':
+    #         sens_array = jac_array * theta
             
-        elif kind == 'relative':
-            y_nom = func(self, args)
-            y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
-            sens_array = jac_array * (theta / y_safe[..., None])
+    #     elif kind == 'relative':
+    #         y_nom = func(self, args)
+    #         y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
+    #         sens_array = jac_array * (theta / y_safe[..., None])
             
-        else:
-            raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
-                             f"Supported: 'relative', 'semi-relative', 'absolute'") 
+    #     else:
+    #         raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
+    #                          f"Supported: 'relative', 'semi-relative', 'absolute'") 
         
-        if norm is not None:
-            return jnp.linalg.norm(sens_array, ord=norm)
+    #     if norm is not None:
+    #         return jnp.linalg.norm(sens_array, ord=norm)
             
-        sens_moved = jnp.moveaxis(sens_array, -1, 0)
-        param_names = self.flat_param_names()
+    #     sens_moved = jnp.moveaxis(sens_array, -1, 0)
+    #     param_names = self.flat_param_names()
         
-        return {name: sens_moved[i] for i, name in enumerate(param_names)}
+    #     return {name: sens_moved[i] for i, name in enumerate(param_names)}
 
-    @eqx.filter_jit
-    def func_samples(
-        self, 
-        func: Callable[['Module'], jnp.ndarray], 
-        args: Any,
-        *,
-        key: jax.Array, 
-        num_samples: int = 1000
-    ) -> jnp.ndarray:
-        """
-        Evaluates an arbitrary function over samples drawn from the 
-        module's distribution.
+    # @eqx.filter_jit
+    # def func_samples(
+    #     self, 
+    #     func: Callable[['Module'], jnp.ndarray], 
+    #     args: Any,
+    #     *,
+    #     key: jax.Array, 
+    #     num_samples: int = 1000
+    # ) -> jnp.ndarray:
+    #     """
+    #     Evaluates an arbitrary function over samples drawn from the 
+    #     module's distribution.
 
-        Parameters
-        ----------
-        func : Callable[[Module], jnp.ndarray]
-            A function that takes a Module instance and returns a JAX array.
-        args : Any
-            The args to pass to `func`.            
-        key : jax.Array
-            JAX random key for sampling.
-        num_samples : int, default=1000
-            Number of modules to sample from the joint distribution.
+    #     Parameters
+    #     ----------
+    #     func : Callable[[Module], jnp.ndarray]
+    #         A function that takes a Module instance and returns a JAX array.
+    #     args : Any
+    #         The args to pass to `func`.            
+    #     key : jax.Array
+    #         JAX random key for sampling.
+    #     num_samples : int, default=1000
+    #         Number of modules to sample from the joint distribution.
 
-        Returns
-        -------
-        jnp.ndarray
-            The function evaluated over all samples. Shape will be 
-            (num_samples, *func_output_shape).
-        """
-        dist = self.flat_distribution()
-        flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
+    #     Returns
+    #     -------
+    #     jnp.ndarray
+    #         The function evaluated over all samples. Shape will be 
+    #         (num_samples, *func_output_shape).
+    #     """
+    #     dist = self.flat_distribution()
+    #     flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
 
-        def evaluate_single(flat_params_array):
-            sampled_module = self.with_params(flat_params_array)
-            return func(sampled_module, args)
+    #     def evaluate_single(flat_params_array):
+    #         sampled_module = self.with_params(flat_params_array)
+    #         return func(sampled_module, args)
 
-        return jax.vmap(evaluate_single)(flat_param_samples)  
+    #     return jax.vmap(evaluate_single)(flat_param_samples)  

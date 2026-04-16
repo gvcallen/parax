@@ -188,7 +188,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     """
     # Public init fields
     name: str | None = field(default=None, kw_only=True, static=True)
-    _param_groups: list[ParameterGroup] = field(default_factory=list, kw_only=True, repr=False, static=True, init=False)
+    _param_groups: list[ParameterGroup] = field(default_factory=list, kw_only=True, repr=False, init=False)
     
     # Class variables
     _separator: ClassVar[str] = '_'

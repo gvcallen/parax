@@ -626,10 +626,13 @@ class Parameter(eqx.Module):
         
         # Display 'value' if untransformed, 'latent_value' if transformed,
         # perfectly matching the JSON serialization and constructor logic.
-        if self.transform is None:
-            args.append(f"value={format_array(self.value)}")
+        if self.latent_value is None:
+            args.append(f"value=None")
         else:
-            args.append(f"latent_value={format_array(self.latent_value)}")
+            if self.transform is None:
+                args.append(f"value={format_array(self.value)}")
+            else:
+                args.append(f"latent_value={format_array(self.latent_value)}")
         
         if self.scale != 1.0:
             args.append(f"scale={self.scale}")

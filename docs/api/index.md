@@ -10,6 +10,10 @@
 
 ::: parax.Operator
 
+::: parax.where_free_param_value
+
+::: parax.when_free_param_value
+
 ::: parax.partition
 
 ::: parax.load

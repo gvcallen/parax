@@ -818,7 +818,7 @@ def is_valid_param(x: Any) -> bool:
 
 def is_free_param(x: Any) -> bool:
     """
-    Check if an object is a free (unfixed) Parameter.
+    Check if an object is a free (unfixed) Parameter object.
 
     Parameters
     ----------
@@ -834,7 +834,7 @@ def is_free_param(x: Any) -> bool:
 
 def is_fixed_param(x: Any) -> bool:
     """
-    Check if an object is a fixed Parameter.
+    Check if an object is a fixed Parameter  object.
 
     Parameters
     ----------

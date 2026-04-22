@@ -119,7 +119,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     |---|---|
     | [`children`][parax.Module.children] | Returns the immediate submodules. |
     | [`submodules`][parax.Module.submodules] | Returns all nested submodules (depth-first). |
-    | [`sampled`][parax.Module.sampled] | Return a new module with parameters drawn from this module's distribution. |
+    | [`merged`][parax.Module.merged] | Combines this module with parameters/group in other modules. |
 
     **Parameter Inspection**
 
@@ -145,7 +145,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     |---|---|
     | [`with_params`][parax.Module.with_params] | Return a module with parameters updated. |
     | [`with_mapped_params`][parax.Module.with_mapped_params] | Apply a map function to parameters. |
-    | [`with_transformed_params`][parax.Module.with_transformed_params] | Apply a map function to parameters. |
     | [`with_fixed_params`][parax.Module.with_fixed_params] | Return a module with specified parameters fixed. |
     | [`with_free_params`][parax.Module.with_free_params] | Return a module with specified parameters free. |
     | [`with_free_params_only`][parax.Module.with_free_params_only] | Return a module with ONLY the specified parameters free. |
@@ -159,20 +158,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     | [`with_param_groups`][parax.Module.with_param_groups] | Return a module with parameter groups appended. |
     | [`with_demoted_param_groups`][parax.Module.with_demoted_param_groups] | Recursively demote parameter groups to deepest submodule. |
     | [`with_no_param_groups`][parax.Module.with_no_param_groups] | Return a module with all parameter groups removed. |
-
-    **Distribution Manipulation**
-
-    | Method | Description |
-    |---|---|
-    | [`with_mapped_distributions`][parax.Module.with_mapped_distributions] | Apply a map function to the parameter distributions. |
-    | [`with_uniform_distributions`][parax.Module.with_uniform_distributions] | Return a module with uniform distributions set. |
+    | [`with_mapped_param_groups`][parax.Module.with_mapped_param_groups] | Return a module with all parameter groups mapped. |
 
     **Field & Module Manipulation**
 
     | Method | Description |
     |---|---|
     | [`with_defaults`][parax.Module.with_defaults] | Return this module type with default initialization args. |
-    | [`with_modules`][parax.Module.with_modules] | Combines this module with free parameters in other modules. |
     | [`with_fields`][parax.Module.with_fields] | Return a copy with dataclass-style field replacements. |
     | [`with_name`][parax.Module.with_name] | Return a copy of this module with a different name. |
     | [`with_submodule_fields`][parax.Module.with_submodule_fields] | Dataclass-style field replacements on a nested sub-module. |
@@ -474,17 +466,6 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return nodes_by_type(self, Module)[1:]         
 
-    def sampled(self, key=None, **kwargs) -> 'Module':
-        """Returns a new module with parameters sampled from this parameter's distribution.
-        
-        Returns
-        -------
-        Module
-        """
-        dist = self.flat_distribution()
-        flat_param_samples = dist.sample(key, sample_shape=(1,))[0]
-        return self.with_params(flat_param_samples)
-    
     def merged(self: Self, modules: Self | Sequence[Self]) -> Self:
         """Merge this module with free parameters and parameter groups
         in other modules.
@@ -504,11 +485,42 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if not isinstance(modules, Sequence):
             modules = [modules]
 
+        def get_explicit_groups_recursively(module: 'Module', prefix: str = "") -> list[ParameterGroup]:
+            explicit_groups = []
+            
+            # 1. Grab explicitly defined groups on THIS module level
+            for group in (module._param_groups or []):
+                if prefix:
+                    new_names = [prefix + name for name in group.param_names]
+                    lifted_group = dataclasses.replace(group, param_names=new_names)
+                    explicit_groups.append(lifted_group)
+                else:
+                    explicit_groups.append(deepcopy(group))
+
+            # 2. Recurse into nested submodules
+            path_and_nodes, _ = jax.tree_util.tree_flatten_with_path(
+                module, 
+                is_leaf=lambda x: isinstance(x, Module) and x is not module
+            )
+
+            for path, node in path_and_nodes:
+                if isinstance(node, Module) and node is not module:
+                    relative_name = module.path_to_param_name(path)
+                    next_prefix = f"{prefix}{relative_name}{module._separator}" if relative_name else prefix
+                    explicit_groups.extend(get_explicit_groups_recursively(node, next_prefix))
+
+            return explicit_groups
+
         combined = self
         for other in modules:
+            # Merge parameters
             combined = combined.with_params(other.named_params())
-            combined = combined.with_param_groups(other.param_groups(explicit_only=True))
-        return combined    
+            
+            # Extract ALL explicit groups hierarchically and merge them
+            all_explicit_groups = get_explicit_groups_recursively(other)
+            combined = combined.with_param_groups(all_explicit_groups)
+            
+        return combined
         
     # ---- Parameter inspection -------------------------------------------------- 
     
@@ -1088,37 +1100,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return map_others(node)
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
-    
-    def with_transformed_params(
-        self: Self, 
-        bijector: AbstractBijector, 
-        param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] | None = None, 
-        **kwargs
-    ) -> Self:
-        """
-        Return a module with a distreqx bijector applied to the specified parameters.
-
-        This utilizes the underlying `transformed` method on the matched Parameters, 
-        which updates their physical values, bounds, and distributions simultaneously 
-        while preserving the unconstrained latent values.
-
-        Parameters
-        ----------
-        bijector : distreqx.bijectors.AbstractBijector
-            The bijector to apply.
-        param_filter : str | Sequence[str] | Callable[[str], bool] | None, default=None
-            Parameter names to transform. If None, applies to all parameters.
-
-        Returns
-        -------
-        Self
-        """
-        return self.with_mapped_params(
-            mapper=lambda p: p.transformed(bijector), 
-            param_filter=param_filter, 
-            **kwargs
-        )    
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)    
         
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.
@@ -1337,141 +1319,84 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         object.__setattr__(new_module, '_param_groups', [])
         return new_module
     
-    # ---- Distribution manipulation --------------------------------------------------
-
-    def with_mapped_distributions(
+    def with_mapped_param_groups(
         self: Self, 
-        mapper: Callable[[AbstractDistribution], AbstractDistribution], 
-        dist_filter: Callable[[AbstractDistribution], bool] | None = None, 
+        mapper: Callable[[ParameterGroup], ParameterGroup], 
+        group_filter: str | Sequence[str] | Callable[[ParameterGroup], bool] | None = None, 
         *, 
-        map_others: Callable[[AbstractDistribution], AbstractDistribution] | None = None,
-        param_groups: bool = False
+        map_others: Callable[[ParameterGroup], ParameterGroup] | None = None
     ) -> Self:
-        """Return a module with a function applied to its parameter distributions.
+        """Return a module with a function applied to its explicit parameter groups.
 
-        This method allows for bulk-updates of distributions, such as widening variances 
-        or changing distribution types.
-
-        If ``param_groups`` is False, the mapping is applied to the distributions 
-        of individual parameters (flattened).
-
-        If ``param_groups`` is True, the mapping is applied to the distributions 
-        of [`parax.ParameterGroup`][] objects. This mode is recursive: it will traverse 
-        the module tree and apply the mapping to all explicit parameter groups in all submodules.
+        This method recursively traverses the module tree and applies the mapping
+        to all explicitly defined parameter groups.
 
         Parameters
         ----------
-        mapper : Callable[[AbstractDistribution], AbstractDistribution]
-            Function that takes a distribution and returns a new one.
-        dist_filter : Callable[[AbstractDistribution], bool] | None, default=None
-            A predicate function. If provided, the mapping is only applied to 
-            distributions where ``dist_filter(dist)`` is True. If None, applies to all.
-        map_others : Callable[[AbstractDistribution], AbstractDistribution] | None, default=None
-            An optional map to apply to all distributions NOT in the filter.
-        param_groups : bool, default=False
-            If True, map distributions on parameter groups (recursively). 
-            If False, map distributions on individual parameters (flat).
+        mapper : Callable[[ParameterGroup], ParameterGroup]
+            Function that takes a parameter group and returns a new one.
+        group_filter : str | Sequence[str] | Callable[[ParameterGroup], bool] | None, default=None
+            Filter to determine which groups to map. Can be a group name, a list 
+            of group names, or a callable that takes a ParameterGroup and returns a bool. 
+            If None, applies to all groups.
+        map_others : Callable[[ParameterGroup], ParameterGroup] | None, default=None
+            An optional map to apply to all groups NOT in the filter.
 
         Returns
         -------
         Self
-            A new module with updated distributions.
         """
-        mapped_module = self
-
-        if param_groups:
-            current_groups = self._param_groups if self._param_groups is not None else []
-            for group in current_groups:
-                if dist_filter is None or dist_filter(group.distribution):
-                    mapped_module = mapped_module.with_param_groups(group.with_distribution(mapper(group.distribution)))
-                elif map_others is not None:
-                    mapped_module = mapped_module.with_param_groups(group.with_distribution(map_others(group.distribution)))
-
-            new_submodules = {}
-            for f in dataclasses.fields(mapped_module):
-                child = getattr(mapped_module, f.name)
-                if isinstance(child, Module):
-                    updated_child = child.with_mapped_distributions(
-                        mapper, 
-                        dist_filter, 
-                        map_others=map_others, 
-                        param_groups=True
-                    )
-                    new_submodules[f.name] = updated_child
+        # 1. Resolve the filter into a callable predicate
+        def is_match(group: ParameterGroup) -> bool:
+            if group_filter is None:
+                return True
+            if isinstance(group_filter, Callable):
+                return group_filter(group)
             
-            if new_submodules:
-                mapped_module = mapped_module.with_fields(**new_submodules)
-
-        else:
-            def map_fn(node):
-                if is_valid_param(node):
-                    if dist_filter is None or dist_filter(node.distribution):
-                        return node.with_distribution(mapper(node.distribution))
-                    elif map_others is not None:
-                        return node.with_distribution(map_others(node.distribution))
-                return node
+            name = getattr(group, 'name', None)
+            if isinstance(group_filter, str):
+                return name == group_filter
+            if isinstance(group_filter, Sequence):
+                return name in group_filter
                 
-            mapped_module = jax.tree_util.tree_map(map_fn, self, is_leaf=is_valid_param)
+            return False
+
+        # 2. Process groups on the current module level
+        current_groups = self._param_groups if self._param_groups is not None else []
+        new_groups = []
+        for group in current_groups:
+            if is_match(group):
+                new_groups.append(mapper(group))
+            elif map_others is not None:
+                new_groups.append(map_others(group))
+            else:
+                new_groups.append(group)
+
+        # 3. Recursively process nested submodules
+        new_fields = {}
+        for f in dataclasses.fields(self):
+            if f.name == '_param_groups':
+                continue
+                
+            child = getattr(self, f.name)
+            
+            if isinstance(child, Module):
+                new_fields[f.name] = child.with_mapped_param_groups(
+                    mapper, group_filter, map_others=map_others
+                )
+            elif isinstance(child, (list, tuple)):
+                # Handle sequences of submodules exactly like with_no_param_groups
+                if any(isinstance(x, Module) for x in child):
+                    new_fields[f.name] = type(child)(
+                        x.with_mapped_param_groups(mapper, group_filter, map_others=map_others) 
+                        if isinstance(x, Module) else x 
+                        for x in child
+                    )
                     
-        return mapped_module
-    
-    def with_uniform_distributions(self, percentage: float, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None, *, respect_bounds=False, remove_param_groups=True, zero_values='keep', **kwargs) -> Self:
-        """Return a module with uniform distributions set centered on current parameter values.
-
-        The distributions are defined with bounds calculated as ``value * (1.0 +/- percentage)``.
-
-        Parameters
-        ----------
-        percentage : float
-            The fractional width of the uniform distribution (e.g. 0.1 = 10%).
-        param_filter: str | Sequence[str] | Callable[[str], bool], default=None
-            The parameters to be updated with new uniform distributions. For the default case, all are updated.
-        respect_bounds: bool, default=False
-            Whether or not the `min` and `max` bounds of the current distributions should be respected.
-            If `True`, new bounds will not go larger than past these bounds.
-        remove_param_groups: bool, default=True
-            Whether to remove parameter groups recursively when setting the uniform distributions.
-            Otherwise, the joint distribution of the module may not be the desired uniform distribution.
-        zero_values: str, default='keep'
-            How to treat zero values. Currently the only option is to keep them and their bounds as is.
-
-        Returns
-        -------
-        Self
-            A new module with updated parameter distributions.
-        """        
-        current_param_names = set(self.param_names(param_filter, **kwargs))
-        
-        def map_fn(path, param: Parameter):
-            if is_valid_param(param):
-                name = self.path_to_param_name(path)
-                if name in current_param_names:
-                    value = jnp.asarray(param.value)
-                    
-                    # Calculate bounds element-wise natively in JAX
-                    base_min = jnp.where(value > 0.0, value * (1.0 - percentage), value * (1.0 + percentage))
-                    base_max = jnp.where(value > 0.0, value * (1.0 + percentage), value * (1.0 - percentage))
-                    
-                    if zero_values == 'keep':
-                        new_min = jnp.where(value == 0.0, 0.0, base_min)
-                        new_max = jnp.where(value == 0.0, 0.0, base_max)
-                    else:
-                        raise Exception("Unknown option for 'zero_values'")
-                    
-                    if respect_bounds:
-                        param_min = getattr(param, 'min', -jnp.inf) if param.bounds is None else param.bounds[0]
-                        param_max = getattr(param, 'max', jnp.inf) if param.bounds is None else param.bounds[1]
-                        new_min = jnp.maximum(new_min, param_min)
-                        new_max = jnp.minimum(new_max, param_max)
-
-                    distribution = UniformDistribution(new_min, new_max)
-                    return param.with_distribution(distribution)
-            return param
-
-        new_module = jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
-        if remove_param_groups:
-            new_module = new_module.with_no_param_groups()
-        return new_module
+        # 4. Reconstruct the module cleanly
+        new_module = self.with_fields(**new_fields)
+        object.__setattr__(new_module, '_param_groups', new_groups)
+        return new_module    
     
     # ---- Field and module manipulation --------------------------------------------------            
     
@@ -1750,146 +1675,3 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """        
         module_param_names = self.param_names(include_fixed=True, submodules=submodules)
         return self.with_fixed_params(module_param_names)
-    
-    # ---- Function tools --------------------------------------------------        
-
-    # @eqx.filter_jit
-    # def func_jacobian(
-    #     self: Self, 
-    #     func: Callable[['Module'], jnp.ndarray], 
-    #     args: Any
-    # ) -> dict[str, jnp.ndarray]:
-    #     """Calculate the Jacobian of an arbitrary function with respect to free parameters.
-
-    #     This uses forward-mode automatic differentiation to compute the gradients 
-    #     of the provided function with respect to each free parameter in the module.
-
-    #     Parameters
-    #     ----------
-    #     func : Callable[[Module], jnp.ndarray]
-    #         Function to differentiate. Must take a Module and args
-    #         and return a jnp.ndarray of any shape.
-    #     args : Any
-    #         The args to pass to `func`.
-
-    #     Returns
-    #     -------
-    #     dict[str, jnp.ndarray]
-    #         A dictionary mapping flat parameter names to their gradient 
-    #         arrays. Each array has the same shape as the output of `func`.
-    #     """
-    #     def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-    #         sampled_module = self.with_params(flat_params_array)
-    #         return func(sampled_module, args)
-
-    #     jac_array = jax.jacfwd(func_from_flat)(self.flat_param_values())
-    #     jac_moved = jnp.moveaxis(jac_array, -1, 0)
-    #     param_names = self.flat_param_names()
-        
-    #     return {name: jac_moved[i] for i, name in enumerate(param_names)}
-    
-    # @eqx.filter_jit
-    # def func_sensitivity(
-    #     self: Self, 
-    #     func: Callable[['Module'], jnp.ndarray], 
-    #     args: Any,
-    #     kind: str = 'relative',
-    #     norm: int | str | None = None
-    # ) -> dict[str, jnp.ndarray] | jnp.ndarray:
-    #     r"""Calculate the sensitivity of an arbitrary function w.r.t parameters.
-
-    #     Supported kinds:
-    #     - 'relative': (dy/dtheta) * (theta/y). Fractional change in output per 
-    #       fractional change in parameter. Blows up if y is zero.
-    #     - 'semi-relative': (dy/dtheta) * theta. Change in output per 
-    #       fractional change in parameter. Stable if y is zero.
-    #     - 'absolute': (dy/dtheta). Raw gradient.
-
-    #     Parameters
-    #     ----------
-    #     func : Callable[[Module], jnp.ndarray]
-    #         Function to evaluate.
-    #     args : Any
-    #         The args to pass to `func`.
-    #     kind : str, default='relative'
-    #         The type of sensitivity to calculate ('relative', 'semi-relative', 'absolute').
-    #     norm : int | str | None, default=None
-    #         If provided, aggregates the parameter sensitivities into a single scalar 
-    #         metric using the specified norm (e.g., 2 for L2 norm, jnp.inf for max norm).
-
-    #     Returns
-    #     -------
-    #     dict[str, jnp.ndarray] | jnp.ndarray
-    #         If `norm` is None, returns a dictionary mapping flat parameter names 
-    #         to sensitivity arrays.
-    #         If `norm` is specified, returns a 0D scalar jax array representing 
-    #         the global sensitivity metric.
-    #     """
-    #     def func_from_flat(flat_params_array: jnp.ndarray) -> jnp.ndarray:
-    #         sampled_module = self.with_params(flat_params_array)
-    #         return func(sampled_module, args)
-
-    #     theta = self.flat_param_values()
-    #     jac_array = jax.jacfwd(func_from_flat)(theta)
-        
-    #     if kind == 'absolute':
-    #         sens_array = jac_array
-            
-    #     elif kind == 'semi-relative':
-    #         sens_array = jac_array * theta
-            
-    #     elif kind == 'relative':
-    #         y_nom = func(self, args)
-    #         y_safe = jnp.where(y_nom == 0, 1e-15, y_nom)
-    #         sens_array = jac_array * (theta / y_safe[..., None])
-            
-    #     else:
-    #         raise ValueError(f"Unknown sensitivity kind: '{kind}'. "
-    #                          f"Supported: 'relative', 'semi-relative', 'absolute'") 
-        
-    #     if norm is not None:
-    #         return jnp.linalg.norm(sens_array, ord=norm)
-            
-    #     sens_moved = jnp.moveaxis(sens_array, -1, 0)
-    #     param_names = self.flat_param_names()
-        
-    #     return {name: sens_moved[i] for i, name in enumerate(param_names)}
-
-    # @eqx.filter_jit
-    # def func_samples(
-    #     self, 
-    #     func: Callable[['Module'], jnp.ndarray], 
-    #     args: Any,
-    #     *,
-    #     key: jax.Array, 
-    #     num_samples: int = 1000
-    # ) -> jnp.ndarray:
-    #     """
-    #     Evaluates an arbitrary function over samples drawn from the 
-    #     module's distribution.
-
-    #     Parameters
-    #     ----------
-    #     func : Callable[[Module], jnp.ndarray]
-    #         A function that takes a Module instance and returns a JAX array.
-    #     args : Any
-    #         The args to pass to `func`.            
-    #     key : jax.Array
-    #         JAX random key for sampling.
-    #     num_samples : int, default=1000
-    #         Number of modules to sample from the joint distribution.
-
-    #     Returns
-    #     -------
-    #     jnp.ndarray
-    #         The function evaluated over all samples. Shape will be 
-    #         (num_samples, *func_output_shape).
-    #     """
-    #     dist = self.flat_distribution()
-    #     flat_param_samples = dist.sample(key, sample_shape=(num_samples,))
-
-    #     def evaluate_single(flat_params_array):
-    #         sampled_module = self.with_params(flat_params_array)
-    #         return func(sampled_module, args)
-
-    #     return jax.vmap(evaluate_single)(flat_param_samples)  

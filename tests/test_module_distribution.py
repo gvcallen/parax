@@ -86,22 +86,3 @@ def test_distribution_scalar_metrics(prob_model: MathModel):
     
     assert isinstance(entropy_val, jax.Array)
     assert entropy_val.shape == ()
-
-def test_distribution_kl_divergence(prob_model: MathModel):
-    dist1 = ModuleDistribution(prob_model)
-    
-    # Shift only Normal distributions safely
-    def shift_normal(d):
-        if isinstance(d, Normal):
-            return Normal(loc=d.loc + 1.0, scale=d.scale)
-        return d
-        
-    shifted_model = prob_model.with_mapped_distributions(shift_normal, param_groups=True)
-    dist2 = ModuleDistribution(shifted_model)
-    
-    kl_identical = dist1.kl_divergence(dist1)
-    assert jnp.allclose(kl_identical, 0.0, atol=1e-5)
-    
-    kl_different = dist1.kl_divergence(dist2)
-    assert kl_different > 0.0
-    assert kl_different.shape == ()

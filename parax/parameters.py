@@ -209,3 +209,32 @@ def Free(value=None, **kwargs) -> Parameter:
         
     value = jnp.array(value, dtype=float)
     return Parameter(value=value, fixed=False, **kwargs)
+
+
+def Bounded(min: float | Sequence[float], max: float | Sequence[float], value=None, **kwargs) -> Parameter:
+    r"""
+    Create a `Parameter` with specified bounds.
+    
+    Parameters
+    ----------
+    min : float | Sequence[float]
+        The minimum bounds of the parameter. Can be a sequence for a multi-valued Parameter.
+    max : float | Sequence[float]
+        The maximum bounds of the parameter. Can be a sequence for a multi-valued Parameter.
+    value : optional
+        The initial value. If None, the midpoint of the bounds is used. Defaults to None.
+    **kwargs
+        Additional keyword arguments passed to the `Parameter` constructor.
+
+    Returns
+    -------
+    Parameter
+        The bounded Parameter object.
+    """
+    min, max = jnp.array(min, dtype=float), jnp.array(max, dtype=float)
+    
+    if 'latent_value' in kwargs:
+        return Parameter(**kwargs)
+        
+    values = (min + max) / 2.0 if value is None else value
+    return Parameter(value=values, bounds=jnp.stack([min, max], axis=-1))

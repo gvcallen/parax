@@ -485,40 +485,44 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         if not isinstance(modules, Sequence):
             modules = [modules]
 
-        def get_explicit_groups_recursively(module: 'Module', prefix: str = "") -> list[ParameterGroup]:
-            explicit_groups = []
+        def merge_groups_recursively(base_mod: 'Module', ext_mod: 'Module') -> 'Module':
+            new_fields = {}
             
-            # 1. Grab explicitly defined groups on THIS module level
-            for group in (module._param_groups or []):
-                if prefix:
-                    new_names = [prefix + name for name in group.param_names]
-                    lifted_group = dataclasses.replace(group, param_names=new_names)
-                    explicit_groups.append(lifted_group)
-                else:
-                    explicit_groups.append(deepcopy(group))
+            for f in dataclasses.fields(base_mod):
+                if f.name == '_param_groups':
+                    continue
 
-            # 2. Recurse into nested submodules
-            path_and_nodes, _ = jax.tree_util.tree_flatten_with_path(
-                module, 
-                is_leaf=lambda x: isinstance(x, Module) and x is not module
-            )
+                b_child = getattr(base_mod, f.name)
+                e_child = getattr(ext_mod, f.name)
 
-            for path, node in path_and_nodes:
-                if isinstance(node, Module) and node is not module:
-                    relative_name = module.path_to_param_name(path)
-                    next_prefix = f"{prefix}{relative_name}{module._separator}" if relative_name else prefix
-                    explicit_groups.extend(get_explicit_groups_recursively(node, next_prefix))
+                # Recurse into direct submodules
+                if isinstance(b_child, Module) and isinstance(e_child, Module):
+                    new_fields[f.name] = merge_groups_recursively(b_child, e_child)
+                    
+                # Handle sequences of submodules (matching your with_no_param_groups logic)
+                elif isinstance(b_child, (list, tuple)) and isinstance(e_child, (list, tuple)):
+                    if any(isinstance(x, Module) for x in b_child):
+                        new_fields[f.name] = type(b_child)(
+                            merge_groups_recursively(b, e) if isinstance(b, Module) and isinstance(e, Module) else b 
+                            for b, e in zip(b_child, e_child)
+                        )
 
-            return explicit_groups
+            # Reconstruct the base module with the updated submodules
+            updated_base = base_mod.with_fields(**new_fields)
+
+            # Merge explicit parameter groups cleanly at their native hierarchy level
+            if getattr(ext_mod, '_param_groups', None):
+                updated_base = updated_base.with_param_groups(ext_mod._param_groups)
+
+            return updated_base
 
         combined = self
         for other in modules:
-            # Merge parameters
+            # 1. Merge parameters structurally (your existing method handles the whole tree correctly)
             combined = combined.with_params(other.named_params())
             
-            # Extract ALL explicit groups hierarchically and merge them
-            all_explicit_groups = get_explicit_groups_recursively(other)
-            combined = combined.with_param_groups(all_explicit_groups)
+            # 2. Merge param groups structurally without premoting them
+            combined = merge_groups_recursively(combined, other)
             
         return combined
         

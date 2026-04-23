@@ -1628,7 +1628,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         return self.with_fields(**{target_key: updated_child})  
     
     def with_free_submodules(self: Self, submodules: 'Module' | Sequence['Module'] | str | Sequence[str], fix_others=False, include_fixed=True) -> Self:
-        """Free all parameters in the given submodules.
+        """Free parameters in the given submodules.
 
         Submodules parameters are obtained using [`parax.Module.param_names`][].,
         and subsequently freed using [`parax.Module.with_free_params`][].

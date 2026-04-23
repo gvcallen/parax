@@ -10,10 +10,10 @@ import distreqx.distributions as dist
 from parax.parameter import Parameter
 
 
-def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, **kwargs) -> Parameter:
+def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, add_bounds=True, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
-
+    
     Parameters
     ----------
     low : float | Sequence[float]
@@ -22,6 +22,8 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
         The upper value of the distribution. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the midpoint of the distribution is used. Defaults to None.
+    add_bounds : bool
+        Whether or not bounds should automatically be added at `low` and `high`. Defaults to True.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -32,6 +34,9 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     """
     low, high = jnp.array(low, dtype=float), jnp.array(high, dtype=float)
     dists = dist.Uniform(low, high)
+    
+    if add_bounds:
+        kwargs.setdefault('bounds', jnp.stack([low, high], axis=-1))
     
     if 'latent_value' in kwargs:
         return Parameter(distribution=dists, **kwargs)
@@ -93,7 +98,7 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
     return Uniform(low, high, *args, **kwargs)
 
 
-def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=None, **kwargs) -> Parameter:
+def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=None, icdf_bounds=0.001, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a normal (Gaussian) distribution.
 
@@ -105,6 +110,10 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
         The standard deviation of the distribution. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the mean of the distribution is used. Defaults to None.
+    icdf_bounds : float | None
+        The percentile to place bounds at using the inverse CDF.
+        Bounds are placed so that `min = normal.icdf(icdf_bounds)` and `max = normal.icdf(1.0-icdf_bounds)`.
+        Defaults to 1%. Can be None for no bounds.
     **kwargs
         Additional keyword arguments forward to the `Parameter` constructor.
 
@@ -116,8 +125,12 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
     mean, std = jnp.array(mean, dtype=float), jnp.array(std, dtype=float)
     dists = dist.Normal(mean, std)
     
+    if icdf_bounds is not None:
+        min, max = dists.icdf(icdf_bounds), dists.icdf(1.0-icdf_bounds)
+        kwargs.setdefault('bounds', jnp.stack([min, max], axis=-1))
+    
     if 'latent_value' in kwargs:
-        return Parameter(distribution=dists, **kwargs)
+        return Parameter(distribution=dists, **kwargs)\
         
     values = mean if value is None else value
     return Parameter(value=values, distribution=dists, **kwargs)

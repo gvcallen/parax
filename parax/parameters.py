@@ -125,7 +125,7 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
     mean, std = jnp.array(mean, dtype=float), jnp.array(std, dtype=float)
     dists = dist.Normal(mean, std)
     
-    if icdf_bounds is not None:
+    if icdf_bounds is not None and hasattr(dists, 'icdf'):
         min, max = dists.icdf(icdf_bounds), dists.icdf(1.0-icdf_bounds)
         kwargs.setdefault('bounds', jnp.stack([min, max], axis=-1))
     

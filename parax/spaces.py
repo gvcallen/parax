@@ -13,8 +13,6 @@ from parax.parameter import Parameter, is_free_param
 from parax.tree import partition
 from parax.module import Module
 
-from distreqx.bijectors import Chain, Sigmoid, Softplus, ScalarAffine
-
 # ------------------------------------------------------------------
 # Bounds Extraction (Element-wise safe)
 # ------------------------------------------------------------------
@@ -198,11 +196,7 @@ def hypercube_to_physical(tree: PyTree) -> Any:
     return jax.tree.map(_map_to_x, tree, is_leaf=is_free_param)
 
 
-def enforce_bounds(
-    module: PyTree, 
-    search_space: Literal['latent', 'hypercube'], 
-    icdf_bounds: float | None = None,
-) -> PyTree:
+def enforce_bounds(module: PyTree) -> PyTree:
     """
     Apply auto-generated bounding bijectors to free parameters.
 
@@ -215,12 +209,6 @@ def enforce_bounds(
     ----------
     module : PyTree
         The input PyTree containing parax Parameters.
-    search_space : {'latent', 'hypercube'}
-        The target optimization domain. Dictates how boundary limits are inferred.
-    icdf_bounds : float
-        The epsilon value used to prevent numerical overflow at the edges of 
-        distributions when operating in the hypercube (e.g., 0.001 limits the 
-        domain to [0.001, 0.999]).
 
     Returns
     -------
@@ -228,28 +216,14 @@ def enforce_bounds(
         A structurally identical PyTree where unbounded free parameters have 
         been updated with appropriate bounds-enforcing bijectors.
     """
-    if search_space == 'hypercube' and icdf_bounds is None:
-        icdf_bounds = 0.001
+    from distreqx.bijectors import Chain, Sigmoid, Softplus, ScalarAffine
 
     def _apply_bounding_bijectors(x: Parameter):
-        if not is_free_param(x): 
+        if not is_free_param(x) or x.bounds is None or x.transform is not None: 
             return x
         
-        # Trust the user: If a transform is already present, rely on it
-        if x.transform is not None:
-            return x
-        
-        lower, upper = -jnp.inf, jnp.inf
-        
-        # Extract limits based on the search space
-        if search_space == 'hypercube':
-            lower = jnp.full_like(x.value, icdf_bounds)
-            upper = jnp.full_like(x.value, 1.0 - icdf_bounds)
-        elif x.bounds is not None:
-            lower = x.bounds[..., 0]
-            upper = x.bounds[..., 1]
-        else:
-            return x  # No bounds to enforce
+        lower = x.bounds[..., 0]
+        upper = x.bounds[..., 1]
         
         has_lower = jnp.any(lower > -jnp.inf)
         has_upper = jnp.any(upper < jnp.inf)
@@ -269,15 +243,6 @@ def enforce_bounds(
             bijector = Chain([ScalarAffine(shift=upper, scale=jnp.full_like(upper, -1.0)), Softplus()])
             
         # Re-initialize the parameter with the new transform
-        return Parameter(
-            value=x.value, 
-            fixed=x.fixed,
-            name=x.name,
-            distribution=x.distribution,
-            bounds=x.bounds,
-            scale=x.scale,
-            transform=bijector,
-            **x.info
-        )
+        return x.with_transform(transform=bijector)
 
     return jax.tree.map(_apply_bounding_bijectors, module, is_leaf=is_free_param)

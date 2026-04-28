@@ -5,6 +5,7 @@ try:
 except PackageNotFoundError:
     pass
 
+# Main API
 from parax.field import field
 from parax.serialization import load, save
 from parax.module import Module
@@ -15,10 +16,13 @@ from parax.parameter_group import ParameterGroup
 from parax.tree import partition, where_free_param_value, when_free_param_value
 from parax.operator import Operator, OpInputs, OpOutputs
 from parax.parameters import Uniform, RelativeUniform, CenteredUniform, Normal, RelativeNormal, Fixed, Free
-from parax import op
+from parax.spaces import physical_to_hypercube, hypercube_to_physical, make_bounds, enforce_bounds
+
+# Sub-modules
+from parax import op, spaces
 
 __all__= [
-    "op",
+    "op", "spaces",
     "Parameter", "is_param", "is_valid_param", "is_free_param", "is_fixed_param", "as_param",
     "ParameterMetadata",
     "ParameterGroup",
@@ -30,4 +34,5 @@ __all__= [
     "ModuleDistribution",
     "Operator", "OpInputs", "OpOutputs",
     "Uniform", "RelativeUniform", "CenteredUniform", "Normal", "RelativeNormal", "Fixed", "Free",
+    "physical_to_hypercube", "hypercube_to_physical", "make_bounds", "enforce_bounds",
 ]

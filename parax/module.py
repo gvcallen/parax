@@ -898,7 +898,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         check_unknown: bool = True,
         fix_others = False,
         include_fixed = False,
-        replace_with_default: bool = False,
+        remove_metadata: bool = False,
         **param_kwargs: dict[str, Parameter] | dict[str, float],
     ) -> Self:
         """Return a new module with parameters updated.
@@ -919,10 +919,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             Fix any parameters not explicitly passed.
         include_fixed : bool, default=False
             Include fixed parameters when interpreting ``params`` mapping.
-        replace_with_new : bool, default=False
-            If True, float values passed in dicts will completely replace the current 
-            parameter with a default `parax.Parameter(val)` parameter, rather than keeping 
-            the existing parameter's metadata.
+        remove_metadata : bool, default=False
+            If True, metadata with be removed from the updated parameters.
+            This is mostly useful when passing floats, in which case a completely new
+            parameter is created using `parax.Parameter(val)`.
         **param_kwargs : dict
             Additional parameter updates by name.
 
@@ -943,8 +943,8 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
             params_array = jnp.asarray(params)
 
-            if replace_with_default:
-                raise ValueError("`replace_with_new=True` is only supported when passing dictionaries or kwargs, not flat arrays.")
+            if remove_metadata:
+                raise ValueError("`remove_metadata=True` is only supported when passing dictionaries or kwargs, not flat arrays.")
             
             # Use `eqx.partition` to perfectly isolate parameter values while preserving exact tree structure
             dynamic, static = partition(self, include_fixed=include_fixed, param_objects=False)
@@ -998,14 +998,11 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                         new_val_flat = jnp.array(new_sub_values)
                         new_val_shaped = new_val_flat.reshape(parent_param.latent_value.shape)
 
-                        if replace_with_default:
+                        if remove_metadata:
                             params[parent_name] = Parameter(new_val_shaped)
                         else:
                             params[parent_name] = parent_param.with_value(new_val_shaped)                        
                         
-                        # UPDATED: Use .with_value() instead of dataclasses.replace
-                        params[parent_name] = parent_param.with_value(new_val_shaped)            
-        
         unknown_params = set(params.keys() - new_params.keys())
         if check_unknown and len(unknown_params) != 0:
             raise Exception(f"Error: the following parameters were passed but are not in the module: {unknown_params}")
@@ -1021,9 +1018,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         for name, value in params.items():
             if isinstance(value, Parameter):
-                new_params[name] = value
+                if remove_metadata:
+                    new_params[name] = dataclasses.replace(value, metadata=None)
+                else:
+                    new_params[name] = value
+
             else:
-                if replace_with_default:
+                if remove_metadata:
                     new_params[name] = Parameter(jnp.asarray(value))
                 else:
                     new_params[name] = new_params[name].with_value(jnp.asarray(value))                

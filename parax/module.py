@@ -898,6 +898,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         check_unknown: bool = True,
         fix_others = False,
         include_fixed = False,
+        replace_with_default: bool = False,
         **param_kwargs: dict[str, Parameter] | dict[str, float],
     ) -> Self:
         """Return a new module with parameters updated.
@@ -918,6 +919,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             Fix any parameters not explicitly passed.
         include_fixed : bool, default=False
             Include fixed parameters when interpreting ``params`` mapping.
+        replace_with_new : bool, default=False
+            If True, float values passed in dicts will completely replace the current 
+            parameter with a default `parax.Parameter(val)` parameter, rather than keeping 
+            the existing parameter's metadata.
         **param_kwargs : dict
             Additional parameter updates by name.
 
@@ -937,6 +942,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 raise ValueError("Cannot pass both a flat array and explicit keyword arguments to with_params.")
                 
             params_array = jnp.asarray(params)
+
+            if replace_with_default:
+                raise ValueError("`replace_with_new=True` is only supported when passing dictionaries or kwargs, not flat arrays.")
             
             # Use `eqx.partition` to perfectly isolate parameter values while preserving exact tree structure
             dynamic, static = partition(self, include_fixed=include_fixed, param_objects=False)
@@ -989,6 +997,11 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     if updates_found:
                         new_val_flat = jnp.array(new_sub_values)
                         new_val_shaped = new_val_flat.reshape(parent_param.latent_value.shape)
+
+                        if replace_with_default:
+                            params[parent_name] = Parameter(new_val_shaped)
+                        else:
+                            params[parent_name] = parent_param.with_value(new_val_shaped)                        
                         
                         # UPDATED: Use .with_value() instead of dataclasses.replace
                         params[parent_name] = parent_param.with_value(new_val_shaped)            
@@ -1010,8 +1023,10 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if isinstance(value, Parameter):
                 new_params[name] = value
             else:
-                # UPDATED: Route primitive/array updates through .with_value()
-                new_params[name] = new_params[name].with_value(jnp.asarray(value))
+                if replace_with_default:
+                    new_params[name] = Parameter(jnp.asarray(value))
+                else:
+                    new_params[name] = new_params[name].with_value(jnp.asarray(value))                
                 
         # Fast tree mapping bypasses string iteration logic completely
         def map_fn(path, node):

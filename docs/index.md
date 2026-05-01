@@ -32,15 +32,17 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-In classical/physical modeling, you care about raw arrays alone, but rather focus on concept Parameters: values that have physical constraints, scales, units, and prior distributions. In JAX-land, the common way to supply such metadata is to work with "shadow" PyTrees - separate PyTrees with a structure that "shadows" your original model structure but only contains each separate pieces of metadata.
+In classical/physical modeling, you rarely care about raw arrays, but are interested in **physical parameters**: values that have constraints, scales, units, and prior distributions. In JAX-land, the common way to supply such metadata is to work with "shadow" PyTrees. These are multiple PyTrees with a tree structure that "shadows" your original model structure, with separate trees for each piece of metadata.
 
-Using the above approach directly, however, can be very tedious in some applications, where you commonly want to define metadata right during "model creation", and also potentially manipulate this metadata during "model preparation". Parax aims to make this workflow possible by providing a `Parameter` class alongside tree utilities to unpack and manipulate any resultant "ParamTrees". This allows the above workflow to be compatible with common JAX transformations.
+Using the above approach directly, however, can be very tedious in some applications, since it is common to want to define and manipulate metadata in multiple places. For example, you may want to specify default metadata (e.g. units) during *model definition*, and then inject different metadata during *model creation*, and also potentially manipulate this metadata at a later stage during *model preparation*.
+
+Parax aims to make the above workflow possible by providing a `Parameter` class alongside tree utilities to unpack and manipulate the resultant "ParamTrees". This allows parametric modeling that is still compatible with common JAX transformations.
 
 Further, to allow for experimentation with models without manual unwrapping (e.g. in a Jupyter notebook), Parax overides the (experimental) `__jax_array__` protocol, allowing parameters to behave just like JAX arrays for simple applications.
 
 ## Example 1: Parameters Constraints
 
-This example demonstrate defining a parameter with constraints, and then evaluating it interactively without unwrapping.
+This example demonstrates defining a parameter with an interval constraint, as well as evaluating it interactively without unwrapping (i.e. using `__jax_array`).
 
 ```python
 import jax.numpy as jnp
@@ -59,7 +61,7 @@ print(f"Raw (unconstrained) value: {p.raw_value}")
 
 ## Example 2: Optimizing an Model using Optimistix
 
-In this example, we define a simple quadratic model ($y = ax^2 + bx + c$) using `equinox.Module` and `parax.Parameter`. We provide a default for the first parameter, fix the y-intercept, and use `parax.optimize.minimize` with `optimistix` to fit the model to some noisy data.
+In this example, we define a simple quadratic model ($y = ax^2 + bx + c$) using `equinox.Module`. We provide a default for the first parameter, fix the y-intercept, and use `parax.optimize.minimize` with `optimistix` to fit the model to some noisy data. Note that under-the-hood, `parax.optimize.minimize` just does some basic partitioning and unwrapping using the utilities in `parax.paramtree`.
 
 ```python
 import jax
@@ -90,8 +92,7 @@ y_true = y_true + jax.random.normal(jax.random.key(0), x_true.shape)
 
 # 4. Define the loss Function
 def loss_fn(model, args=None):
-    y_pred = model(x_true)
-    return jnp.mean((y_pred - y_true)**2)
+    return jnp.mean((model(x_true) - y_true)**2)
 
 # 5. Run the BFGS optimizer
 solver = optx.LBFGS(rtol=1e-6, atol=1e-6)

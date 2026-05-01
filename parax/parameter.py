@@ -6,10 +6,9 @@ import dataclasses
 from typing import Any
 
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, ArrayLike
 import equinox as eqx
-from distreqx.distributions import AbstractDistribution
-from distreqx.bijectors import AbstractBijector
+import distreqx.distributions as dist
 import distreqx.bijectors as bij
 
 from parax.constraints import AbstractConstraint, Unconstrained
@@ -41,16 +40,16 @@ class Parameter(eqx.Module):
     #: A combined multiplier acting as both the pre-conditioning scale and the physical unit.
     #: Transforms the base space to physical space. 
     #: Can be an Array or a `quax.ArrayValue`.
-    scale: Array | Any = eqx.field(default=1.0)
+    scale: Array | ArrayLike = eqx.field(default_factory=lambda: jnp.array(1.0))
     
     #: If True, the parameter should be ignored during optimization.
     fixed: Array = eqx.field(default=False, converter=jnp.asarray)
 
     #: The probability distribution in base space. Useful to specify priors for Bayesian inference.
-    distribution: AbstractDistribution | None = eqx.field(default=None)
+    distribution: dist.AbstractDistribution
     
     #: The parameter constraint in base space. Useful to define bounds and conditioning for optimization.
-    constraint: AbstractConstraint | None = eqx.field(default=None)
+    constraint: AbstractConstraint
 
     #: String identifier(s) for the parameter.
     name: str | list[str] | None = eqx.field(default=None, static=True)
@@ -60,12 +59,12 @@ class Parameter(eqx.Module):
 
     def __init__(
         self,
-        base_value: Any | None = None,
-        scale: Any = 1.0,
+        base_value: Array | None = None,
+        scale: Array | ArrayLike = 1.0,
         *,
-        raw_value: Any | None = None,
+        raw_value: Array | None = None,
         fixed: bool = False,
-        distribution: AbstractDistribution | None = None,
+        distribution: dist.AbstractDistribution | None = None,
         constraint: AbstractConstraint | None = None,
         name: str | list[str] | None = None,
         metadata: dict | None = None,
@@ -81,7 +80,9 @@ class Parameter(eqx.Module):
             fixed: If True, indicates the parameter should be frozen during optimization.
             name: Identifier for logging or unwrapping logic.
             distribution: A distreqx distribution defined in the base space.
+                          If None is passed, an `ImproperUniform` distribution is created internally.
             constraint: A parax constraint defining base bounds and mappings.
+                        If None is passed, an `Unconstrained` constraint is created internally.
             metadata: Additional static metadata.
         """
         # Error checking
@@ -90,40 +91,39 @@ class Parameter(eqx.Module):
         if base_value is not None and raw_value is not None:
             raise ValueError("Cannot provide both `base_value` and `raw_value`.")
         
-        # Scale normalization
+        # Array standardization
+        fixed = jnp.asarray(fixed, dtype=bool)
+        if raw_value is not None:
+            raw_value = jnp.asarray(raw_value, dtype=float)
+            shape = raw_value.shape
+        else:
+            base_value = jnp.asarray(base_value, dtype=float)
+            shape = base_value.shape
+        
+        # Constraint and distribution standardization
+        if constraint is None:
+            constraint = Unconstrained(shape=shape)
+        if distribution is None:
+            distribution = dist.ImproperUniform(shape)
+        
+        # Scale standardization
         if isinstance(scale, float):
             scale = jnp.asarray(scale)
         elif isinstance(scale, str):
             import unxt
             scale = unxt.unit(scale)
 
-        # Raw value normalization
+        # Raw value standardization
         if base_value is not None:
-            if constraint is not None and constraint.bijector is not None:
-                raw_value = constraint.bijector.inverse(base_value)
-            else:
-                raw_value = base_value
+            raw_value = constraint.bijector.inverse(base_value)
 
-        self.raw_value = jnp.asarray(raw_value, dtype=float)
+        self.raw_value = raw_value
         self.scale = scale
-        self.fixed = jnp.asarray(fixed, dtype=bool)
+        self.fixed = fixed
         self.distribution = distribution
         self.constraint = constraint
         self.name = name
-        self.metadata = metadata
-
-    def replace(self, **kwargs: Any) -> "Parameter":
-        """
-        Creates a new Parameter with updated fields.
-
-        This is a convenience method for shallow, node-level updates. 
-        For deep updates across a PyTree of parameters, prefer `equinox.tree_at`
-        or the utilities in `parax.tree`.
-
-        Example:
-            new_param = param.replace(raw_value=jnp.array(5.0))
-        """
-        return dataclasses.replace(self, **kwargs)        
+        self.metadata = metadata or {}
 
     @property
     def unit(self) -> Any:
@@ -151,7 +151,7 @@ class Parameter(eqx.Module):
         return self.raw_to_physical_bijector.forward(self.raw_value)
     
     @property
-    def raw_to_base_bijector(self) -> AbstractBijector:
+    def raw_to_base_bijector(self) -> bij.AbstractBijector:
         """
         Bijector mapping from raw (unconstrained) space to base (constrained) space.
         """
@@ -159,14 +159,14 @@ class Parameter(eqx.Module):
         return constraint.bijector
     
     @property
-    def base_to_physical_bijector(self) -> AbstractBijector:
+    def base_to_physical_bijector(self) -> bij.AbstractBijector:
         """
         Bijector mapping from base (constrained) space to physical (scaled & constrained) space.
         """
         return bij.Scale(self.scale)
 
     @property
-    def raw_to_physical_bijector(self) -> AbstractBijector:
+    def raw_to_physical_bijector(self) -> bij.AbstractBijector:
         """
         Bijector mapping from raw (unconstrained) space to physical (scaled & constrained) space.
         
@@ -198,10 +198,10 @@ class Parameter(eqx.Module):
         if self.fixed is not False:
             args.append(f"fixed={self.fixed}")
             
-        if self.distribution is not None:
+        if self.distribution is not None and not isinstance(self.distribution, dist.ImproperUniform):
             args.append(f"distribution={format_distribution(self.distribution)}")
             
-        if self.constraint is not None:
+        if self.constraint is not None and not isinstance(self.constraint, Unconstrained):
             args.append(f"constraint={self.constraint}")
             
         if self.name is not None:
@@ -236,18 +236,18 @@ def asparam(value: Any) -> Parameter:
     return Parameter(base_value=value)
 
 
-def field(
+def param(
     default: Any = dataclasses.MISSING,
     scale: Any = 1.0,
     *,
     constraint: AbstractConstraint | None = None,
-    distribution: AbstractDistribution | None = None,
+    distribution: dist.AbstractDistribution | None = None,
     fixed: Any = False,
     name: str | list[str] | None = None,
     **kwargs
 ) -> Any:
     """
-    Specifies a Parax Parameter field within an Equinox module.
+    Specifies a field for a Parax Parameter within an Equinox module.
 
     This function defines the default physical metadata (scale, bounds, fixed state)
     for a parameter. When the module is initialized, any raw values passed to this 
@@ -289,3 +289,4 @@ def field(
         field_kwargs["default"] = default
         
     return eqx.field(**field_kwargs)
+    

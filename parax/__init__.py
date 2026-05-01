@@ -8,7 +8,7 @@ except PackageNotFoundError:
 from parax.parameter import (
     Parameter as Parameter,
     asparam as asparam,
-    field as field,
+    param as param,
 )
 
 from parax.filters import (
@@ -21,4 +21,16 @@ from parax.filters import (
     when_free_raw_value as when_free_raw_value,
 )
 
-from parax import tree as tree
+from parax.paramtree import (
+    freeze as freeze,
+    unfreeze as unfreeze,
+    merge_update as merge_update,
+    partition as partition,
+    combine as combine,
+)
+
+from parax import optimize as optimize
+
+from parax.replace import tree_replace as tree_replace
+from parax import paramtree as paramtree
+from parax import experimental as experimental

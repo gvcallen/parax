@@ -1,5 +1,6 @@
 """
-Tree mapping/unwrapping utilities for Parax.
+Tree mapping/unwrapping utilities for "Parameter PyTrees",
+called "ParamTrees" for short.
 
 These functions operate on PyTrees with `parax.Parameter` leaves.
 They are design to map parametric structures to new PyTrees
@@ -11,13 +12,17 @@ can be extracted that represent a combined distribution/constraint
 over the entire tree.
 
 Note that these functions only allow parameter leaves. To operate
-on mixed PyTrees, first partition using e.g. `eqx.partition(pytree, prx.is_param)`,
-then perform the mapping, and then combine using `eqx.combine`.
+on mixed PyTrees, first partition using e.g.,
+`eqx.partition(pytree, prx.is_free_param, is_leaf=prx.is_param)`,
+then perform the mapping, and then re-combine using `eqx.combine`.
 """
 import dataclasses
+from typing import Sequence, Any
+from functools import reduce
 
 import jax
 from jaxtyping import PyTree, Array
+import equinox as eqx
 from distreqx.distributions import Joint
 from distreqx.bijectors import TreeMap
 
@@ -28,7 +33,7 @@ from parax.constraints import TreeConstraint
 
 def raw_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts raw values from a PyTree of parameters.
+    Extracts physical values from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` leaves.
@@ -41,7 +46,7 @@ def raw_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def base_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts base values from a PyTree of parameters.
+    Extracts physical values from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` leaves.
@@ -54,7 +59,7 @@ def base_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def physical_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts physical values from a PyTree of parameters.
+    Extracts physical values from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` leaves.
@@ -67,7 +72,7 @@ def physical_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def scales(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts the scale from every Parameter in the PyTree.
+    Extracts the scale from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` objects.
@@ -80,7 +85,7 @@ def scales(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def fixed(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts the fixed boolean flag from a parameter PyTree.
+    Extracts the fixed boolean flag from a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` objects.
@@ -93,7 +98,7 @@ def fixed(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def distribution(pytree: PyTree[Parameter]) -> Joint:
     """
-    Constructs a joint probability distribution from a parameter PyTree.
+    Constructs a joint probability distribution from a ParamTree.
 
     The resultant distribution is of type `distreqx.distributions.Joint`
     and applies over the base values for all parameters in the pytree.
@@ -112,7 +117,7 @@ def distribution(pytree: PyTree[Parameter]) -> Joint:
 
 def constraint(pytree: PyTree[Parameter]) -> TreeConstraint:
     """
-    Constructs a combined tree constraint from a parameter PyTree.
+    Constructs a combined tree constraint from a ParamTree.
 
     The resultant constraint is of type `parax.constraints.TreeConstraint`
     and applies over the raw values for all parameters in the pytree.
@@ -134,7 +139,7 @@ def constraint(pytree: PyTree[Parameter]) -> TreeConstraint:
 
 def raw_to_base_bijector(pytree: PyTree[Parameter]) -> TreeMap:
     """
-    Constructs a combined tree bijector from a parameter PyTree.
+    Constructs a combined tree bijector from a ParamTree.
     
     The resultant bijector is of type `distreqx.bijectors.TreeMap`
     and can be used to convert a PyTree of raw values
@@ -152,7 +157,7 @@ def raw_to_base_bijector(pytree: PyTree[Parameter]) -> TreeMap:
 
 def raw_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
     """
-    Constructs a combined tree bijector from a parameter PyTree.
+    Constructs a combined tree bijector from a ParamTree.
     
     The resultant bijector is of type `distreqx.bijectors.TreeMap`
     and can be used to convert a PyTree of raw values
@@ -170,7 +175,7 @@ def raw_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
 
 def base_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
     """
-    Constructs a combined tree bijector from a parameter PyTree.
+    Constructs a combined tree bijector from a ParamTree.
     
     The resultant bijector is of type `distreqx.bijectors.TreeMap`
     and can be used to convert a PyTree of base values
@@ -188,7 +193,7 @@ def base_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
 
 def names(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts the name from every Parameter in the PyTree.
+    Extracts the name from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` objects.
@@ -201,7 +206,7 @@ def names(pytree: PyTree[Parameter]) -> PyTree[Array]:
 
 def metadata(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    Extracts the metadata from every Parameter in the PyTree.
+    Extracts the metadata from every Parameter in a ParamTree.
 
     Args:
         pytree: Any JAX PyTree containing `Parameter` objects.
@@ -212,11 +217,93 @@ def metadata(pytree: PyTree[Parameter]) -> PyTree[Array]:
     return jax.tree.map(lambda p: p.metadata, pytree, is_leaf=is_param)
 
 
-def replace_raw_values(pytree: PyTree[Parameter], new_raw_values: PyTree[Array]) -> PyTree[Parameter]:
+def freeze(pytree: PyTree[Parameter]):
     """
-    Injects new raw values into an existing Parameter PyTree.
+    Sets fixed=True for all parameter leaves in the given ParamTree.
+
+    This can be used with `eqx.tree_at` to selectively freeze
+    specific parameters in a model.
+    """
+    return jax.tree.map(lambda leaf: dataclasses.replace(leaf, fixed=True), pytree, is_leaf=is_param)
+
+
+def unfreeze(pytree: PyTree[Parameter]):
+    """
+    Sets fixed=False for all parameter leaves in the given ParamTree.
     
-    This is the inverse of `raw_values`. It preserves all metadata (scales, 
-    constraints, names) while updating the underlying `raw_value` arrays.
+    This can be used with `eqx.tree_at` as the `replace_fn` to selectively unfreeze
+    specific parameters in a model.
     """
-    return jax.tree.map(lambda p, v: dataclasses.replace(p, raw_value=v), pytree, new_raw_values, is_leaf=is_param)
+    return jax.tree.map(lambda leaf: dataclasses.replace(leaf, fixed=False), pytree, is_leaf=is_param)
+
+
+def merge_update(pytrees: Sequence[PyTree[Parameter]]) -> PyTree:
+    """Merge a sequence of ParamTree into one based on free parameters.
+    
+    This is useful to combine separate PyTrees obtained from fitting
+    the same initial PyTrees with different free parameters.
+    
+    Starting with the first PyTree, any free parameter (fixed == False) 
+    in the next PyTree overrides the parameter in the accumulated PyTree.
+    
+    Note that this function only works in eager mode.
+
+    Parameters
+    ----------
+    pytrees : Sequence[PyTree]
+        The PyTrees to merge. Must contain at least one PyTree.
+
+    Returns
+    -------
+    PyTree
+        The merged PyTree.
+    """
+    if not pytrees:
+        raise ValueError("Must provide at least one PyTree to merge.")
+
+    def merge_two(tree1: PyTree, tree2: PyTree) -> PyTree:
+        def _merge_leaf(p1: Parameter, p2: Parameter) -> Parameter:
+            return p2 if not p2.fixed else p1
+
+        return jax.tree.map(
+            _merge_leaf, 
+            tree1, 
+            tree2, 
+            is_leaf=is_param
+        )
+
+    return reduce(merge_two, pytrees)
+
+
+def partition(pytree: PyTree[Parameter], filter_spec: Any) -> tuple[PyTree[Parameter], PyTree[Parameter]]:
+    """
+    Partitions a ParamTree into two trees (dynamic and static).
+
+    This is a wrapper around `equinox.partition` that implicitly sets 
+    `is_leaf=is_param`.
+
+    Args:
+        pytree: The ParamTree to partition.
+        filter_spec: A filter (e.g., a function like `is_free_param` or 
+            a boolean PyTree) to determine which leaves are dynamic.
+
+    Returns:
+        A tuple of `(dynamic_tree, static_tree)`.
+    """
+    return eqx.partition(pytree, filter_spec, is_leaf=is_param)
+
+
+def combine(*pytrees: PyTree) -> PyTree:
+    """
+    Combines multiple ParamTree partitions back into a single tree.
+
+    This is a wrapper around `equinox.combine` that implicitly sets 
+    `is_leaf=is_param`.
+
+    Args:
+        *pytrees: The PyTree partitions to combine.
+
+    Returns:
+        The combined ParamTree.
+    """
+    return eqx.combine(*pytrees, is_leaf=is_param)

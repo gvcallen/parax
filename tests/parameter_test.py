@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # Adjust this import to match your actual module structure
-from parax.parameter import Parameter, asparam, field
+from parax.parameter import Parameter, asparam, param
 from parax.constraints import AbstractConstraint
 
 
@@ -135,8 +135,8 @@ def test_asparam():
 def test_parameter_field():
     # Define a dummy equinox module using the custom field
     class DummyModel(eqx.Module):
-        p_required: Parameter = field(scale=2.0)
-        p_default: Parameter = field(default=2.0, scale=4.0)
+        p_required: Parameter = param(scale=2.0)
+        p_default: Parameter = param(default=2.0, scale=4.0)
 
     # Instantiate triggering the converter
     model = DummyModel(p_required=3.0)
@@ -151,7 +151,7 @@ def test_parameter_field():
 
 def test_parameter_field_with_explicit_parameter():
     class DummyModel(eqx.Module):
-        p: Parameter = field(scale=2.0)
+        p: Parameter = param(scale=2.0)
 
     # If the user passes an explicit Parameter, it should bypass the default field metadata
     explicit_p = Parameter(base_value=1.0, scale=10.0)

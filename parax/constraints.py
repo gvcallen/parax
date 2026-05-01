@@ -32,17 +32,15 @@ class AbstractConstraint(eqx.Module):
 class Unconstrained(AbstractConstraint):
     """Represents a value that can span the entire real number line."""
     shape: Any = eqx.field(static=True)
-    dtype: Any = eqx.field(default=None, static=True)
 
     def __init__(self, shape: Any = (), dtype: Any = None):
         self.shape = shape
-        self.dtype = dtype
     
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
         return (
-            jnp.full(self.shape, -jnp.inf, dtype=self.dtype),
-            jnp.full(self.shape, jnp.inf, dtype=self.dtype),
+            jnp.full(self.shape, -jnp.inf, dtype=float),
+            jnp.full(self.shape, jnp.inf, dtype=float),
         )
 
     @property

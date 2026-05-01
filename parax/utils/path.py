@@ -3,8 +3,8 @@ from dataclasses import is_dataclass, fields
 from jaxtyping import PyTree
 from jax.tree_util import GetAttrKey, DictKey, SequenceKey, FlattenedIndexKey
 
-def path_to_param_name(tree: PyTree, path: list, separator: str = '_') -> str:
-    """Convert a PyTree path to a fully-qualified parameter name."""
+def path_to_name(tree: PyTree, path: list, separator: str = '_') -> str:
+    """Convert a PyTree path to a fully-qualified name."""
     name_fields = []
     node = tree
 
@@ -50,3 +50,4 @@ def path_to_param_name(tree: PyTree, path: list, separator: str = '_') -> str:
             raise Exception(f"Unsupported key type in path: {type(item)}")
             
     return separator.join(name_fields)
+    

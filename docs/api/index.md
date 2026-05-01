@@ -1,27 +1,13 @@
 # API Reference
 
-::: parax.Parameter
+::: parax.parameter
 
-::: parax.ParameterMetadata
+::: parax.filters
 
-::: parax.ParameterGroup
+::: parax.paramtree
 
-::: parax.Module
+::: parax.optimize
 
-::: parax.Operator
+::: parax.tree_replace
 
-::: parax.where_free_param_value
-
-::: parax.when_free_param_value
-
-::: parax.partition
-
-::: parax.load
-
-::: parax.save
-
-::: parax.field
-
-::: parax.parameters
-
-::: parax.op
+::: parax.experimental

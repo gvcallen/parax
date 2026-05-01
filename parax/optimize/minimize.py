@@ -1,14 +1,16 @@
 import abc
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable
 
 from jaxtyping import PyTree, Scalar
 import equinox as eqx
+import optimistix as optx
 
-import parax.tree as tree
-from parax.filters import is_free_param
+import parax.paramtree as ppt
+from parax.parameter import Parameter
+from parax.filters import is_free_param, is_param
 from parax.optimize.results import OptimizeResults
-
-OptimistixAbstractMinimiser = TypeVar('OptimistixAbstractMinimiser')
+from parax.replace import tree_replace
+from parax.paramtree import partition, combine
 
 class MinimizePayload(eqx.Module):
     """The core mathematical payload of a minimization run."""
@@ -75,14 +77,14 @@ class AbstractMinimizer(eqx.Module):
     
 
 def minimize(
-    objective: Callable[[PyTree, Any], Scalar],
-    solver: OptimistixAbstractMinimiser | AbstractMinimizer,
-    model: PyTree,
+    fn: Callable[[PyTree, Any], Scalar],
+    solver: optx.AbstractMinimiser | AbstractMinimizer,
+    y0: PyTree[Parameter],
+    *,
     args: PyTree = None,
-    respect_bounds: bool = True,
-    max_steps: int = 1024,
+    max_steps: int = 256,
     has_aux: bool = False,
-    param_filter: Any = is_free_param,
+    param_spec: Any = is_free_param,
     **kwargs
 ) -> OptimizeResults:
     """
@@ -92,59 +94,65 @@ def minimize(
     bijector mappings, and physical constraint bounds.
     """
     if not isinstance(solver, AbstractMinimizer):
-        import optimistix as optx
         if not isinstance(solver, optx.AbstractMinimiser):
             raise Exception(f"Unknown solver in `parax.minimize`: {solver}")
         from parax.optimize.optimistix import OptimistixMinimise
         solver = OptimistixMinimise(solver)
 
     # Setup problem
-    params, static = eqx.partition(model, param_filter)
-    bounded = respect_bounds and solver.supports_bounds
+    params, static = partition(y0, param_spec)
+    bounded = solver.supports_bounds
 
-    # Extract raw values, constraints and scales
-    constraint = tree.constraint(params)
-    raw_values = tree.raw_values(params)
-    base_to_physical_bijector = tree.base_to_physical_bijector(params)
+    # Extract constraints, scales, and tree bijectors
+    constraint = ppt.constraint(params)
+    raw_to_base_bij = ppt.raw_to_base_bijector(params)
+    base_to_physical_bij = ppt.base_to_physical_bijector(params)
+
+    # Calculate static arrays
+    static_arrays = ppt.physical_values(static)
 
     if bounded:
         lower, upper = constraint.bounds
+        y0 = ppt.base_values(params)
     else:
-        raw_to_base_bijector = constraint.bijector
+        lower, upper = None, None
+        y0 = ppt.raw_values(params)
 
-    def raw_objective_fn(raw_values, _args):
+    def _array_objective_fn(y, _args):
         if not bounded:
-            base_values = raw_to_base_bijector.forward(raw_values)
+            base_values = raw_to_base_bij.forward(y)
         else:
-            base_values = raw_values
+            base_values = y
         
-        physical_values = base_to_physical_bijector.forward(base_values)
-        y0_with_physical_values = eqx.combine(physical_values, static)
+        physical_params = base_to_physical_bij.forward(base_values)
+        model_arrays = eqx.combine(physical_params, static_arrays)
 
-        out = objective(y0_with_physical_values, _args)
-        if has_aux:
-            loss, aux = out
-            return loss, aux
-        return out        
+        return fn(model_arrays, _args)
 
     # Run the minimization
     payload, metrics = solver.minimize(
-        fn=raw_objective_fn,
-        y0=raw_values,
+        fn=_array_objective_fn,
+        y0=y0,
         args=args,
-        lower=lower if bounded else None,
-        upper=upper if bounded else None,
+        lower=lower,
+        upper=upper,
         has_aux=has_aux,
         max_steps=max_steps,
         **kwargs
     )
 
+    if bounded:
+        final_raw_values = raw_to_base_bij.inverse(payload.y)
+    else:
+        final_raw_values = payload.y
+
     # Return the result
-    optimized_params = tree.replace_raw_values(params, payload.y)
-    optimized_model = eqx.combine(optimized_params, static)
+    optimized_params = tree_replace(params, raw_value=final_raw_values, is_leaf=is_param)
+    optimized_model = eqx.combine(optimized_params, static, is_leaf=is_param)
+    
     return OptimizeResults(
         model=optimized_model,
-        objective_value=payload.fn_value,
+        final_value=payload.fn_value,
         metrics=metrics, 
         aux=payload.aux,
     )

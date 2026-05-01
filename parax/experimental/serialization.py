@@ -9,7 +9,6 @@ import jax.tree_util as jtu
 import jsonpickle
 import jsonpickle.handlers
 
-from parax.deprecate.module import Module
 from parax.parameter import Parameter
 import equinox as eqx
 
@@ -96,7 +95,7 @@ def load(source: str | os.PathLike | BinaryIO) -> Any:
     else:
         data = source.read()
 
-    decoded = jsonpickle.decode(data)    
+    decoded = jsonpickle.decode(data)
     
     # Recursively check for nested degraded objects across the entire PyTree
     def _verify_no_degraded_modules(obj, current_path="root"):
@@ -139,8 +138,6 @@ def save(target: str | os.PathLike | BinaryIO, tree: Any):
     """
     # 1. Map over the PyTree, converting only Parax Modules into their saveable forms
     def to_saveable(node):
-        if isinstance(node, Module):
-            return node.saveable()
         return node
         
     # NB: we treat all equinox Modules as leafs so JAX doesnt mangle their internals.
@@ -148,7 +145,7 @@ def save(target: str | os.PathLike | BinaryIO, tree: Any):
     tree_save = jtu.tree_map(
         to_saveable, 
         tree, 
-        is_leaf=lambda x: isinstance(x, (Module, eqx.Module))
+        is_leaf=lambda x: isinstance(x, (eqx.Module))
     )
     
     # 2. Encode the standardized tree

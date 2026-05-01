@@ -6,7 +6,7 @@ from jaxtyping import PyTree, Array
 import equinox as eqx
 
 from parax.filters import is_param
-from parax.tree import unwrap
+from parax.paramtree import unwrap
 
 
 def extract_state(dynamic_model: PyTree, bounded: bool) -> PyTree:

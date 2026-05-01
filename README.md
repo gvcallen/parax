@@ -32,15 +32,15 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-In classical and physical modeling, we rarely care about raw arrays alone. We care about Parameters: values that have physical constraints, scales, units, and prior distributions. In JAX-land, the common way to supply such metadata is to work with "shadow" PyTrees - separate PyTrees with a structure that "shadows" your original model structure but only containing the separate pieces of metadata.
+In classical/physical modeling, you care about raw arrays alone, but rather focus on concept Parameters: values that have physical constraints, scales, units, and prior distributions. In JAX-land, the common way to supply such metadata is to work with "shadow" PyTrees - separate PyTrees with a structure that "shadows" your original model structure but only contains each separate pieces of metadata.
 
-The above approach, however, is very tedious in scientific modeling, where you commonly want to define metadata right during "model creation", and potentially manipulate this metadata during "model preparation". Parax aims to make this work possible by providing a `Parameter` class with common metadata alongside tree-utilities to unpack and manipulate resultant "ParamTrees" to make them compatible with common JAX transformations.
+Using the above approach directly, however, can be very tedious in some applications, where you commonly want to define metadata right during "model creation", and also potentially manipulate this metadata during "model preparation". Parax aims to make this workflow possible by providing a `Parameter` class alongside tree utilities to unpack and manipulate any resultant "ParamTrees". This allows the above workflow to be compatible with common JAX transformations.
 
-Further, to faciliate experimentation with models without manual unwrapping (e.g. in a Jupyter notebook), Parax overides the (experimental) `__jax_array__` protocol, allowing parameters to behave just like JAX arrays for simple applications.
+Further, to allow for experimentation with models without manual unwrapping (e.g. in a Jupyter notebook), Parax overides the (experimental) `__jax_array__` protocol, allowing parameters to behave just like JAX arrays for simple applications.
 
 ## Example 1: Parameters Constraints
 
-This example demonstrate defining a parameter without constraints, and then evaluating it interactively without unwrapping.
+This example demonstrate defining a parameter with constraints, and then evaluating it interactively without unwrapping.
 
 ```python
 import jax.numpy as jnp

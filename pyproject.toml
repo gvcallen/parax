@@ -13,6 +13,9 @@ dependencies = [
     "distreqx",
     "jsonpickle",
     "optimistix",
+    "tqdm",
+    "scipy",
+    "blackjax",
 ]
 
 [project.optional-dependencies]

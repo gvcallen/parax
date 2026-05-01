@@ -1,640 +1,198 @@
-import json
+"""
+The main Parameter class.
+"""
+
 import dataclasses
-from typing import Any, Callable
+from typing import Any
 
 import jax.numpy as jnp
+from jaxtyping import Array
 import equinox as eqx
-from distreqx.distributions import AbstractDistribution, Transformed
-from distreqx.bijectors import AbstractBijector, Chain
+from distreqx.distributions import AbstractDistribution
+from distreqx.bijectors import AbstractBijector
+import distreqx.bijectors as bij
 
-from parax.field import field
-from parax.parameter_metadata import ParameterMetadata
+from parax.constraints import AbstractConstraint, Unconstrained
 from parax.utils import (
     format_array, 
-    serialize_array,
-    deserialize_array,
-    split_vectorized_distribution, 
-    serialize_distribution, 
-    deserialize_distribution, 
     format_distribution,
-    serialize_transform,
-    deserialize_transform,
-    format_transform,
 )
-
 
 class Parameter(eqx.Module):
     """
-    A container for a parameter.
+    A container for a physical Parameter.
 
-    This class serves as the fundamental building block for defining
-    parameters with metadata within Equinox modules. It is designed
-    to be a flexible container that behaves like a standard JAX array
-    (i.e.., a `jax.numpy.ndarray`) while holding additional metadata for model
-    training and analysis.
+    `Parameter` is a JAX PyTree node (`eqx.Module`) that pairs an array
+    with physical metadata. It maps unconstrained optimization spaces
+    to bounded physical spaces using "constraints", and allows specifying
+    probability distributions (priors) via `distreqx`.
 
-    Usage
-    -----
-    * Use in mathematical operations just like a JAX/numpy array.
-    * `Parameter` objects are JAX PyTrees, compatible with JAX transformations (jit, grad).
-    * Mark as `fixed` (honored by `parax.partition`).
-    * Associate distributions and transforms/bijectors using `distreqx`.
+    `Parameter` also provides native support for units via `unxt`
+    by passing a string, an `unxt.Unit`, or an `unxt.Quantity`.
+
+    Note that while `__jax_array__` and various dunder methods are overriden
+    to provide seemless computations with other arrays, this support is experimental,
+    and PyTrees using parameters should rather be unwrapped using the various utilities in
+    `parax.tree` rather than relying on the implicit behaviour.
     """
-    #: The underlying unscaled, untransformed, latent value.
-    latent_value: jnp.ndarray
-      
-    #: If True, the parameter is treated as a constant during optimization/sampling.
-    fixed: bool = field(default=False, static=True)
-        
-    #: The hidden structure containing all extended parameter properties.
-    metadata: ParameterMetadata | None = None
+    #: The parameter value in unconstrained space used by optimizers and samplers.
+    raw_value: Array = eqx.field(converter=jnp.asarray)
+
+    #: A combined multiplier acting as both the pre-conditioning scale and the physical unit.
+    #: Transforms the base space to physical space. 
+    #: Can be an Array or a `quax.ArrayValue`.
+    scale: Array | Any = eqx.field(default=1.0)
+    
+    #: If True, the parameter should be ignored during optimization.
+    fixed: Array = eqx.field(default=False, converter=jnp.asarray)
+
+    #: The probability distribution in base space. Useful to specify priors for Bayesian inference.
+    distribution: AbstractDistribution | None = eqx.field(default=None)
+    
+    #: The parameter constraint in base space. Useful to define bounds and conditioning for optimization.
+    constraint: AbstractConstraint | None = eqx.field(default=None)
+
+    #: String identifier(s) for the parameter.
+    name: str | list[str] | None = eqx.field(default=None, static=True)
+
+    #: Additional arbitrary metadata.
+    metadata: dict = eqx.field(default_factory=dict, static=True)
 
     def __init__(
-        self, 
-        value: Any | None = None, 
-        fixed: bool = False, 
-        metadata: ParameterMetadata | None = None, 
-        n: int | None = None,
-        shape: tuple[int, ...] | int | None = None,
-        **kwargs
+        self,
+        base_value: Any | None = None,
+        scale: Any = 1.0,
+        *,
+        raw_value: Any | None = None,
+        fixed: bool = False,
+        distribution: AbstractDistribution | None = None,
+        constraint: AbstractConstraint | None = None,
+        name: str | list[str] | None = None,
+        metadata: dict | None = None,
     ):
         """
-        During initialization, core metadata and arbitrary kwargs are automatically routed into the 
-        hidden `ParameterMetadata` struct. If a transform/bijector is provided, the input 
-        `value` is assumed to be in the physical (constrained) space and is 
-        automatically inverted to store the latent (unconstrained) value.
-        
-        The parameter `n` allows for vectorizing the input value and metadata 
-        across `n` dimensions.
+        Args:
+            base_value: The base array value.
+            scale: Linear preconditioning factor for the optimizer space. Can be any array-like value
+                   that multiplies with a standard array (e.g. float, `unxt.Unit` or `unxt.Quantity`.)
+                   If a `float` is passed, it is converted to an array.
+                   If a `string` is passed, an `unxt.Unit` is created internally.
+            raw_value: The unconstrained value. Mutually exclusive with `base_value`.
+            fixed: If True, indicates the parameter should be frozen during optimization.
+            name: Identifier for logging or unwrapping logic.
+            distribution: A distreqx distribution defined in the base space.
+            constraint: A parax constraint defining base bounds and mappings.
+            metadata: Additional static metadata.
         """
-        latent_value = kwargs.pop('latent_value', None)
+        # Error checking
+        if base_value is None and raw_value is None:
+            raise ValueError("Must provide either `base_value` or `raw_value`.")
+        if base_value is not None and raw_value is not None:
+            raise ValueError("Cannot provide both `base_value` and `raw_value`.")
         
-        if latent_value is None and value is None:
-            raise Exception("Must pass one of either `latent_value` or `value` to Parameter constructor")
-        
-        if n is not None and shape is not None:
-            raise ValueError("Cannot specify both `n` and `shape`.")
+        # Scale normalization
+        if isinstance(scale, float):
+            scale = jnp.asarray(scale)
+        elif isinstance(scale, str):
+            import unxt
+            scale = unxt.unit(scale)
 
-        if isinstance(shape, int):
-            shape = (shape,)
-
-        # 1. Handle Vectorization (n) & Broadcasting (shape)
-        if n is not None:
-            if value is not None:
-                value = jnp.broadcast_to(jnp.asarray(value, dtype=float), (n,) + jnp.shape(value))
-            if latent_value is not None:
-                latent_value = jnp.broadcast_to(jnp.asarray(latent_value, dtype=float), (n,) + jnp.shape(latent_value))
-        elif shape is not None:
-            if value is not None:
-                value = jnp.broadcast_to(jnp.asarray(value, dtype=float), shape)
-            if latent_value is not None:
-                latent_value = jnp.broadcast_to(jnp.asarray(latent_value, dtype=float), shape)
-
-        # 2. Extract known metadata keys
-        updates = {}
-        for key in ["name", "distribution", "transform", "bounds", "scale"]:
-            if key in kwargs:
-                updates[key] = kwargs.pop(key)
-                
-        # Handle vectorization for specific metadata fields
-        if n is not None and n != 1:
-            # Vectorize bounds: if shape is (2,), it becomes (n, 2)
-            if "bounds" in updates and updates["bounds"] is not None:
-                b = jnp.asarray(updates["bounds"], dtype=float)
-                updates["bounds"] = jnp.broadcast_to(b, (n,) + b.shape)
-            
-            # Vectorize name: if a string is passed, turn into a list of n strings
-            if "name" in updates and isinstance(updates["name"], str):
-                updates["name"] = [f"{updates['name']}_{i}" for i in range(n)]
-
-        # Format specific fields
-        if "name" in updates and isinstance(updates["name"], tuple):
-            updates["name"] = list(updates["name"])
-            
-        if "bounds" in updates and updates["bounds"] is not None:
-            updates["bounds"] = jnp.asarray(updates["bounds"], dtype=float)
-            
-        # Any remaining kwargs belong in the custom 'info' dict
-        info_updates = kwargs if len(kwargs) > 0 else {}
-
-        # 3. Reconcile metadata
-        if metadata is not None:
-            if updates or info_updates:
-                new_info = dict(metadata.info) if metadata.info is not None else {}
-                new_info.update(info_updates)
-                
-                self.metadata = dataclasses.replace(
-                    metadata, 
-                    **updates, 
-                    info=new_info if new_info else None
-                )
+        # Raw value normalization
+        if base_value is not None:
+            if constraint is not None and constraint.bijector is not None:
+                raw_value = constraint.bijector.inverse(base_value)
             else:
-                self.metadata = metadata
-        else:
-            name = updates.get("name", None)
-            distribution = updates.get("distribution", None)
-            transform = updates.get("transform", None)
-            bounds = updates.get("bounds", None)
-            scale = updates.get("scale", 1.0)
-            
-            if (distribution is None and transform is None and bounds is None and 
-                scale == 1.0 and name is None and not info_updates):
-                self.metadata = None
-            else:
-                self.metadata = ParameterMetadata(
-                    name=name,
-                    distribution=distribution,
-                    transform=transform,
-                    bounds=bounds,
-                    scale=scale,
-                    info=info_updates if info_updates else None
-                )
-                
-        # 4. Handle latent value extraction/inversion
-        if latent_value is None:
-            latent_value = jnp.asarray(value, dtype=float)
-            if self.metadata is not None and self.metadata.transform is not None:
-                if isinstance(self.metadata.transform, AbstractBijector):
-                    # We can invert bijectors safely
-                    latent_value = self.metadata.transform.inverse(latent_value)
-                elif callable(self.metadata.transform):
-                    # We cannot invert a generic callable
-                    raise ValueError(
-                        "Cannot automatically infer `latent_value` from a physical `value` "
-                        "when using a non-invertible transform (Callable). You must provide "
-                        "`latent_value` explicitly."
-                    )
-                
-                if jnp.any(jnp.isnan(latent_value)):
-                    raise ValueError(f"Got nan while applying bijector inverse in parameter init.")
-        else:
-            if value is not None:
-                raise Exception("Both `latent_value` and `value` cannot be passed")
-        
-        # 5. Safe-guard for non-invertible transforms
-        if self.metadata is not None and self.metadata.transform is not None:
-            if not isinstance(self.metadata.transform, AbstractBijector):
-                if self.metadata.distribution is not None:
-                    raise ValueError(
-                        "Cannot apply a physical `distribution` to a parameter with a "
-                        "non-bijective callable transform. The probability volume change cannot "
-                        "be calculated. Define distributions on the latent inputs instead."
-                    )
-                if self.metadata.bounds is not None:
-                    raise ValueError(
-                        "Cannot apply physical `bounds` to a parameter with a "
-                        "non-bijective callable transform. Optimizers cannot map physical bounds "
-                        "back to the latent space through arbitrary functions."            
-                    )
-            
-        self.latent_value = jnp.asarray(latent_value, dtype=float)
-        self.fixed = fixed
+                raw_value = base_value
+
+        self.raw_value = jnp.asarray(raw_value, dtype=float)
+        self.scale = scale
+        self.fixed = jnp.asarray(fixed, dtype=bool)
+        self.distribution = distribution
+        self.constraint = constraint
+        self.name = name
+        self.metadata = metadata
+
+    def replace(self, **kwargs: Any) -> "Parameter":
+        """
+        Creates a new Parameter with updated fields.
+
+        This is a convenience method for shallow, node-level updates. 
+        For deep updates across a PyTree of parameters, prefer `equinox.tree_at`
+        or the utilities in `parax.tree`.
+
+        Example:
+            new_param = param.replace(raw_value=jnp.array(5.0))
+        """
+        return dataclasses.replace(self, **kwargs)        
 
     @property
-    def value(self) -> jnp.ndarray:
+    def unit(self) -> Any:
         """
-        Get the unscaled physical space value.
-
-        Returns
-        -------
-        jnp.ndarray
-            The parameter value mapped through the transform (if any), but unscaled.
+        Read-only access to the physical dimensions of the scale, if any.
         """
-        raw_val = self.latent_value
-        if self.transform is not None:
-            if isinstance(self.transform, AbstractBijector):
-                raw_val = self.transform.forward(raw_val)
-            elif callable(self.transform):
-                raw_val = self.transform(raw_val)
-            
-        return jnp.asarray(raw_val)
+        return getattr(self.scale, "unit", None)
     
     @property
-    def name(self) -> str | list[str] | None:
+    def base_value(self) -> Any:
         """
-        Get the parameter name.
+        The value in base space.
 
-        Returns
-        -------
-        str, list of str, or None
-            The name or list of names associated with the parameter.
+        Returns the constraint's bijector applied to the raw value.
         """
-        return self.metadata.name if self.metadata is not None else None
+        return self.raw_to_base_bijector.forward(self.raw_value)
 
     @property
-    def distribution(self) -> AbstractDistribution | None:
+    def physical_value(self) -> Any:
         """
-        Get the parameter distribution.
-
-        Returns
-        -------
-        AbstractDistribution or None
-            The probability distribution associated with the parameter.
+        The value in physical space.
+        
+        Returns the base value multiplied by `self.scale`.
         """
-        return self.metadata.distribution if self.metadata is not None else None
+        return self.raw_to_physical_bijector.forward(self.raw_value)
+    
+    @property
+    def raw_to_base_bijector(self) -> AbstractBijector:
+        """
+        Bijector mapping from raw (unconstrained) space to base (constrained) space.
+        """
+        constraint = self.constraint if self.constraint is not None else Unconstrained()
+        return constraint.bijector
+    
+    @property
+    def base_to_physical_bijector(self) -> AbstractBijector:
+        """
+        Bijector mapping from base (constrained) space to physical (scaled & constrained) space.
+        """
+        return bij.Scale(self.scale)
 
     @property
-    def transform(self) -> AbstractBijector | None:
+    def raw_to_physical_bijector(self) -> AbstractBijector:
         """
-        Get the parameter transform.
-
-        Returns
-        -------
-        AbstractBijector or None
-            The bijector used to map between latent and physical space.
+        Bijector mapping from raw (unconstrained) space to physical (scaled & constrained) space.
+        
+        Composes the unconstraining bijector with a scaling bijector.
         """
-        return self.metadata.transform if self.metadata is not None else None
-
-    @property
-    def bounds(self) -> jnp.ndarray | None:
-        """
-        Get the parameter bounds.
-
-        Returns
-        -------
-        jnp.ndarray or None
-            The physical bounds of the parameter.
-        """
-        return self.metadata.bounds if self.metadata is not None else None
-
-    @property
-    def scale(self) -> float:
-        """
-        Get the parameter scale.
-
-        Returns
-        -------
-        float
-            The multiplier applied to the physical value for numerical operations.
-        """
-        return self.metadata.scale if self.metadata is not None else 1.0
-
-    @property
-    def info(self) -> dict:
-        """
-        Get the parameter's custom metadata.
-
-        Returns
-        -------
-        dict
-            Any arbitrary keyword arguments passed during initialization.
-        """
-        if self.metadata is None or self.metadata.info is None:
-            return {}
-        return self.metadata.info
+        return bij.Chain([self.base_to_physical_bijector, self.raw_to_base_bijector])    
 
     @property
     def shape(self) -> tuple[int, ...]:
-        """
-        Get the shape of the parameter.
+        return self.raw_value.shape
 
-        Returns
-        -------
-        tuple of int
-            The shape of the latent array.
-        """
-        return self.latent_value.shape
-    
     @property
     def size(self) -> int:
-        """
-        Get the number of elements in the parameter.
+        return self.raw_value.size
 
-        Returns
-        -------
-        int
-            The total size of the latent array.
-        """
-        return self.latent_value.size
-    
-    @property
-    def latent_distribution(self) -> AbstractDistribution | None:
-        """
-        Get the parameter distribution in the latent space.
-
-        Returns
-        -------
-        AbstractDistribution or None
-            The physical probability distribution mapped back to the latent space 
-            via the inverse of the parameter's transform.
-        """
-        dist = self.distribution
-        transform = self.transform
-
-        if dist is None:
-            return None
-        if transform is None:
-            return dist
-        
-        if not isinstance(transform, AbstractBijector):
-            raise NotImplementedError(
-                "Cannot compute latent_distribution for non-bijective transforms."
-            )
-        
-        from distreqx.bijectors import Inverse
-        return Transformed(dist, Inverse(transform))
-    
-    def with_name(self, name: str) -> 'Parameter':
-        """
-        Return a copy of the parameter with a new physical name.
-
-        Parameters
-        ----------
-        name : str
-            The new name.
-
-        Returns
-        -------
-        Parameter
-            A copy of this object with `name` updated.
-        """
-        if self.metadata is None:
-            new_meta = ParameterMetadata(name=name)
-        else:
-            new_meta = dataclasses.replace(self.metadata, name=name)
-            
-        return dataclasses.replace(self, metadata=new_meta)
-    
-    def with_value(self, value: jnp.ndarray) -> 'Parameter':
-        """
-        Return a copy of the parameter with a new physical value.
-
-        Parameters
-        ----------
-        value : jnp.ndarray
-            The new unscaled physical value to set. It will be mapped through 
-            the transform inverse if one exists.
-
-        Returns
-        -------
-        Parameter
-            A copy of this object with `value` updated.
-        """
-        latent_value = jnp.asarray(value)
-        if self.metadata is not None and self.metadata.transform is not None:
-            if isinstance(self.metadata.transform, AbstractBijector):
-                latent_value = self.metadata.transform.inverse(latent_value)        
-            else:
-                raise ValueError("Cannot use `with_value` on a parameter with a non-bijective transform.")
-        return dataclasses.replace(self, latent_value=latent_value)
-    
-    def with_distribution(self, distribution: AbstractDistribution) -> 'Parameter':
-        """
-        Return a copy of the parameter with a new distribution.
-
-        Parameters
-        ----------
-        distribution : distreqx.distributions.AbstractDistribution
-            The distribution to associate with this parameter.
-
-        Returns
-        -------
-        Parameter
-            A copy of this object with the `distribution` replaced.
-
-        Raises
-        ------
-        Exception
-            If `distribution` is not a distreqx AbstractDistribution.
-        """
-        if not isinstance(distribution, AbstractDistribution):
-            raise Exception('Only distreqx distributions are supported as parameter distributions')
-        
-        if self.metadata is None:
-            new_meta = ParameterMetadata(distribution=distribution)
-        else:
-            new_meta = dataclasses.replace(self.metadata, distribution=distribution)
-            
-        return dataclasses.replace(self, metadata=new_meta)
-    
-    def with_transform(self, transform: AbstractBijector) -> 'Parameter':
-        """
-        Return a copy of the parameter with a new transform.
-
-        Parameters
-        ----------
-        transform : distreqx.bijectors.AbstractBijector
-            The transform to associate with this parameter.
-
-        Returns
-        -------
-        Parameter
-            A copy of this object with the `transform` replaced.
-
-        Raises
-        ------
-        Exception
-            If `distribution` is not a distreqx AbstractDistribution.
-        """
-        if not isinstance(transform, AbstractBijector):
-            raise Exception('Only distreqx bijectors are supported as parameter transforms')
-        
-        if self.metadata is None:
-            new_meta = ParameterMetadata(transform=transform)
-        else:
-            new_meta = dataclasses.replace(self.metadata, transform=transform)
-            
-        return dataclasses.replace(self, metadata=new_meta)    
-    
-    def transformed(self, transform: AbstractBijector | Callable) -> 'Parameter':
-        """
-        Return a copy of this parameter transformed.
-
-        This method applies the given transform to the parameter's physical space. 
-        It updates the parameter by chaining the new transform with 
-        any existing one, transforming the probability distribution, and mapping 
-        the bounds. The underlying latent unconstrained value remains unchanged.
-
-        Parameters
-        ----------
-        transform : distreqx.bijectors.AbstractBijector | Callable
-            The transform to apply to the parameter's unscaled physical space.
-            If a callable is passed, some functionality is limited.
-
-        Returns
-        -------
-        Parameter
-            A dynamically transformed Parameter object.
-            
-        Raises
-        ------
-        TypeError
-            If the provided transform is not an instance of AbstractBijector.
-        """
-        if not isinstance(transform, AbstractBijector):
-            raise TypeError("The provided transformation must be a distreqx AbstractBijector.")
-        if self.latent_value is None:
-            raise Exception("Cannot transform a parameter with a None latent value")
-
-        # 1. Transform the distribution
-        new_dist = self.distribution
-        if new_dist is not None:
-            new_dist = Transformed(new_dist, transform)
-            
-        # 2. Chain the transforms (applied right-to-left: first old, then new)
-        old_transform = self.transform
-        if old_transform is not None:
-            if isinstance(transform, AbstractBijector) and isinstance(old_transform, AbstractBijector):
-                new_transform = Chain([transform, old_transform])
-            else:
-                # Fallback for chaining callables
-                new_transform = lambda x: transform(old_transform(x)) if callable(old_transform) else transform(old_transform.forward(x))
-        else:
-            new_transform = transform
-            
-        # 3. Transform the bounds
-        new_bounds = self.bounds
-        if new_bounds is not None:
-            new_bounds = transform.forward(new_bounds)
-        
-        # 4. Update metadata
-        if self.metadata is None:
-            new_meta = ParameterMetadata(
-                distribution=new_dist,
-                transform=new_transform,
-                bounds=new_bounds
-            )
-        else:
-            new_meta = dataclasses.replace(
-                self.metadata, 
-                distribution=new_dist,
-                transform=new_transform,
-                bounds=new_bounds
-            )
-            
-        # The latent value remains unchanged; the chained transform handles the new physical mapping.
-        return dataclasses.replace(self, metadata=new_meta)
-    
-    def flattened(self, separator='_') -> 'list[Parameter]':
-        """
-        Flatten the parameter into a list of scalar Parameters.
-        
-        If the internal parameter is scalar, the list will contain self.
-        Otherwise, the parameter is split (de-vectorized) if possible.
-        
-        Parameters
-        ----------
-        separator : str, optional
-            Separator used for naming split parameters (e.g., name_0), by default '_'.
-
-        Returns
-        -------
-        list of Parameter
-            The list of individual scalar parameters.
-
-        Raises
-        ------
-        ValueError
-            If the list of names does not match the parameter size.
-        """
-        if self.latent_value.ndim == 0 and not isinstance(self.name, list):
-            return [self]
-            
-        unscaled_physical = self.value
-        flat_val = jnp.ravel(unscaled_physical)
-        
-        if self.distribution is not None:
-            if not self.distribution.event_shape:
-                dists_split = [self.distribution] * flat_val.size
-            else:
-                dists_split = split_vectorized_distribution(self.distribution)
-        else:
-            dists_split = [None] * flat_val.size
-
-        if isinstance(self.name, list):
-            if len(self.name) != flat_val.size:
-                raise ValueError(f"Length of name list ({len(self.name)}) must match parameter size ({flat_val.size}).")
-            flat_names = self.name
-        elif self.name is not None:
-            flat_names = [f"{self.name}{separator}{i}" for i in range(flat_val.size)]
-        else:
-            flat_names = [None] * flat_val.size
-                
-        return [
-            Parameter(
-                value=val, 
-                fixed=self.fixed, 
-                distribution=p, 
-                transform=self.transform,
-                bounds=self.bounds,
-                scale=self.scale, 
-                name=n,
-                **self.info 
-            ) 
-            for val, p, n in zip(flat_val, dists_split, flat_names)
-        ]
-    
-    def as_fixed(self) -> 'Parameter':
-        """
-        Return a copy of the parameter set to fixed.
-
-        Returns
-        -------
-        Parameter
-            A copy with `fixed=True`.
-        """
-        return dataclasses.replace(self, fixed=True)
-    
-    def as_free(self) -> 'Parameter':
-        """
-        Return a copy of the parameter set to free.
-
-        Returns
-        -------
-        Parameter
-            A copy with `fixed=False`.
-        """
-        return dataclasses.replace(self, fixed=False)
-    
-    def __array__(self, dtype=None):
-        """
-        NumPy array interface.
-
-        Returns
-        -------
-        numpy.ndarray
-            The fully scaled and physical space array.
-        """
-        return jnp.asarray(self.value * self.scale, dtype=dtype)
-    
-    def __jax_array__(self, dtype=None):
-        """
-        JAX array interface.
-
-        Returns
-        -------
-        jnp.ndarray
-            The fully scaled and physical space array.
-        """
-        return jnp.asarray(self.value * self.scale, dtype=dtype)
-    
-    def __len__(self):
-        """
-        Get the length of the parameter value.
-
-        Returns
-        -------
-        int
-            `1` for scalars, otherwise `len(latent_value)`.
-        """
-        if len(self.latent_value.shape) == 0:
-            return 1 
-        return len(self.latent_value)
-    
     def __repr__(self):
         args = []
         
-        # Display 'value' if untransformed, 'latent_value' if transformed,
-        # perfectly matching the JSON serialization and constructor logic.
-        if self.latent_value is None:
-            args.append(f"value=None")
+        # Support None in repr for equinox partitioning
+        if self.raw_value is None:
+            args.append("raw_value=None")
         else:
-            if self.transform is None:
-                args.append(f"value={format_array(self.value)}")
-            else:
-                args.append(f"latent_value={format_array(self.latent_value)}")
+            args.append(f"base_value={format_array(self.base_value)}")
         
-        if self.scale != 1.0:
+        # Safely check if scale is 1.0 without triggering JAX Tracer boolean errors
+        if self.scale is not None and not hasattr(self.scale, 'unit') and jnp.allclose(self.scale, jnp.array(1.0)):
             args.append(f"scale={self.scale}")
             
         if self.fixed is not False:
@@ -643,241 +201,91 @@ class Parameter(eqx.Module):
         if self.distribution is not None:
             args.append(f"distribution={format_distribution(self.distribution)}")
             
-        if self.transform is not None:
-            args.append(f"transform={format_transform(self.transform)}")
-            
-        if self.bounds is not None:
-            args.append(f"bounds={format_array(self.bounds)}")
+        if self.constraint is not None:
+            args.append(f"constraint={self.constraint}")
             
         if self.name is not None:
             args.append(f"name={repr(self.name)}")
             
-        if self.info:
-            for k, v in self.info.items():
+        if self.metadata:
+            for k, v in self.metadata.items():
                 args.append(f"{k}={repr(v)}")
             
         return f"Parameter({', '.join(args)})"
-            
-    def __add__(self, other):
-        """Elementwise addition."""
-        return jnp.add(jnp.array(self), jnp.array(other))
+
+    # =========================================================================
+    # Interactive Math Dunders
+    # =========================================================================
     
-    def __sub__(self, other):
-        """Elementwise subtraction."""
-        return jnp.subtract(jnp.array(self), jnp.array(other))
-    
-    def __mul__(self, other):
-        """Elementwise multiplication."""
-        return jnp.multiply(jnp.array(self), jnp.array(other))
+    def __jax_array__(self): return self.physical_value
+    def __add__(self, other): return self.physical_value + other
+    def __radd__(self, other): return other + self.physical_value
+    def __sub__(self, other): return self.physical_value - other
+    def __rsub__(self, other): return other - self.physical_value
+    def __mul__(self, other): return self.physical_value * other
+    def __rmul__(self, other): return other * self.physical_value
+    def __truediv__(self, other): return self.physical_value / other
+    def __rtruediv__(self, other): return other / self.physical_value
+    def __pow__(self, other): return self.physical_value ** other
 
-    def __truediv__(self, other):
-        """Elementwise true division."""
-        return jnp.divide(jnp.array(self), jnp.array(other))
 
-    def __radd__(self, other):
-        """Reflected elementwise addition."""
-        return jnp.add(jnp.array(other), jnp.array(self))
-    
-    def __rsub__(self, other):
-        """Reflected elementwise subtraction."""
-        return jnp.subtract(jnp.array(other), jnp.array(self))
+def asparam(value: Any) -> Parameter:
+    if isinstance(value, Parameter):
+        return value
 
-    def __rmul__(self, other):
-        """Reflected elementwise multiplication."""
-        return jnp.multiply(jnp.array(other), jnp.array(self))
-    
-    def __rtruediv__(self, other):
-        """Reflected elementwise true division."""
-        return jnp.divide(jnp.array(other), jnp.array(self))
-    
-    def copy(self):
-        """
-        Return a shallow copy.
+    return Parameter(base_value=value)
 
-        Returns
-        -------
-        Parameter
-            A copied instance.
-        """
-        return dataclasses.replace(self)
-    
-    def to_json(self) -> str:
-        """
-        Serialize the parameter to a JSON string.
-        
-        Omits any fields that are None or empty to keep the payload lightweight.
-        For readability, standard parameters serialize their 'value'. Transformed 
-        parameters serialize their 'latent_value' to safely support non-bijective mappings.
 
-        Returns
-        -------
-        str
-            A JSON-formatted string containing the parameter's data.
-        """
-        d = {
-            "fixed": self.fixed,
-            "scale": self.scale
-        }
-        
-        # Serialize 'value' for readability if no transform exists, 
-        # otherwise serialize 'latent_value' for architectural safety.
-        if self.latent_value is not None:
-            if self.transform is None:
-                d["value"] = serialize_array(self.value)
-            else:
-                d["latent_value"] = serialize_array(self.latent_value)
-        
-        if self.distribution is not None:
-            d["distribution"] = serialize_distribution(self.distribution)
-            
-        if self.transform is not None:
-            d["transform"] = serialize_transform(self.transform)
-            
-        if self.bounds is not None:
-            d["bounds"] = self.bounds.tolist()
-            
-        if self.name is not None:
-            d["name"] = self.name
-            
-        if self.info: 
-            d["info"] = self.info 
-            
-        return json.dumps(d, indent=2)
-
-    @classmethod
-    def from_json(cls, s: str) -> "Parameter":
-        """
-        Deserialize a parameter from a JSON string.
-
-        Parameters
-        ----------
-        s : str
-            The JSON string produced by `to_json`.
-
-        Returns
-        -------
-        Parameter
-            A reconstructed `Parameter` instance.
-        """
-        d = json.loads(s)
-        
-        # Safely extract either 'value' or 'latent_value' depending on how it was saved
-        raw_value = d.pop("value", None)
-        raw_latent = d.pop("latent_value", None)
-        
-        if raw_latent is not None:
-            d["latent_value"] = deserialize_array(raw_latent)
-        elif raw_value is not None:
-            d["value"] = deserialize_array(raw_value)
-            
-        fixed = d.pop("fixed", False)
-        
-        if "distribution" in d:
-            d["distribution"] = deserialize_distribution(d["distribution"])
-            
-        if "transform" in d:
-            d["transform"] = deserialize_transform(d["transform"])
-            
-        info_dict = d.pop("info", {})
-        d.update(info_dict)
-        
-        return cls(fixed=fixed, **d)
-    
-
-def is_param(x: Any) -> bool:
-    """
-    Check if an object is an instance of a Parameter.
-
-    Parameters
-    ----------
-    x : Any
-        The object to check.
-
-    Returns
-    -------
-    bool
-        True if the object is a Parameter, False otherwise.
-    """
-    return isinstance(x, Parameter)
-
-def is_valid_param(x: Any) -> bool:
-    """
-    Check if an object is a Parameter and has a valid latent value.
-
-    Parameters
-    ----------
-    x : Any
-        The object to check.
-
-    Returns
-    -------
-    bool
-        True if the object is a Parameter with a non-None value, False otherwise.
-    """
-    return isinstance(x, Parameter) and x.latent_value is not None
-
-def is_free_param(x: Any) -> bool:
-    """
-    Check if an object is a free (unfixed) Parameter object.
-
-    Parameters
-    ----------
-    x : Any
-        The object to check.
-
-    Returns
-    -------
-    bool
-        True if the object is a non-fixed Parameter, False otherwise.
-    """
-    return is_valid_param(x) and not x.fixed
-
-def is_fixed_param(x: Any) -> bool:
-    """
-    Check if an object is a fixed Parameter  object.
-
-    Parameters
-    ----------
-    x : Any
-        The object to check.
-
-    Returns
-    -------
-    bool
-        True if the object is a fixed Parameter, False otherwise.
-    """
-    return is_valid_param(x) and x.fixed
-
-def as_param(x: Any | list[Any] | dict[str, Any], **kwargs) -> "Parameter":
-    """
-    Ensure an object is a Parameter or container of Parameters.
-    
-    If the object is already a Parameter, it is returned unchanged. Otherwise, 
-    the underlying objects are converted into new Parameter objects.
-
-    Parameters
-    ----------
-    x : Any, list, or dict
-        The object to convert.
+def field(
+    default: Any = dataclasses.MISSING,
+    scale: Any = 1.0,
+    *,
+    constraint: AbstractConstraint | None = None,
+    distribution: AbstractDistribution | None = None,
+    fixed: Any = False,
+    name: str | list[str] | None = None,
     **kwargs
-        Additional keyword arguments passed to the Parameter constructor.
-
-    Returns
-    -------
-    Parameter, list of Parameter, or dict of Parameter
-        The object wrapped as Parameter(s).
+) -> Any:
     """
-    from parax.parameters import Free, Fixed
+    Specifies a Parax Parameter field within an Equinox module.
+
+    This function defines the default physical metadata (scale, bounds, fixed state)
+    for a parameter. When the module is initialized, any raw values passed to this 
+    field are automatically converted into fully configured `Parameter` objects. 
+    Users can override these defaults by passing an explicit `Parameter` object instead.
+
+    Args:
+        default: The default base value. If omitted, this field becomes required.
+        scale: Physical unit or scaling factor (default: 1.0).
+        constraint: base bounds and mapping logic.
+        distribution: Prior probability distribution for Bayesian inference.
+        fixed: Whether the parameter is frozen during optimization (default: False).
+        name: String identifier for the parameter.
+        **kwargs: Additional static metadata to store in the parameter.
+    """
+    def _converter(val: Any) -> Parameter:
+        if isinstance(val, Parameter):
+            return val
+        
+        return Parameter(
+            base_value=val,
+            scale=scale,
+            constraint=constraint,
+            distribution=distribution,
+            fixed=fixed,
+            name=name,
+            **kwargs
+        )
+
+    # Build the keyword arguments for Equinox's underlying field mapping
+    field_kwargs = {
+        "converter": _converter,
+        "metadata": kwargs
+    }
     
-    if isinstance(x, Parameter):
-        return x
-    elif isinstance(x, list):
-        return [as_param(xi, **kwargs) for xi in x]
-    elif isinstance(x, dict):
-        return {k: as_param(xi, **kwargs) for k, xi in x.items()}
-    else:
-        is_fixed = kwargs.pop('fixed', False)
-        if is_fixed:
-            return Fixed(value=x, **kwargs)
-        else:
-            return Free(value=x, **kwargs)
+    # Only pass 'default' to Equinox if the user actually provided one.
+    # Otherwise, Equinox knows this is a strictly required argument.
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
+        
+    return eqx.field(**field_kwargs)

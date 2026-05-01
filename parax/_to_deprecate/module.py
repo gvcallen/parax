@@ -21,10 +21,11 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
 from distreqx.bijectors import AbstractBijector
 
-from parax.parameter import Parameter, is_valid_param, as_param
-from parax.parameter_group import ParameterGroup
+from parax.filters import is_param
+from parax.parameter import Parameter, asparam
+from parax.deprecate.parameter_group import ParameterGroup
 from parax.field import field
-from parax.tree import partition
+from parax.filters import partition
 from parax.utils import get_first_underlying_type, nodes_by_type
 
 @dataclass_transform(field_specifiers=(field, eqx.field, dataclasses.field))
@@ -53,7 +54,7 @@ class ModuleMeta(type(eqx.Module)):
                             if not k.startswith('_') and k not in ('name', 'type')
                         }
                         
-                        field_kwargs['converter'] = lambda x, fn=field_name: as_param(x, fixed=False)
+                        field_kwargs['converter'] = lambda x, fn=field_name: asparam(x, fixed=False)
                         
                         if 'metadata' in field_kwargs and field_kwargs['metadata']:
                             field_kwargs['metadata'] = dict(field_kwargs['metadata'])
@@ -72,7 +73,7 @@ class ModuleMeta(type(eqx.Module)):
                         raise Exception(f"Expected a parameter for default '{field_name}' in class {name} but found a tuple.")
                     field_kwargs['default'] = default
                 
-                field_kwargs['converter'] = lambda x, fn=field_name: as_param(x, fixed=False)
+                field_kwargs['converter'] = lambda x, fn=field_name: asparam(x, fixed=False)
             
             # 3. Apply default_factory to avoid Python's mutable default trap
             if default is not dataclasses.MISSING:
@@ -303,7 +304,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """Iterate over (name, Parameter) pairs in internal order."""
         
         # 1. Direct Flattening
-        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_valid_param)
+        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_param)
 
         # 2. Pre-process submodule IDs outside the loop (Fast JAX C++ traversal)
         allowed_param_ids = None
@@ -318,9 +319,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
             allowed_param_ids = set()
             for sm in resolved_submodules:
-                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_valid_param)
+                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_param)
                 for node in sm_nodes:
-                    if is_valid_param(node) and (include_fixed or not getattr(node, "fixed", False)):
+                    if is_param(node) and (include_fixed or not getattr(node, "fixed", False)):
                         allowed_param_ids.add(id(node))
 
         # 3. Pre-process filters into O(1) lookups
@@ -351,7 +352,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         # 4. The Single Lazy Pass
         for path, param in path_and_nodes:
-            if not is_valid_param(param):
+            if not is_param(param):
                 continue
             if not include_fixed and getattr(param, "fixed", False):
                 continue
@@ -1031,7 +1032,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
         # Fast tree mapping bypasses string iteration logic completely
         def map_fn(path, node):
-            if is_valid_param(node):
+            if is_param(node):
                 name = self.path_to_param_name(path)
                 if name in new_params:
                     new_param = new_params[name]
@@ -1040,7 +1041,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return new_param
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_param)
 
     def with_mapped_params(
         self: Self, 
@@ -1110,7 +1111,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
         # Directly map using JAX natively
         def map_fn(path, node):
-            if is_valid_param(node):
+            if is_param(node):
                 if not include_fixed and getattr(node, "fixed", False):
                     return node
                 name = self.path_to_param_name(path)
@@ -1120,7 +1121,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return map_others(node)
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_valid_param)    
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_param)    
         
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.

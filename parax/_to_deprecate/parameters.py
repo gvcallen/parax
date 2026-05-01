@@ -1,29 +1,29 @@
 """
-Parameter factories with pre-defined probability distributions.
+Parameter factories with pre-defined probability distributions and constraints.
 """
 
-from typing import Sequence
+from jaxtyping import ArrayLike
 
 import jax.numpy as jnp
 import distreqx.distributions as dist
 
 from parax.parameter import Parameter
+from parax.constraints import Interval
 
-
-def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=None, add_bounds=True, **kwargs) -> Parameter:
+def Uniform(low: float | ArrayLike, high: float | ArrayLike, value=None, make_constraint: bool = True, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
     
     Parameters
     ----------
-    low : float | Sequence[float]
+    low : float | ArrayLike
         The lower value of the distribution. Can be a sequence for a multi-valued Parameter.
-    high : float | Sequence[float]
+    high : float | ArrayLike
         The upper value of the distribution. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the midpoint of the distribution is used. Defaults to None.
-    add_bounds : bool
-        Whether or not bounds should automatically be added at `low` and `high`. Defaults to True.
+    make_constraint : bool
+        Creates an interval constraint with default bounds `low` and `high`. Defaults to True.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -35,17 +35,17 @@ def Uniform(low: float | Sequence[float], high: float | Sequence[float], value=N
     low, high = jnp.array(low, dtype=float), jnp.array(high, dtype=float)
     dists = dist.Uniform(low, high)
     
-    if add_bounds:
-        kwargs.setdefault('bounds', jnp.stack([low, high], axis=-1))
+    if make_constraint:
+        kwargs.setdefault('constraint', Interval(low, high))
     
-    if 'latent_value' in kwargs:
+    if 'raw_value' in kwargs:
         return Parameter(distribution=dists, **kwargs)
         
     values = (low + high) / 2.0 if value is None else value
-    return Parameter(value=values, distribution=dists, **kwargs)
+    return Parameter(unscaled_value=values, distribution=dists, **kwargs)
 
 
-def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | Sequence[float], *args, **kwargs) -> Parameter:
+def RelativeUniform(mean: float | ArrayLike, deviation_fraction: float | ArrayLike, *args, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution defined by a fractional deviation.
 
@@ -53,9 +53,9 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
 
     Parameters
     ----------
-    mean : float | Sequence[float]
+    mean : float | ArrayLike
         The center (mean) of the distribution.
-    deviation_fraction : float | Sequence[float]
+    deviation_fraction : float | ArrayLike
         The relative radius of the distribution bounds as a fraction of the mean.
         e.g., 0.1 results in bounds of [0.9 * mean, 1.1 * mean].
     **kwargs
@@ -74,15 +74,15 @@ def RelativeUniform(mean: float | Sequence[float], deviation_fraction: float | S
     return Uniform(mean_arr - delta, mean_arr + delta, *args, **kwargs)
 
 
-def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[float], *args, **kwargs) -> Parameter:
+def CenteredUniform(mean: float | ArrayLike, half_width: float | ArrayLike, *args, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a uniform distribution.
 
     Parameters
     ----------
-    mean : float | Sequence[float]
+    mean : float | ArrayLike
         The mean value of the distribution. Can be a sequence for a multi-valued Parameter.
-    half_width : float | Sequence[float]
+    half_width : float | ArrayLike
         The half-width value of the distribution. Can be a sequence for a multi-valued Parameter.
     **kwargs
         Additional keyword arguments passed to [`parax.Uniform`][].
@@ -98,22 +98,23 @@ def CenteredUniform(mean: float | Sequence[float], half_width: float | Sequence[
     return Uniform(low, high, *args, **kwargs)
 
 
-def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=None, icdf_bounds=0.001, **kwargs) -> Parameter:
+def Normal(mean: float | ArrayLike, std: float | ArrayLike, value=None, make_constraint: bool = True, interval_std: float = 2.0, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a normal (Gaussian) distribution.
 
     Parameters
     ----------
-    mean : float | Sequence[float]
+    mean : float | ArrayLike
         The mean of the distribution. Can be a sequence for a multi-valued Parameter.
-    std : float | Sequence[float]
+    std : float | ArrayLike
         The standard deviation of the distribution. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the mean of the distribution is used. Defaults to None.
-    icdf_bounds : float | None
-        The percentile to place bounds at using the inverse CDF.
-        Bounds are placed so that `min = normal.icdf(icdf_bounds)` and `max = normal.icdf(1.0-icdf_bounds)`.
-        Defaults to 1%. Can be None for no bounds.
+    make_constraint : bool
+        Creates an interval constraint with default bounds `mean` +- `interval_std` * `std`. Defaults to True.
+    interval_std : float
+        Number of standard deviations from the mean to place the bounds if `make_constraint` is True.
+        Defaults to 2.0.
     **kwargs
         Additional keyword arguments forward to the `Parameter` constructor.
 
@@ -125,18 +126,19 @@ def Normal(mean: float | Sequence[float], std: float | Sequence[float], value=No
     mean, std = jnp.array(mean, dtype=float), jnp.array(std, dtype=float)
     dists = dist.Normal(mean, std)
     
-    if icdf_bounds is not None and hasattr(dists, 'icdf'):
-        min, max = dists.icdf(icdf_bounds), dists.icdf(1.0-icdf_bounds)
-        kwargs.setdefault('bounds', jnp.stack([min, max], axis=-1))
+    if make_constraint:    
+        lower = mean - interval_std * std
+        upper = mean + interval_std * std
+        kwargs.setdefault('constraint', Interval(lower, upper))
     
-    if 'latent_value' in kwargs:
+    if 'raw_value' in kwargs:
         return Parameter(distribution=dists, **kwargs)\
         
     values = mean if value is None else value
-    return Parameter(value=values, distribution=dists, **kwargs)
+    return Parameter(unscaled_value=values, distribution=dists, **kwargs)
 
 
-def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence[float], **kwargs) -> Parameter:
+def RelativeNormal(mean: float | ArrayLike, std_fraction: float | ArrayLike, **kwargs) -> Parameter:
     r"""
     Create a `Parameter` with a normal distribution defined by a relative standard deviation.
 
@@ -144,9 +146,9 @@ def RelativeNormal(mean: float | Sequence[float], std_fraction: float | Sequence
 
     Parameters
     ----------
-    mean : float | Sequence[float]
+    mean : float | ArrayLike
         The center (mean) of the distribution.
-    std_fraction : float | Sequence[float]
+    std_fraction : float | ArrayLike
         The standard deviation expressed as a fraction of the mean 
         (also known as the coefficient of variation).
         e.g., 0.1 results in a distribution with sigma = 0.1 * mean.
@@ -175,7 +177,7 @@ def Fixed(value=None, **kwargs) -> Parameter:
     Parameters
     ----------
     value : optional
-        The value of the parameter. If None, `latent_value` must be provided in kwargs.
+        The value of the parameter. If None, `raw_value` must be provided in kwargs.
     **kwargs
         Additional keyword arguments passed to the `Parameter` constructor.
 
@@ -184,14 +186,14 @@ def Fixed(value=None, **kwargs) -> Parameter:
     Parameter
         The created fixed Parameter object.
     """
-    if 'latent_value' in kwargs:
+    if 'raw_value' in kwargs:
         return Parameter(fixed=True, **kwargs)
         
     if value is None:
-        raise ValueError("Must provide either `value` or `latent_value`.")
+        raise ValueError("Must provide either `value` or `raw_value`.")
         
     value = jnp.array(value, dtype=float)
-    return Parameter(value=value, fixed=True, **kwargs)
+    return Parameter(unscaled_value=value, fixed=True, **kwargs)
 
 
 def Free(value=None, **kwargs) -> Parameter:
@@ -203,7 +205,7 @@ def Free(value=None, **kwargs) -> Parameter:
     Parameters
     ----------
     value : optional
-        The value of the parameter. If None, `latent_value` must be provided in kwargs.
+        The value of the parameter. If None, `raw_value` must be provided in kwargs.
     n : int, optional
         The number of identical parameters to create in an array. Defaults to None.
     **kwargs
@@ -214,26 +216,26 @@ def Free(value=None, **kwargs) -> Parameter:
     Parameter
         The created free Parameter object.
     """
-    if 'latent_value' in kwargs:
+    if 'raw_value' in kwargs:
         return Parameter(fixed=False, **kwargs)
         
     if value is None:
-        raise ValueError("Must provide either `value` or `latent_value`.")
+        raise ValueError("Must provide either `value` or `raw_value`.")
         
     value = jnp.array(value, dtype=float)
-    return Parameter(value=value, fixed=False, **kwargs)
+    return Parameter(unscaled_value=value, fixed=False, **kwargs)
 
 
-def Bounded(min: float | Sequence[float], max: float | Sequence[float], value=None, **kwargs) -> Parameter:
+def Bounded(lower: float | ArrayLike, upper: float | ArrayLike, value=None, **kwargs) -> Parameter:
     r"""
-    Create a `Parameter` with specified bounds.
+    Create a `Parameter` with specified bounds using an interval constraint.
     
     Parameters
     ----------
-    min : float | Sequence[float]
-        The minimum bounds of the parameter. Can be a sequence for a multi-valued Parameter.
-    max : float | Sequence[float]
-        The maximum bounds of the parameter. Can be a sequence for a multi-valued Parameter.
+    lower : float | ArrayLike
+        The lower bound of the parameter. Can be a sequence for a multi-valued Parameter.
+    upper : float | ArrayLike
+        The upper bound of the parameter. Can be a sequence for a multi-valued Parameter.
     value : optional
         The initial value. If None, the midpoint of the bounds is used. Defaults to None.
     **kwargs
@@ -244,10 +246,12 @@ def Bounded(min: float | Sequence[float], max: float | Sequence[float], value=No
     Parameter
         The bounded Parameter object.
     """
-    min, max = jnp.array(min, dtype=float), jnp.array(max, dtype=float)
+    lower, upper = jnp.array(lower, dtype=float), jnp.array(upper, dtype=float)
     
-    if 'latent_value' in kwargs:
+    if 'raw_value' in kwargs:
         return Parameter(**kwargs)
+    
+    kwargs.setdefault('constraint', Interval(lower, upper))
         
-    values = (min + max) / 2.0 if value is None else value
-    return Parameter(value=values, bounds=jnp.stack([min, max], axis=-1))
+    values = (lower + upper) / 2.0 if value is None else value
+    return Parameter(unscaled_value=values, **kwargs)

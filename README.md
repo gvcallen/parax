@@ -1,10 +1,8 @@
 ![Parax Logo](https://raw.githubusercontent.com/gvcallen/parax/main/assets/logo.png)
 
-**Parax** is a parametric modelling library built on top of [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** is a mini-framework designed for parametric/scientific modeling in [JAX](https://github.com/jax-ml/jax) and [Equinox](https://github.com/patrick-kidger/equinox).
 
-At its core, the library provides a `Parameter` class which inherits from `eqx.Module` and wraps a JAX array. A parameter can be marked as `fixed` for training, as well as assigned arbitrary metadata.
-
-However, the library also provides additional helpers, including `parax.partition`, `parax.Module` and `parax.Operator`. `partition` caters for easy partitioning of module's that contain `Parameter` objects. `Parameter` and `Module` together provide an experience similar to PyTorch with its `torch.nn.Parameter`, but in a more Equinox/JAX-friendly style. `Operator` caters for composable operations over arbitrary arguments (such as `Module`'s), allowing for easy PyTree feature extraction.
+It provides `parax.Parameter` with common (and custom) metadata, as well as useful tools and wrappers for model unwrapping, inspection, manipulation, optimization, and inference.
 
 | **Parax** |  |
 |-------------|-------|
@@ -14,13 +12,14 @@ However, the library also provides additional helpers, including `parax.partitio
 
 ## Features
 
-- **Easy parameter fixing**: Parameters can be marked as `fixed` and the resultant modules partitioned using `parax.partition`.
-- **Encapsulated constraints and scaling**: Optional scaling and transformations are abstracted away by applying them when the parameter object is cast to a JAX array. This can be used, for example, to enforce positivity or arbitrary constraints during optimization.
-- **Parameter transforms**: Arbitrary transforms can be applied to parameters using `myparam.transformed(bij)`. This applies a transform to both the parameter and its underlying distribution (if any).
-- **Arbitrary metadata support**: While **Parax** natively caters for common metadata such as distributions, bijectors, scaling, bounds and a name, arbitrary metadata can also be attached for more complex modelling purposes (for example, in the scientific domain it is common to want to attach units to a parameter).
-- **Extended Equinox module**: **Parax** provides `parax.Module`, which extends `eqx.Module` to allow for easy inspection, updating, fixing, freeing, or mapping of parameters and their metadata deep within complex models using simple string paths and bulk `with_*` methods. For example, `parax.Module.named_params()` returns a dictionary of parameters with names based on string paths.
-- (experimental) **Composable PyTree operations**: **Parax** provides `parax.Operator`, which caters for composable, parametric operations over arbitrary arguments. This can be very useful in manipulating domain-specific `parax.Module` objects in a parameter-aware manner.
-- (experimental) **Model saving and loading**. By employing methods to serialize `distreqx` distributions and transformation/bijections, **Parax** provides (experimental) support to directly save (pickle) models using `parax.load` and `parax.save`, as long as they align to certain rules.
+- **parax.Parameter**: Equinox module common physical metadata such as `fixed`, `scale`, `constraint` and `distribution` (via [distreqx](https://github.com/lockwo/distreqx)).
+- **Unit support**: Support for units in `scale` via [unxt](https://github.com/GalacticDynamics/unxt).
+- **Optimization and inference wrappers**: Out-of-the-box support for optimization ((via [optimistix](https://github.com/patrick-kidger/optimistix), [optax](https://github.com/google-deepmind/optax) and `scipy.optimize.minimize`)) and Bayesian inference (via [BlackJAX](https://github.com/blackjax-devs/blackjax)).
+- **Lower-level tree utilities**: Built-in filters and tree-mapping utilities, such as `where_free_raw_value`, `is_free_param`, `tree.raw_value`, `tree.constraint`, `tree.distribution` etc.
+
+- **Model manipulation**: Provides `prx.tree_at`, catering for surgical, parameter-driven model manipulation.
+- (experimental) **Composable PyTree operations**: Composable operations over arbitrary PyTree arguments in `parax.Operator`.
+- (experimental) **Model saving and loading**. Direct model saving (pickling) via `parax.load` and `parax.save`.
 
 ## Installation
 Parax can be installed using pip directly:

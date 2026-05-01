@@ -1,130 +1,222 @@
+"""
+Tree mapping/unwrapping utilities for Parax.
+
+These functions operate on PyTrees with `parax.Parameter` leaves.
+They are design to map parametric structures to new PyTrees
+that represent a specific value or metadata from the original PyTree.
+
+For example, raw_values, physical values, the "fixed" attribute etc.
+can be extracted. Further, joint probability distributions and constraints
+can be extracted that represent a combined distribution/constraint
+over the entire tree.
+
+Note that these functions only allow parameter leaves. To operate
+on mixed PyTrees, first partition using e.g. `eqx.partition(pytree, prx.is_param)`,
+then perform the mapping, and then combine using `eqx.combine`.
+"""
 import dataclasses
-from typing import TypeVar, Any, Callable
+
 import jax
-import jax.numpy as jnp
-import equinox as eqx
-from parax.parameter import is_valid_param, is_free_param
+from jaxtyping import PyTree, Array
+from distreqx.distributions import Joint
+from distreqx.bijectors import TreeMap
 
-T = TypeVar("T")
+from parax.parameter import Parameter
+from parax.filters import is_param
+from parax.constraints import TreeConstraint
 
 
-def where_free_param_value(pytree):
-    """Generates a boolean filter mask identifying the `latent_value` of free parameters.
-
-    This evaluates the given `pytree` and returns a boolean mask of the same structural 
-    prefix. It is designed to isolate trainable/free components: the `latent_value` of 
-    any node satisfying `is_free_param` becomes `True`, while fixed parameters, other 
-    attributes (like the `fixed` boolean itself), and standard arrays become `False`.
-
-    Intended for direct use as a filter spec with [`eqx.partition`][] or [`eqx.filter`][].
-
-    **Arguments:**
-
-    - `pytree`: Any JAX PyTree (typically your full Equinox model).
-
-    **Returns:**
-
-    A PyTree of booleans matching the structure of `pytree`.
-
-    !!! Example
-
-        ```python
-        # Partition a model to extract only the free, trainable arrays
-        mask = where_free_param_value(model)
-        params, static = eqx.partition(model, mask)
-        
-        # 'params' now contains only the latent_values, everything else is None.
-        ```
+def raw_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    def build_mask(node):
-        if is_free_param(node):
-            false_param = jax.tree_util.tree_map(lambda _: False, node)
-            return eqx.tree_at(lambda p: p.latent_value, false_param, True)
-        return False
+    Extracts raw values from a PyTree of parameters.
 
-    return jax.tree_util.tree_map(build_mask, pytree, is_leaf=is_valid_param)
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
 
-
-def when_free_param_value(pytree, replace_with: Any):
+    Returns:
+        A PyTree containing the `raw_value` arrays in place of `Parameter` wrappers. 
     """
-    Creates a PyTree structural mask where the `latent_value` of all free parameters 
-    is replaced with `replace_with`. All other nodes (fixed params, standard arrays) 
-    are set to `None`.
+    return jax.tree.map(lambda p: p.raw_value, pytree, is_leaf=is_param)
 
-    Ideal for generating `in_axes` specs for `eqx.filter_vmap` or sharding specs.
 
-    !!! Example
-
-        ```python
-        # Map free parameter values to axis 0 for vmap, ignoring everything else
-        axes_spec = map_free_param_values(model, replace_with=0)
-        
-        # Pass the pre-computed tree spec directly to in_axes
-        vmapped_fn = eqx.filter_vmap(my_fn, in_axes=axes_spec)
-        ```
+def base_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    return jax.tree_util.tree_map(
-        lambda is_free: replace_with if is_free else None,
-        where_free_param_value(pytree),
-    )
-    
+    Extracts base values from a PyTree of parameters.
 
-def partition(
-    pytree: T, 
-    include_fixed: bool = False, 
-    include_arrays: bool = False,
-    param_objects: bool = False,
-) -> tuple[T, T]:
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
+
+    Returns:
+        A PyTree containing the `base_value` attribute in place of `Parameter` wrappers. 
     """
-    Partitions an arbitrary PyTree into (dynamic, static) halves.
+    return jax.tree.map(lambda p: p.base_value, pytree, is_leaf=is_param)
 
-    By default, this acts as a "strict" parameter partitioner: ONLY non-fixed 
-    [`~parax.Parameter`][] objects are routed to the dynamic tree. Raw JAX arrays are 
-    treated as static data unless explicitly requested.
-    
-    Parameters
-    ----------
-    pytree : T
-        The PyTree to partition.
-    include_fixed : bool, default=False
-        If True, includes [`~parax.Parameter`][] objects where `fixed=True`.
-    include_arrays : bool, default=False
-        If True, standard JAX floating-point arrays (not wrapped in a 
-        [`~parax.Parameter`][]) are ALSO routed to the dynamic tree.
-    param_objects : bool, default=False
-        If True, the entire [`~parax.Parameter`][] object is routed to the dynamic tree. 
-        If False, ONLY the underlying `.latent_value` array is routed to the dynamic tree.
-                    
-    Returns
-    -------
-    tuple of T
-        A tuple containing `(dynamic, static)` PyTrees.
+
+def physical_values(pytree: PyTree[Parameter]) -> PyTree[Array]:
     """
-    
-    def build_mask(node):
-        # 1. Parameter Logic
-        if is_valid_param(node):
-            if not include_fixed and getattr(node, "fixed", False):
-                return False 
-            
-            if param_objects:
-                return True
-            else:
-                false_param = jax.tree_util.tree_map(lambda _: False, node)
-                return eqx.tree_at(lambda p: p.latent_value, false_param, True)
-        
-        # 2. Raw Array Logic (The Escape Hatch)
-        if include_arrays and eqx.is_array(node):
-            # Only treat floating point arrays as dynamic (standard JAX/Equinox behavior)
-            return jax.numpy.issubdtype(node.dtype, jax.numpy.inexact)
-            
-        # 3. Everything else is static
-        return False
+    Extracts physical values from a PyTree of parameters.
 
-    # Build the filter spec
-    filter_spec = jax.tree_util.tree_map(build_mask, pytree, is_leaf=is_valid_param)
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
+
+    Returns:
+        A PyTree containing the `physical_value` attribute in place of `Parameter` wrappers. 
+    """
+    return jax.tree.map(lambda p: p.physical_value, pytree, is_leaf=is_param)
+
+
+def scales(pytree: PyTree[Parameter]) -> PyTree[Array]:
+    """
+    Extracts the scale from every Parameter in the PyTree.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A PyTree where `Parameter` leaves are replaced by their `scale` property.
+    """
+    return jax.tree.map(lambda p: p.scale, pytree, is_leaf=is_param)
+
+
+def fixed(pytree: PyTree[Parameter]) -> PyTree[Array]:
+    """
+    Extracts the fixed boolean flag from a parameter PyTree.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A PyTree containing the `fixed` boolean property in place of `Parameter` wrappers. 
+    """
+    return jax.tree.map(lambda p: p.fixed, pytree, is_leaf=is_param)
+
+
+def distribution(pytree: PyTree[Parameter]) -> Joint:
+    """
+    Constructs a joint probability distribution from a parameter PyTree.
+
+    The resultant distribution is of type `distreqx.distributions.Joint`
+    and applies over the base values for all parameters in the pytree.
+    It can be used to sample and calculate the log probability of values 
+    over the entire tree structure simultaneously.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A `distreqx.distributions.Joint` distribution representing the prior.
+    """
+    distribution_tree = jax.tree.map(lambda p: p.distribution, pytree, is_leaf=is_param)
+    return Joint(distribution_tree)
+
+
+def constraint(pytree: PyTree[Parameter]) -> TreeConstraint:
+    """
+    Constructs a combined tree constraint from a parameter PyTree.
+
+    The resultant constraint is of type `parax.constraints.TreeConstraint`
+    and applies over the raw values for all parameters in the pytree.
+
+    Note that the constraint's bijector transforms raw values to base values
+    and not phyiscal values. To transform straight to physical values,
+    either multiply the base values by scales element-wise,
+    or use `parax.tree.raw_to_physical_bijector` directly.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A `parax.constraints.TreeConstraint` containing the joint constraints.
+    """
+    constraint_tree = jax.tree.map(lambda p: p.constraint, pytree, is_leaf=is_param)
+    return TreeConstraint(constraint_tree)
+
+
+def raw_to_base_bijector(pytree: PyTree[Parameter]) -> TreeMap:
+    """
+    Constructs a combined tree bijector from a parameter PyTree.
     
-    # Preserve Parameter objects if requested
-    leaf_fn = is_valid_param if param_objects else None
+    The resultant bijector is of type `distreqx.bijectors.TreeMap`
+    and can be used to convert a PyTree of raw values
+    to a PyTree of base values.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
+
+    Returns:
+        A `TreeMap` bijector mapping from raw to base space.
+    """
+    bijector_tree = jax.tree.map(lambda p: p.raw_to_base_bijector, pytree, is_leaf=is_param)
+    return TreeMap(bijector_tree)
+
+
+def raw_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
+    """
+    Constructs a combined tree bijector from a parameter PyTree.
     
-    return eqx.partition(pytree, filter_spec, is_leaf=leaf_fn)
+    The resultant bijector is of type `distreqx.bijectors.TreeMap`
+    and can be used to convert a PyTree of raw values
+    to a PyTree of physical values.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
+
+    Returns:
+        A `TreeMap` bijector mapping from raw to physical space.
+    """
+    bijector_tree = jax.tree.map(lambda p: p.raw_to_physical_bijector, pytree, is_leaf=is_param)
+    return TreeMap(bijector_tree)
+
+
+def base_to_physical_bijector(pytree: PyTree[Parameter]) -> TreeMap:
+    """
+    Constructs a combined tree bijector from a parameter PyTree.
+    
+    The resultant bijector is of type `distreqx.bijectors.TreeMap`
+    and can be used to convert a PyTree of base values
+    to a PyTree of physical values.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` leaves.
+
+    Returns:
+        A `TreeMap` bijector mapping from base to physical space.
+    """
+    bijector_tree = jax.tree.map(lambda p: p.base_to_physical_bijector, pytree, is_leaf=is_param)
+    return TreeMap(bijector_tree)
+
+
+def names(pytree: PyTree[Parameter]) -> PyTree[Array]:
+    """
+    Extracts the name from every Parameter in the PyTree.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A PyTree where `Parameter` leaves are replaced by their `name` property.
+    """
+    return jax.tree.map(lambda p: p.name, pytree, is_leaf=is_param)
+
+
+def metadata(pytree: PyTree[Parameter]) -> PyTree[Array]:
+    """
+    Extracts the metadata from every Parameter in the PyTree.
+
+    Args:
+        pytree: Any JAX PyTree containing `Parameter` objects.
+
+    Returns:
+        A PyTree where `Parameter` leaves are replaced by their `metadata` property.
+    """
+    return jax.tree.map(lambda p: p.metadata, pytree, is_leaf=is_param)
+
+
+def replace_raw_values(pytree: PyTree[Parameter], new_raw_values: PyTree[Array]) -> PyTree[Parameter]:
+    """
+    Injects new raw values into an existing Parameter PyTree.
+    
+    This is the inverse of `raw_values`. It preserves all metadata (scales, 
+    constraints, names) while updating the underlying `raw_value` arrays.
+    """
+    return jax.tree.map(lambda p, v: dataclasses.replace(p, raw_value=v), pytree, new_raw_values, is_leaf=is_param)

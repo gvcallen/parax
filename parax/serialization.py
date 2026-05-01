@@ -1,5 +1,5 @@
 """
-IO helpers e.g. for module loading and saving.
+(experimental) IO helpers e.g. for module loading and saving.
 """
 import os
 import json
@@ -9,7 +9,7 @@ import jax.tree_util as jtu
 import jsonpickle
 import jsonpickle.handlers
 
-from parax.module import Module
+from parax.deprecate.module import Module
 from parax.parameter import Parameter
 import equinox as eqx
 

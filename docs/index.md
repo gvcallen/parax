@@ -2,7 +2,7 @@
 
 **Parax** is a mini-framework designed for parametric/scientific modeling in [JAX](https://github.com/jax-ml/jax).
 
-It uses [Equinox](https://github.com/patrick-kidger/equinox) to provide `parax.Parameter`: a custom PyTree class representing a model parameter with metadata. Further, **Parax** provides useful tools and wrappers for optimization, inference, and model inspection/manipulation.
+It uses [Equinox](https://github.com/patrick-kidger/equinox) to provide `parax.Parameter` - a custom PyTree class representing a model parameter with metadata. Further, **Parax** provides useful tools and wrappers for optimization, inference, and model inspection/manipulation.
 
 | **Parax** |  |
 |-------------|-------|
@@ -22,6 +22,12 @@ Parax can be installed using pip:
 
 ``
 pip install parax
+``
+
+You likely also need a custom `distreqx` branch:
+
+``
+pip install git+https://github.com/gvcallen/distreqx.git
 ``
 
 ## Overview

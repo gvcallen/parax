@@ -23,6 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install mkdocs mkdocs-material mkdocstrings[python] mkdocs-macros-plugin
+        pip install git+https://github.com/gvcallen/distreqx.git
         pip install -e ".[docs]"
 
     - name: Deploy to GitHub Pages

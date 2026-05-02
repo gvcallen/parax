@@ -4,8 +4,6 @@
 
 ::: parax.filters
 
-::: parax.paramtree
-
 ::: parax.optimize
 
 ::: parax.tree_replace

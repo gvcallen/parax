@@ -1,26 +1,25 @@
 from typing import Any, TypeGuard
+
+import jax.numpy as jnp
 import jax
 import equinox as eqx
-from jaxtyping import PyTree
 
-from parax.parameter import Parameter
+from parax.variables import AbstractVariable, AbstractFreeVariable
 from parax.constraints import AbstractConstraint
 from distreqx.distributions import AbstractDistribution
+from distreqx.bijectors import AbstractBijector
 
 
-def is_param(x: Any) -> TypeGuard[Parameter]:
-    """Returns True if `x` is a `parax.Parameter`."""
-    return isinstance(x, Parameter)
+def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
+    """Returns True if `x` is a `parax.AbstractVariable`."""
+    return isinstance(x, AbstractVariable)
 
 
-def is_free_param(x: Any) -> TypeGuard[Parameter]:
-    """Returns True if `x` is a `parax.Parameter` AND is not fixed."""
-    return is_param(x) and not x.fixed
-
-
-def is_fixed_param(x: Any) -> TypeGuard[Parameter]:
-    """Returns True if `x` is a `parax.Parameter` AND is not fixed."""
-    return is_param(x) and x.fixed
+def is_free_variable(x: Any) -> TypeGuard[AbstractFreeVariable]:
+    """
+    Returns True if `x` is a `parax.AbstractFreeVariable`.
+    """
+    return isinstance(x, AbstractFreeVariable)
 
 
 def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
@@ -33,47 +32,49 @@ def is_distribution(x: Any) -> TypeGuard[AbstractDistribution]:
     return isinstance(x, AbstractDistribution)
 
 
-def where_free_raw_value(pytree: PyTree) -> PyTree:
+def is_bijector(x: Any) -> TypeGuard[AbstractBijector]:
+    """Returns True if `x` is a `distreqx.AbstractBijector`."""
+    return isinstance(x, AbstractBijector)
+
+
+def where_free_array(pytree: Any) -> Any:
     """
-    Generates a boolean filter mask identifying the `raw_value` of free parameters.
-
-    Designed to isolate trainable/free components: the `raw_value` of any node 
-    satisfying `is_free_param` becomes `True`, while fixed parameters and other 
-    attributes become `False`.
-
-    Intended for direct use as a filter spec with `eqx.partition` or `eqx.filter`
-    for optimization and inference.
-
-    Args:
-        pytree: Any JAX PyTree.
-
-    Returns:
-        A PyTree of booleans matching the structure of `pytree`.
+    Takes a PyTree and returns a boolean mask of the exact same structure.
+    
+    The mask is `True` ONLY for array-like leaves that are nested inside 
+    an `AbstractFreeVariable` and arent inside non-free variables.
+    All other leaves are `False`.
     """
-    def build_mask(node: Any) -> Any:
-        if is_free_param(node):
-            false_param = jax.tree_util.tree_map(lambda _: False, node)
-            return eqx.tree_at(lambda p: p.raw_value, false_param, True)
+    def mask_fn(x: Any) -> Any:
+        if not is_variable(x):
+            return False
+
+        if is_free_variable(x):
+            return jax.tree_util.tree_map(
+                lambda leaf: True if eqx.is_inexact_array(leaf) else False,
+                x
+            )
         return False
 
-    return jax.tree_util.tree_map(build_mask, pytree, is_leaf=is_param)
+    return jax.tree_util.tree_map(mask_fn, pytree, is_leaf=is_variable)
 
 
-def when_free_raw_value(pytree: PyTree, replace_with: Any) -> PyTree:
+def when_free_array(pytree: Any, replace_val: Any) -> Any:
     """
-    Creates a PyTree structural mask where the `raw_value` of all free parameters 
-    is replaced with `replace_with`. All other nodes are set to `None`.
-
-    Ideal for generating `in_axes` specs for `eqx.filter_vmap`.
-
-    Args:
-        pytree: Any JAX PyTree.
-        replace_with: The value to insert at the location of free `raw_value` arrays.
-
-    Returns:
-        A PyTree mask populated with `replace_with` and `None`.
+    Takes a PyTree and replaces all array-like leaves nested inside 
+    an `AbstractFreeVariable` that aren't inside non-free variables with `replace_val`. 
+    
+    All other leaves (outside free variables, or non-arrays) remain unchanged.
     """
-    return jax.tree_util.tree_map(
-        lambda is_free: replace_with if is_free else None,
-        where_free_raw_value(pytree),
-    )
+    def _replace_fn(x: Any) -> Any:
+        if not is_variable(x):
+            return False
+
+        if is_free_variable(x):
+            return jax.tree_util.tree_map(
+                lambda leaf: jnp.full_like(leaf, replace_val) if eqx.is_inexact_array(leaf) else leaf,
+                x
+            )
+        return x
+
+    return jax.tree_util.tree_map(_replace_fn, pytree, is_leaf=is_variable)

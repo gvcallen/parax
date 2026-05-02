@@ -21,8 +21,8 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
 from distreqx.bijectors import AbstractBijector
 
-from parax.filters import is_param
-from parax.parameter import Parameter, asparam
+from parax.filters import is_free_variable
+from parax.constrained import Param, asparam
 from parax.deprecate.parameter_group import ParameterGroup
 from parax.field import field
 from parax.filters import partition
@@ -38,7 +38,7 @@ class ModuleMeta(type(eqx.Module)):
             default = namespace.get(field_name, dataclasses.MISSING)
             
             field_type = get_first_underlying_type(field_types)
-            is_param_type = field_type is not None and isinstance(field_type, type) and issubclass(field_type, Parameter)
+            is_param_type = field_type is not None and isinstance(field_type, type) and issubclass(field_type, Param)
             
             # 1. Handle explicit Field declarations (e.g., x = prx.field(...))
             if isinstance(default, dataclasses.Field):
@@ -68,7 +68,7 @@ class ModuleMeta(type(eqx.Module)):
 
             # 2. Handle standard type hints (e.g., x: Parameter = 10)
             if is_param_type:
-                if default is not dataclasses.MISSING and not isinstance(default, Parameter):                
+                if default is not dataclasses.MISSING and not isinstance(default, Param):                
                     if isinstance(default, tuple):
                         raise Exception(f"Expected a parameter for default '{field_name}' in class {name} but found a tuple.")
                     field_kwargs['default'] = default
@@ -295,16 +295,16 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     
     def iter_params(
         self,
-        param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None,
+        param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool] = None,
         *,
         include_fixed: bool = False,
         flatten: bool = False,
         submodules: 'Module | Sequence[Module] | str | Sequence[str] | None' = None,
-    ) -> Iterator[tuple[str, Parameter]]:
+    ) -> Iterator[tuple[str, Param]]:
         """Iterate over (name, Parameter) pairs in internal order."""
         
         # 1. Direct Flattening
-        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_param)
+        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_free_variable)
 
         # 2. Pre-process submodule IDs outside the loop (Fast JAX C++ traversal)
         allowed_param_ids = None
@@ -319,9 +319,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
             allowed_param_ids = set()
             for sm in resolved_submodules:
-                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_param)
+                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_free_variable)
                 for node in sm_nodes:
-                    if is_param(node) and (include_fixed or not getattr(node, "fixed", False)):
+                    if is_free_variable(node) and (include_fixed or not getattr(node, "fixed", False)):
                         allowed_param_ids.add(id(node))
 
         # 3. Pre-process filters into O(1) lookups
@@ -334,7 +334,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             if isinstance(param_filter, str):
                 param_filter = {param_filter} 
                 filter_is_seq_str = True
-            elif isinstance(param_filter, Parameter):
+            elif isinstance(param_filter, Param):
                 filter_ids = {id(param_filter)}
                 filter_is_seq_param = True
             elif isinstance(param_filter, Sequence):
@@ -342,7 +342,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     if isinstance(param_filter[0], str):
                         param_filter = set(param_filter) 
                         filter_is_seq_str = True
-                    elif isinstance(param_filter[0], Parameter):
+                    elif isinstance(param_filter[0], Param):
                         filter_ids = {id(p) for p in param_filter}
                         filter_is_seq_param = True
             elif isinstance(param_filter, Callable):
@@ -352,7 +352,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         # 4. The Single Lazy Pass
         for path, param in path_and_nodes:
-            if not is_param(param):
+            if not is_free_variable(param):
                 continue
             if not include_fixed and getattr(param, "fixed", False):
                 continue
@@ -437,7 +437,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             
             if f.name == "name":
                 base_fields.append(formatted_field)
-            elif isinstance(val, (Module, Parameter)):
+            elif isinstance(val, (Module, Param)):
                 module_param_fields.append(formatted_field)
             else:
                 other_fields.append(formatted_field)
@@ -529,7 +529,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
     # ---- Parameter inspection -------------------------------------------------- 
     
-    def named_params(self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] = None, *, include_fixed=False, submodules: 'Module' | Sequence['Module'] | str | Sequence[str] | None = None) -> dict[str, Parameter]:
+    def named_params(self, param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool] = None, *, include_fixed=False, submodules: 'Module' | Sequence['Module'] | str | Sequence[str] | None = None) -> dict[str, Param]:
         """Named module parameters as a dict.
 
         Keys are fully-qualified parameter names.
@@ -580,7 +580,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return list(self.named_params(*args, **kwargs).keys())
 
-    def param(self, name: str, *args, **kwargs) -> Parameter:
+    def param(self, name: str, *args, **kwargs) -> Param:
         """
         Return a single module parameter by name.
 
@@ -588,7 +588,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return self.named_params(*args, **kwargs)[name]
     
-    def params(self, *args, **kwargs) -> list[Parameter]:
+    def params(self, *args, **kwargs) -> list[Param]:
         """
         Return module parameters as a list.
 
@@ -612,7 +612,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return list(self.named_param_values(*args, **kwargs).values())
     
-    def named_flat_params(self, include_fixed=False, submodules: 'Module' | Sequence['Module'] | str | Sequence[str] | None = None) -> dict[str, Parameter]:
+    def named_flat_params(self, include_fixed=False, submodules: 'Module' | Sequence['Module'] | str | Sequence[str] | None = None) -> dict[str, Param]:
         """Named flattened module parameters as a dict.
 
         Flat parameters are a de-vectorized version of
@@ -671,7 +671,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """
         return list(self.named_flat_params(*args, **kwargs).keys())    
     
-    def flat_params(self, *args, **kwargs) -> list[Parameter]:
+    def flat_params(self, *args, **kwargs) -> list[Param]:
         """
         Return flattened parameters as a list.
 
@@ -689,7 +689,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
     
     # ---- Grouped Parameter Inspection -----------------------------------------
 
-    def named_grouped_params(self, include_fixed=False) -> dict[str, dict[str, Parameter]]:
+    def named_grouped_params(self, include_fixed=False) -> dict[str, dict[str, Param]]:
         """
         Returns a dictionary of parameter groups, where each group is a 
         dictionary mapping parameter names to their Parameter objects.
@@ -728,7 +728,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             
         return result
 
-    def grouped_params(self, include_fixed=False) -> dict[str, Parameter | list[Parameter]]:
+    def grouped_params(self, include_fixed=False) -> dict[str, Param | list[Param]]:
         """
         Returns a dictionary of parameter groups mapping to their Parameter objects.
         
@@ -894,13 +894,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
     def with_params(
         self: Self,
-        params: dict[str, Parameter] | dict[str, float] | jnp.ndarray | None = None,
+        params: dict[str, Param] | dict[str, float] | jnp.ndarray | None = None,
         check_missing: bool = False,
         check_unknown: bool = True,
         fix_others = False,
         include_fixed = False,
         remove_metadata: bool = False,
-        **param_kwargs: dict[str, Parameter] | dict[str, float],
+        **param_kwargs: dict[str, Param] | dict[str, float],
     ) -> Self:
         """Return a new module with parameters updated.
 
@@ -1000,7 +1000,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                         new_val_shaped = new_val_flat.reshape(parent_param.latent_value.shape)
 
                         if remove_metadata:
-                            params[parent_name] = Parameter(new_val_shaped)
+                            params[parent_name] = Param(new_val_shaped)
                         else:
                             params[parent_name] = parent_param.with_value(new_val_shaped)                        
                         
@@ -1018,7 +1018,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     new_params[missing_param_name] = dataclasses.replace(new_params[missing_param_name], fixed=True)                    
 
         for name, value in params.items():
-            if isinstance(value, Parameter):
+            if isinstance(value, Param):
                 if remove_metadata:
                     new_params[name] = dataclasses.replace(value, metadata=None)
                 else:
@@ -1026,13 +1026,13 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
             else:
                 if remove_metadata:
-                    new_params[name] = Parameter(jnp.asarray(value))
+                    new_params[name] = Param(jnp.asarray(value))
                 else:
                     new_params[name] = new_params[name].with_value(jnp.asarray(value))                
                 
         # Fast tree mapping bypasses string iteration logic completely
         def map_fn(path, node):
-            if is_param(node):
+            if is_free_variable(node):
                 name = self.path_to_param_name(path)
                 if name in new_params:
                     new_param = new_params[name]
@@ -1041,14 +1041,14 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return new_param
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_param)
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_variable)
 
     def with_mapped_params(
         self: Self, 
-        mapper: Callable[[Parameter], Parameter], 
-        param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool] | None = None, 
+        mapper: Callable[[Param], Param], 
+        param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool] | None = None, 
         *, 
-        map_others: Callable[[Parameter], Parameter] | None = None,
+        map_others: Callable[[Param], Param] | None = None,
         prefixes: bool = False,
         include_fixed: bool = False,
         ignore_unknown: bool = False,
@@ -1082,7 +1082,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
             # Safely cast single items or dicts to lists
             if isinstance(param_filter, str):
                 param_filter = [param_filter]
-            elif isinstance(param_filter, Parameter):
+            elif isinstance(param_filter, Param):
                 param_filter = [param_filter]
             elif isinstance(param_filter, dict):
                 param_filter = list(param_filter.keys())
@@ -1098,7 +1098,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 valid_prefixes = tuple(param_filter)
                 resolved_filter = {p for p in current_param_names if p.startswith(valid_prefixes)}
                 
-            elif param_filter and isinstance(param_filter[0], Parameter):
+            elif param_filter and isinstance(param_filter[0], Param):
                 param_ids = {id(p) for p in param_filter}
                 resolved_filter = {name for name, p in self.named_params(include_fixed=include_fixed).items() if id(p) in param_ids}
                 
@@ -1111,7 +1111,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
         # Directly map using JAX natively
         def map_fn(path, node):
-            if is_param(node):
+            if is_free_variable(node):
                 if not include_fixed and getattr(node, "fixed", False):
                     return node
                 name = self.path_to_param_name(path)
@@ -1121,9 +1121,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return map_others(node)
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_param)    
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_variable)    
         
-    def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
+    def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.
 
         This maps each parameter in the filter, calling [`parax.Parameter.as_fixed`][] on each.
@@ -1147,7 +1147,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
         return self.with_mapped_params(lambda p: p.as_fixed(), param_filter=param_filter, map_others=map_others, **kwargs)
     
-    def with_free_params(self: Self, param_filter: str | Sequence[str] | Parameter | Sequence[Parameter] | Callable[[str], bool], *, fix_others: bool = False, **kwargs) -> Self:
+    def with_free_params(self: Self, param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool], *, fix_others: bool = False, **kwargs) -> Self:
         """Free the specified parameters.
 
         This maps each parameter in the filter, calling [`parax.Parameter.as_free`][] on each.

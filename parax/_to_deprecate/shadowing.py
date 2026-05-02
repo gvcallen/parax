@@ -10,7 +10,7 @@ from jaxtyping import PyTree
 from parax.utils.distribution import hypercube_to_physical, physical_to_hypercube
 from parax.utils.tree import tree_map_grouped
 
-from parax.parameter import Parameter, is_free_param
+from parax.constrained import Param, is_free_param
 from parax.filters import partition
 from parax.deprecate.module import Module
 

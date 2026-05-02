@@ -9,7 +9,7 @@ import jax.tree_util as jtu
 import jsonpickle
 import jsonpickle.handlers
 
-from parax.parameter import Parameter
+from parax.constrained import Param
 import equinox as eqx
 
 def _eqx_getstate(self):
@@ -35,7 +35,7 @@ class ParameterHandler(jsonpickle.handlers.BaseHandler):
     Custom jsonpickle handler to explicitly use parax.Parameter's 
     to_json() and from_json() serialization logic.
     """
-    def flatten(self, obj: Parameter, data: dict) -> dict:
+    def flatten(self, obj: Param, data: dict) -> dict:
         try:
             # 1. Attempt to use the class's native JSON serialization
             param_dict = json.loads(obj.to_json())
@@ -52,21 +52,21 @@ class ParameterHandler(jsonpickle.handlers.BaseHandler):
                 
         return data
 
-    def restore(self, data: dict) -> Parameter:
+    def restore(self, data: dict) -> Param:
         # If it fell back to __dict__ serialization, we might need to handle it natively
         clean_data = {k: v for k, v in data.items() if not k.startswith("py/")}
         
         try:
             json_str = json.dumps(clean_data)
-            return Parameter.from_json(json_str)
+            return Param.from_json(json_str)
         except Exception:
             # Fallback if from_json fails on the natively serialized dict
-            param = Parameter.__new__(Parameter)
+            param = Param.__new__(Param)
             param.__dict__.update(clean_data)
             return param
 
 # Register the custom handler with jsonpickle globally
-ParameterHandler.handles(Parameter)
+ParameterHandler.handles(Param)
 
 
 def load(source: str | os.PathLike | BinaryIO) -> Any:

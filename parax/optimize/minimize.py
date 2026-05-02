@@ -5,12 +5,11 @@ from jaxtyping import PyTree, Scalar
 import equinox as eqx
 import optimistix as optx
 
-import parax.paramtree as ppt
-from parax.parameter import Parameter
-from parax.filters import is_free_param, is_param
-from parax.optimize.results import OptimizeResults
+from parax.filters import where_free_array
 from parax.replace import tree_replace
-from parax.paramtree import partition, combine
+from parax.constraints import RealLine
+
+from parax.optimize.results import OptimizeResults
 
 class MinimizePayload(eqx.Module):
     """The core mathematical payload of a minimization run."""
@@ -79,7 +78,7 @@ class AbstractMinimizer(eqx.Module):
 def minimize(
     fn: Callable[[PyTree, Any], Scalar],
     solver: optx.AbstractMinimiser | AbstractMinimizer,
-    y0: PyTree[Parameter],
+    y0: PyTree,
     *,
     args: PyTree = None,
     max_steps: int = 256,
@@ -100,11 +99,11 @@ def minimize(
         solver = OptimistixMinimise(solver)
 
     # Setup problem
-    params, static = partition(y0, param_spec)
+    params, static = eqx.partition(y0, param_spec, is_leaf=is_free_variable)
     bounded = solver.supports_bounds
 
     # Extract constraints, scales, and tree bijectors
-    constraint = ppt.constraint(params)
+    constraint = map_params(lambda x: x.constraint, params)
     raw_to_base_bij = ppt.raw_to_base_bijector(params)
     base_to_physical_bij = ppt.base_to_physical_bijector(params)
 
@@ -147,8 +146,8 @@ def minimize(
         final_raw_values = payload.y
 
     # Return the result
-    optimized_params = tree_replace(params, raw_value=final_raw_values, is_leaf=is_param)
-    optimized_model = eqx.combine(optimized_params, static, is_leaf=is_param)
+    optimized_params = tree_replace(params, raw_value=final_raw_values, is_leaf=is_free_variable)
+    optimized_model = eqx.combine(optimized_params, static, is_leaf=is_free_variable)
     
     return OptimizeResults(
         model=optimized_model,

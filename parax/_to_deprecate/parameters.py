@@ -7,10 +7,10 @@ from jaxtyping import ArrayLike
 import jax.numpy as jnp
 import distreqx.distributions as dist
 
-from parax.parameter import Parameter
+from parax.constrained import Param
 from parax.constraints import Interval
 
-def Uniform(low: float | ArrayLike, high: float | ArrayLike, value=None, make_constraint: bool = True, **kwargs) -> Parameter:
+def Uniform(low: float | ArrayLike, high: float | ArrayLike, value=None, make_constraint: bool = True, **kwargs) -> Param:
     r"""
     Create a `Parameter` with a uniform distribution.
     
@@ -39,13 +39,13 @@ def Uniform(low: float | ArrayLike, high: float | ArrayLike, value=None, make_co
         kwargs.setdefault('constraint', Interval(low, high))
     
     if 'raw_value' in kwargs:
-        return Parameter(distribution=dists, **kwargs)
+        return Param(distribution=dists, **kwargs)
         
     values = (low + high) / 2.0 if value is None else value
-    return Parameter(unscaled_value=values, distribution=dists, **kwargs)
+    return Param(unscaled_value=values, distribution=dists, **kwargs)
 
 
-def RelativeUniform(mean: float | ArrayLike, deviation_fraction: float | ArrayLike, *args, **kwargs) -> Parameter:
+def RelativeUniform(mean: float | ArrayLike, deviation_fraction: float | ArrayLike, *args, **kwargs) -> Param:
     r"""
     Create a `Parameter` with a uniform distribution defined by a fractional deviation.
 
@@ -74,7 +74,7 @@ def RelativeUniform(mean: float | ArrayLike, deviation_fraction: float | ArrayLi
     return Uniform(mean_arr - delta, mean_arr + delta, *args, **kwargs)
 
 
-def CenteredUniform(mean: float | ArrayLike, half_width: float | ArrayLike, *args, **kwargs) -> Parameter:
+def CenteredUniform(mean: float | ArrayLike, half_width: float | ArrayLike, *args, **kwargs) -> Param:
     r"""
     Create a `Parameter` with a uniform distribution.
 
@@ -98,7 +98,7 @@ def CenteredUniform(mean: float | ArrayLike, half_width: float | ArrayLike, *arg
     return Uniform(low, high, *args, **kwargs)
 
 
-def Normal(mean: float | ArrayLike, std: float | ArrayLike, value=None, make_constraint: bool = True, interval_std: float = 2.0, **kwargs) -> Parameter:
+def Normal(mean: float | ArrayLike, std: float | ArrayLike, value=None, make_constraint: bool = True, interval_std: float = 2.0, **kwargs) -> Param:
     r"""
     Create a `Parameter` with a normal (Gaussian) distribution.
 
@@ -132,13 +132,13 @@ def Normal(mean: float | ArrayLike, std: float | ArrayLike, value=None, make_con
         kwargs.setdefault('constraint', Interval(lower, upper))
     
     if 'raw_value' in kwargs:
-        return Parameter(distribution=dists, **kwargs)\
+        return Param(distribution=dists, **kwargs)\
         
     values = mean if value is None else value
-    return Parameter(unscaled_value=values, distribution=dists, **kwargs)
+    return Param(unscaled_value=values, distribution=dists, **kwargs)
 
 
-def RelativeNormal(mean: float | ArrayLike, std_fraction: float | ArrayLike, **kwargs) -> Parameter:
+def RelativeNormal(mean: float | ArrayLike, std_fraction: float | ArrayLike, **kwargs) -> Param:
     r"""
     Create a `Parameter` with a normal distribution defined by a relative standard deviation.
 
@@ -168,7 +168,7 @@ def RelativeNormal(mean: float | ArrayLike, std_fraction: float | ArrayLike, **k
     return Normal(mean=mean_arr, std=sigma, **kwargs)
 
 
-def Fixed(value=None, **kwargs) -> Parameter:
+def Fixed(value=None, **kwargs) -> Param:
     r"""
     Create a `Parameter` that is marked as fixed.
     
@@ -187,16 +187,16 @@ def Fixed(value=None, **kwargs) -> Parameter:
         The created fixed Parameter object.
     """
     if 'raw_value' in kwargs:
-        return Parameter(fixed=True, **kwargs)
+        return Param(fixed=True, **kwargs)
         
     if value is None:
         raise ValueError("Must provide either `value` or `raw_value`.")
         
     value = jnp.array(value, dtype=float)
-    return Parameter(unscaled_value=value, fixed=True, **kwargs)
+    return Param(unscaled_value=value, fixed=True, **kwargs)
 
 
-def Free(value=None, **kwargs) -> Parameter:
+def Free(value=None, **kwargs) -> Param:
     r"""
     Create a `Parameter` that is marked as free (i.e., free to vary).
     
@@ -217,16 +217,16 @@ def Free(value=None, **kwargs) -> Parameter:
         The created free Parameter object.
     """
     if 'raw_value' in kwargs:
-        return Parameter(fixed=False, **kwargs)
+        return Param(fixed=False, **kwargs)
         
     if value is None:
         raise ValueError("Must provide either `value` or `raw_value`.")
         
     value = jnp.array(value, dtype=float)
-    return Parameter(unscaled_value=value, fixed=False, **kwargs)
+    return Param(unscaled_value=value, fixed=False, **kwargs)
 
 
-def Bounded(lower: float | ArrayLike, upper: float | ArrayLike, value=None, **kwargs) -> Parameter:
+def Bounded(lower: float | ArrayLike, upper: float | ArrayLike, value=None, **kwargs) -> Param:
     r"""
     Create a `Parameter` with specified bounds using an interval constraint.
     
@@ -249,9 +249,9 @@ def Bounded(lower: float | ArrayLike, upper: float | ArrayLike, value=None, **kw
     lower, upper = jnp.array(lower, dtype=float), jnp.array(upper, dtype=float)
     
     if 'raw_value' in kwargs:
-        return Parameter(**kwargs)
+        return Param(**kwargs)
     
     kwargs.setdefault('constraint', Interval(lower, upper))
         
     values = (lower + upper) / 2.0 if value is None else value
-    return Parameter(unscaled_value=values, **kwargs)
+    return Param(unscaled_value=values, **kwargs)

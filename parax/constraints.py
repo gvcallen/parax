@@ -2,7 +2,6 @@ from typing import Union, Any
 
 import jax
 import equinox as eqx
-import numpy as np
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
@@ -55,10 +54,10 @@ class GreaterThan(AbstractConstraint):
     """
     Represents a value strictly greater than a lower bound.
     """
-    lower: np.ndarray
+    lower: jnp.ndarray
     
     def __init__(self, lower: Union[float, Array]):
-        self.lower = np.asarray(lower)
+        self.lower = jnp.asarray(lower, dtype=float)
         
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
@@ -79,10 +78,10 @@ class LessThan(AbstractConstraint):
     """
     Represents a value strictly less than an upper bound.
     """
-    upper: np.ndarray
+    upper: jnp.ndarray
 
     def __init__(self, upper: Union[float, Array]):
-        self.upper = np.asarray(upper)
+        self.upper = jnp.asarray(upper, dtype=float)
 
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
@@ -107,12 +106,12 @@ class Interval(AbstractConstraint):
     """
     Represents a value strictly bounded between a lower and upper value.
     """
-    lower: np.ndarray
-    upper: np.ndarray
+    lower: jnp.ndarray
+    upper: jnp.ndarray
 
     def __init__(self, lower: Union[float, Array], upper: Union[float, Array]):
-        self.lower = np.asarray(lower)
-        self.upper = np.asarray(upper)
+        self.lower = jnp.asarray(lower)
+        self.upper = jnp.asarray(upper)
 
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:

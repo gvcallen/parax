@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from parax.utils.path import path_to_pseudoname
 from parax.constrained import Param
-from parax.filters import is_free_variable
+from parax.filters import is_free_array
 
 
 def iterate(
@@ -16,7 +16,7 @@ def iterate(
     *,
     include_fixed: bool = False,
 ) -> Iterator[tuple[str, Param]]:
-    path_and_nodes, _ = jax.tree.flatten_with_path(pytree, is_leaf=is_free_variable)
+    path_and_nodes, _ = jax.tree.flatten_with_path(pytree, is_leaf=is_free_array)
     allowed_param_ids = None
 
     filter_is_seq_str = False
@@ -46,7 +46,7 @@ def iterate(
 
     # 4. The Single Lazy Pass
     for path, param in path_and_nodes:
-        if not is_free_variable(param):
+        if not is_free_array(param):
             continue
         if not include_fixed and getattr(param, "fixed", False):
             continue
@@ -111,7 +111,7 @@ def update(
             
     # Fast tree mapping bypasses string iteration logic completely
     def map_fn(path, node):
-        if is_free_variable(node):
+        if is_free_array(node):
             name = path_to_pseudoname(path)
             if name in new_params:
                 new_param = new_params[name]
@@ -120,4 +120,4 @@ def update(
                 return new_param
         return node
         
-    return jax.tree.map_with_path(map_fn, pytree, is_leaf=is_free_variable)
+    return jax.tree.map_with_path(map_fn, pytree, is_leaf=is_free_array)

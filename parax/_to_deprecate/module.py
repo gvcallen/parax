@@ -21,7 +21,7 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution, Uniform as UniformDistribution
 from distreqx.bijectors import AbstractBijector
 
-from parax.filters import is_free_variable
+from parax.filters import is_free_array
 from parax.constrained import Param, asparam
 from parax.deprecate.parameter_group import ParameterGroup
 from parax.field import field
@@ -304,7 +304,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         """Iterate over (name, Parameter) pairs in internal order."""
         
         # 1. Direct Flattening
-        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_free_variable)
+        path_and_nodes, _ = jax.tree.flatten_with_path(self, is_leaf=is_free_array)
 
         # 2. Pre-process submodule IDs outside the loop (Fast JAX C++ traversal)
         allowed_param_ids = None
@@ -319,9 +319,9 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
             allowed_param_ids = set()
             for sm in resolved_submodules:
-                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_free_variable)
+                sm_nodes, _ = jax.tree.flatten(sm, is_leaf=is_free_array)
                 for node in sm_nodes:
-                    if is_free_variable(node) and (include_fixed or not getattr(node, "fixed", False)):
+                    if is_free_array(node) and (include_fixed or not getattr(node, "fixed", False)):
                         allowed_param_ids.add(id(node))
 
         # 3. Pre-process filters into O(1) lookups
@@ -352,7 +352,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
 
         # 4. The Single Lazy Pass
         for path, param in path_and_nodes:
-            if not is_free_variable(param):
+            if not is_free_array(param):
                 continue
             if not include_fixed and getattr(param, "fixed", False):
                 continue
@@ -1032,7 +1032,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                 
         # Fast tree mapping bypasses string iteration logic completely
         def map_fn(path, node):
-            if is_free_variable(node):
+            if is_free_array(node):
                 name = self.path_to_param_name(path)
                 if name in new_params:
                     new_param = new_params[name]
@@ -1041,7 +1041,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return new_param
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_variable)
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_array)
 
     def with_mapped_params(
         self: Self, 
@@ -1111,7 +1111,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
         
         # Directly map using JAX natively
         def map_fn(path, node):
-            if is_free_variable(node):
+            if is_free_array(node):
                 if not include_fixed and getattr(node, "fixed", False):
                     return node
                 name = self.path_to_param_name(path)
@@ -1121,7 +1121,7 @@ class Module(eqx.Module, metaclass=ModuleMeta):
                     return map_others(node)
             return node
             
-        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_variable)    
+        return jax.tree_util.tree_map_with_path(map_fn, self, is_leaf=is_free_array)    
         
     def with_fixed_params(self: Self, param_filter: str | Sequence[str] | Param | Sequence[Param] | Callable[[str], bool], free_others: bool = False, **kwargs) -> Self:
         """Return a module with specified parameters fixed.

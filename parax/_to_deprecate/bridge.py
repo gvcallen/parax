@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from jaxtyping import PyTree, Array
 import equinox as eqx
 
-from parax.filters import is_free_variable
+from parax.filters import is_free_array
 from parax.paramtree import unwrap
 
 
@@ -43,7 +43,7 @@ def inject_state(
         A new dynamic parax model PyTree. (Must be eqx.combine'd with the static model).
     """
     def _inject(param: Any, state_val: Any) -> Any:
-        if is_free_variable(param):
+        if is_free_array(param):
             if bounded:
                 # Push the bounded physical value backwards to sync the latent space
                 if param.constraint is not None and param.constraint.bijector is not None:
@@ -59,7 +59,7 @@ def inject_state(
         return param
 
     # Map the solver's arrays over the dynamic skeleton
-    return jax.tree_util.tree_map(_inject, dynamic_model, state_tree, is_leaf=is_free_variable)
+    return jax.tree_util.tree_map(_inject, dynamic_model, state_tree, is_leaf=is_free_array)
 
 
 def build_objective_fn(
@@ -106,7 +106,7 @@ def build_logprior_fn(dynamic_model: PyTree) -> Callable:
     """
     def logprior_fn(state_tree: PyTree) -> Array:
         def get_leaf_log_p(param: Any, state_val: Any) -> Array:
-            if is_free_variable(param):
+            if is_free_array(param):
                 lp = jnp.array(0.0)
                 bijector = param.constraint.bijector if param.constraint is not None else None
                 
@@ -125,7 +125,7 @@ def build_logprior_fn(dynamic_model: PyTree) -> Callable:
             return jnp.array(0.0)
             
         log_p_tree = jax.tree_util.tree_map(
-            get_leaf_log_p, dynamic_model, state_tree, is_leaf=is_free_variable
+            get_leaf_log_p, dynamic_model, state_tree, is_leaf=is_free_array
         )
         
         leaves, _ = jax.tree_util.tree_flatten(log_p_tree)
@@ -172,7 +172,7 @@ def build_prior_transform_fn(dynamic_model: PyTree) -> Callable:
     """Builds a function mapping a unit hypercube to the unconstrained latent space."""
     def prior_transform_fn(hypercube_state: PyTree) -> PyTree:
         def _transform(param: Any, u: Any) -> Any:
-            if is_free_variable(param):
+            if is_free_array(param):
                 if param.distribution is None:
                     raise ValueError(
                         f"Hypercube samplers require a proper prior distribution. "
@@ -188,6 +188,6 @@ def build_prior_transform_fn(dynamic_model: PyTree) -> Callable:
             return param
             
         return jax.tree_util.tree_map(
-            _transform, dynamic_model, hypercube_state, is_leaf=is_free_variable
+            _transform, dynamic_model, hypercube_state, is_leaf=is_free_array
         )
     return prior_transform_fn

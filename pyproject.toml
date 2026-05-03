@@ -1,6 +1,6 @@
 [project]
 name = "parax"
-version = "0.5.0"
+version = "0.5.1"
 description = "Parametric modeling in JAX"
 readme = "README.md"
 authors = [
@@ -22,6 +22,7 @@ dependencies = [
 docs = [
     "mkdocs",
     "mkdocs-material",
+    "mkdocs-macros-plugin",
     "mkdocstrings[python]"
 ]
 test = [

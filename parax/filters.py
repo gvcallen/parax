@@ -1,80 +1,59 @@
 from typing import Any, TypeGuard
 
-import jax.numpy as jnp
-import jax
 import equinox as eqx
 
-from parax.variables import AbstractVariable, AbstractFreeVariable
+from parax.constant import AbstractConstant
+from parax.variables import AbstractVariable, AbstractConstrained
+from parax.unwrappables import AbstractUnwrappable
 from parax.constraints import AbstractConstraint
+from parax.metadata import AbstractHasMetadata
+
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector
 
 
+def is_constant(x: Any) -> TypeGuard[AbstractConstant]:
+    """Returns True if `x` is an instance of `parax.AbstractConstant`."""
+    return isinstance(x, AbstractConstant)
+
+
+def is_not_constant(x: Any) -> bool:
+    """Returns True if `x` is not an instance of `parax.AbstractConstant`."""
+    return not isinstance(x, AbstractConstant)
+
+
+def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
+    """Returns True if `x` is an instance of `parax.AbstractUnwrappable`."""
+    return isinstance(x, AbstractUnwrappable)
+
+
 def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
-    """Returns True if `x` is a `parax.AbstractVariable`."""
+    """
+    Returns True if `x` is (strictly) an instance of `parax.AbstractVariable`.
+    """
     return isinstance(x, AbstractVariable)
 
 
-def is_free_variable(x: Any) -> TypeGuard[AbstractFreeVariable]:
-    """
-    Returns True if `x` is a `parax.AbstractFreeVariable`.
-    """
-    return isinstance(x, AbstractFreeVariable)
+def is_constrained(x: Any) -> TypeGuard[AbstractConstrained]:
+    """Returns True if `x` is an instance of `parax.AbstractConstrained`."""
+    return isinstance(x, AbstractConstrained)
 
 
 def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
-    """Returns True if `x` is a `parax.AbstractConstraint`."""
+    """Returns True if `x` is an instance of `parax.AbstractConstraint`."""
     return isinstance(x, AbstractConstraint)
 
 
 def is_distribution(x: Any) -> TypeGuard[AbstractDistribution]:
-    """Returns True if `x` is a `distreqx.AbstractDistribution`."""
+    """Returns True if `x` is an instance of `distreqx.AbstractDistribution`."""
     return isinstance(x, AbstractDistribution)
 
 
 def is_bijector(x: Any) -> TypeGuard[AbstractBijector]:
-    """Returns True if `x` is a `distreqx.AbstractBijector`."""
+    """Returns True if `x` is an instance of `distreqx.AbstractBijector`."""
     return isinstance(x, AbstractBijector)
 
 
-def where_free_array(pytree: Any) -> Any:
-    """
-    Takes a PyTree and returns a boolean mask of the exact same structure.
-    
-    The mask is `True` ONLY for array-like leaves that are nested inside 
-    an `AbstractFreeVariable` and arent inside non-free variables.
-    All other leaves are `False`.
-    """
-    def mask_fn(x: Any) -> Any:
-        if not is_variable(x):
-            return False
-
-        if is_free_variable(x):
-            return jax.tree_util.tree_map(
-                lambda leaf: True if eqx.is_inexact_array(leaf) else False,
-                x
-            )
-        return False
-
-    return jax.tree_util.tree_map(mask_fn, pytree, is_leaf=is_variable)
-
-
-def when_free_array(pytree: Any, replace_val: Any) -> Any:
-    """
-    Takes a PyTree and replaces all array-like leaves nested inside 
-    an `AbstractFreeVariable` that aren't inside non-free variables with `replace_val`. 
-    
-    All other leaves (outside free variables, or non-arrays) remain unchanged.
-    """
-    def _replace_fn(x: Any) -> Any:
-        if not is_variable(x):
-            return False
-
-        if is_free_variable(x):
-            return jax.tree_util.tree_map(
-                lambda leaf: jnp.full_like(leaf, replace_val) if eqx.is_inexact_array(leaf) else leaf,
-                x
-            )
-        return x
-
-    return jax.tree_util.tree_map(_replace_fn, pytree, is_leaf=is_variable)
+def has_bijector(x: Any) -> TypeGuard[AbstractHasMetadata]:
+    """Returns True if `x` is an instance of  `distreqx.AbstractHasMetadata`."""
+    return isinstance(x, AbstractHasMetadata)

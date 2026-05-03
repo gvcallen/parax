@@ -48,7 +48,12 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - API Reference: api/index.md
+  - API Reference:
+    - Base Interface: api/constants_metadata.md
+    - Unwrappables: api/unwrappables.md
+    - Variables: api/variables.md
+    - Constraints: api/constraints.md
+    - Filters: api/filters.md
   - License: license.md
 
 extra_javascript:

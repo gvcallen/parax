@@ -6,7 +6,7 @@ from jaxtyping import PyTree, Array, Scalar
 import equinox as eqx
 
 from parax.infer.results import InferenceResults
-from parax.filters import is_free_variable, where_free_param
+from parax.filters import is_free_array, where_free_param
 from parax._to_deprecate.bridge import (
     extract_state, 
     inject_state, 
@@ -117,7 +117,7 @@ def sample(
     """
     # 1. Structural Partitioning
     filter_spec = filter_spec if filter_spec is not None else where_free_param(y0)
-    dynamic_model, static_model = eqx.partition(y0, filter_spec, is_leaf=is_free_variable)
+    dynamic_model, static_model = eqx.partition(y0, filter_spec, is_leaf=is_free_array)
 
     # 2. Build the Math Wrappers
     wrapped_ll = build_objective_fn(fn, dynamic_model, static_model, bounded=False)

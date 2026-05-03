@@ -30,15 +30,17 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-**Parax** aims to provide a foundation for **parametric modeling**, with focus on library like [Equinox](https://github.com/patrick-kidger/equinox). "Parametric modeling" means modeling with focus on the concept of a parameter as an *array with metadata*. This includes parameterizations, constraints, units and more. Note that although the features in this library are strictly *opt-in* (i.e. they can be used alongside existing PyTree models), Parax also aims to be a foundation for frameworks to be built on top of, and therefore several handy tools are provided to make this more accessible.
+**Parax** aims to provide a foundation for **parametric modeling**, with focus on libraries such as [Equinox](https://github.com/patrick-kidger/equinox).
+
+"Parametric modeling" means modeling with a focus on the concept of a *parameter as an array with metadata*. This means supporting parameterizations, constraints, units, etc.
 
 The design was motivated by several others libraries, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
 
 ## Example 1: Constrained Parameters
 
-While `parax.Param` simply represents a JAX array with metadata, `parax.Constrained` also caters for built-in *constraints*. Both classes override `parax.AbstractVariable`, providing array-like behaviour via `__jax_array__`.
+`parax.Param` represents a simple JAX array with metadata, while `parax.Constrained` also caters for built-in *constraints*. Both classes override `parax.AbstractVariable`, providing array-like behaviour via `__jax_array__`.
 
-The example below demonstrates defining a constrained parameter, and then using it in a JAX expression.
+The example below demonstrates defining a `parax.Constrained` parameter and then using it in a JAX expression.
 
 ```python
 import jax.numpy as jnp

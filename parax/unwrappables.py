@@ -46,9 +46,8 @@ def unwrap(tree: PyTree):
     return _unwrap(tree, include_self=True)
 
 
-
-class Computed(AbstractUnwrappable[T]):
-    """Unwrap an object by calling fn with args and kwargs."""
+class Parameterized(AbstractUnwrappable[T]):
+    """Unwrap an arbitrary object by calling fn with args and kwargs."""
 
     fn: Callable[..., T]
     args: tuple[Any, ...]
@@ -61,6 +60,28 @@ class Computed(AbstractUnwrappable[T]):
 
     def unwrap(self) -> T:
         return self.fn(*self.args, **self.kwargs)
+
+
+class Computed(AbstractUnwrappable[T]):
+    """Unwrap a PyTree by calling fn on its arraylike leaves."""
+    
+    tree: T
+    fn: Callable[..., T]
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+
+    def __init__(self, tree: T, fn: Callable, *args, **kwargs):
+        self.tree = tree
+        self.fn = fn
+        self.args = tuple(args)
+        self.kwargs = kwargs
+
+    def unwrap(self) -> T:
+        return jax.tree.map(
+            lambda x: self.fn(x, *self.args, **self.kwargs),
+            self.tree,
+            is_leaf=eqx.is_array_like,
+        )
 
 
 class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):

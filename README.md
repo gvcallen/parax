@@ -11,9 +11,9 @@
 ## Features
 
 - Derived/fixed parameters
-- PyTree parameterizations and freezing
-- Built-in constraints and metadata support
-- Filtering and PyTree manipulation tools.
+- Computed/frozen PyTrees and callable parameterizations
+- Array constraints and metadata
+- Filtering and manipulation tools
 
 ## Installation
 Parax can be installed using pip:
@@ -61,7 +61,31 @@ print(f"Raw (unconstrained) value: {p.raw_value}")
 assert jnp.allclose(prx.unwrap(p), 8.0)
 ```
 
-## Example 2: Optimizing a Model using Optimistix
+## Example 2: PyTree Parameterizations
+
+While the above approach caters for array constraints, it is sometimes useful to apply computations over an entire PyTree. To accomplish this, Parax uses *unwrapping*.
+
+In the following example, we apply `jnp.exp` to a simple PyTree using `parax.Computed` and `parax.unwrap`.
+
+```python
+import jax.numpy as jnp
+import parax as prx
+
+# Define a PyTree using a dictionary
+pytree = {'a': 1.0, 'b': {'x': 10.0, 'y': 20.0}}
+
+# Wrap the PyTree in `parax.Computed`.
+wrapped = prx.Computed(pytree, jnp.exp)
+
+# Unwrap the Pytree, applying the computation
+unwrapped = prx.unwrap(wrapped)
+
+assert jnp.allclose(unwrapped['a'], jnp.exp(1.0))
+assert jnp.allclose(unwrapped['b']['x'], jnp.exp(10.0))
+assert jnp.allclose(unwrapped['b']['y'], jnp.exp(20.0))
+```
+
+## Example 3: Optimizing an eqx.Model using Optimistix
 
 In this example, we define a damped pendulum model using `equinox.Module`. We set the first parameter as unconstrained, the second as only positive with a scale of "mm", and the third as a fixed variable.
 

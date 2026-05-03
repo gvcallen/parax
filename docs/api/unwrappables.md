@@ -2,6 +2,8 @@
 
 ::: parax.unwrap
 
+::: parax.Parameterized
+
 ::: parax.Computed
 
 ::: parax.Frozen

@@ -19,6 +19,7 @@ from parax.metadata import (
 from parax.unwrappables import (
     AbstractUnwrappable as AbstractUnwrappable,
     unwrap as unwrap,
+    Parameterized as Parameterized,
     Computed as Computed,
     Frozen as Frozen,
     as_frozen as as_frozen,

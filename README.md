@@ -10,8 +10,8 @@
 
 ## Features
 
-- Derived/fixed parameters with array-like behaviour
-- Computed/frozen PyTrees and callable parameterizations
+- Derived/constrained/fixed parameters with array-like behaviour
+- Computed/parameterized/frozen PyTrees via unwrapping
 - Array constraints and metadata
 - Filtering and manipulation tools
 

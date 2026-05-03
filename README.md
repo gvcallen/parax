@@ -12,7 +12,7 @@
 
 - Derived/constrained/fixed parameters with array-like behaviour
 - Computed/parameterized/frozen PyTrees via unwrapping
-- Array constraints and metadata
+- Built-in constraints and metadata support
 - Filtering and manipulation tools
 
 ## Installation

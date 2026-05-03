@@ -198,12 +198,12 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
         return super().__getattribute__(name)
 
 
-def as_fixed(value: AbstractVariable) -> Fixed:
+def as_fixed(value: AbstractVariable | ArrayLike) -> Fixed:
     """
     Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
 
     Args:
-        value: An arbitrary variable.
+        value: An arbitrary variable or array-like object.
 
     Returns:
         A fixed version of the variable.

@@ -87,11 +87,12 @@ class Parameterized(AbstractUnwrappable[T]):
 
 class Computed(AbstractUnwrappable[T]):
     """
-    Unwrap a PyTree by applying a function to its inexact array leaves.
+    Unwrap a PyTree by applying a function to its array-like leaves.
     
-    **Corner Case Note:** This relies on `eqx.is_inexact_array`. Non-array 
+    **Corner Case Note:** This relies on `eqx.is_array_like`. Non-array 
     leaves (e.g., strings, standard integers, metadata) inside `tree` 
-    will be bypassed and left intact.
+    will be bypassed and left intact, while any array-like objects
+    (including booleans) while be mapped.
     """
     
     tree: T
@@ -114,12 +115,12 @@ class Computed(AbstractUnwrappable[T]):
 
     def unwrap(self) -> T:
         def _map_fn(x):
-            if not eqx.is_inexact_array(x):
+            if not eqx.is_array_like(x):
                 return x
             
             return self.fn(x, *self.args, **self.kwargs)
 
-        return jax.tree.map(_map_fn, self.tree, is_leaf=eqx.is_inexact_array)
+        return jax.tree.map(_map_fn, self.tree, is_leaf=eqx.is_array_like)
 
 
 class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):

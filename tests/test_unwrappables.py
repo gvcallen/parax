@@ -38,13 +38,13 @@ def test_computed_bypasses_non_arrays():
     }
     
     # Apply a square function
-    computed_node = Computed(tree, lambda val: val ** 2)
+    computed_node = Computed(tree, lambda val: val ** 2 if not isinstance(val, bool) else True)
     result = unwrap(computed_node)
     
     assert jnp.allclose(result["x"], 4.0)
     assert jnp.allclose(result["y"], 9.0)
     assert result["meta"] == "should_not_change"
-    assert result["flag"] is False
+    assert result["flag"] is True
 
 def test_nested_unwrappables():
     """Test the recursive inside-out resolution of nested Unwrappables."""

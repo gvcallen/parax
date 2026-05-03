@@ -50,7 +50,7 @@ import parax as prx
 p = prx.Constrained(8.0, prx.Interval(0.0, 10.0))
 
 # We can print any constraint's bounds
-print(f"Bounds: {p.bounds}")
+print(f"Bounds: {p.constraint.bounds}")
 
 # We can use the parameter directly in an equation and print the result
 result = jnp.sin(p) + (p * 2.0)

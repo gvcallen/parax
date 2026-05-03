@@ -233,7 +233,7 @@ class TreeConstraint(AbstractConstraint):
     Useful for applying heterogeneous constraints to complex nested structures 
     (like `equinox.Module` instances) simultaneously.
     """
-    constraints: PyTree[AbstractConstraint]
+    tree: PyTree[AbstractConstraint]
 
     def __init__(
         self, 
@@ -254,7 +254,7 @@ class TreeConstraint(AbstractConstraint):
         if not leaves:
             raise ValueError("The pytree of constraints cannot be empty.")
 
-        self.constraints = constraints
+        self.tree = constraints
 
     @property
     def bounds(self) -> tuple[PyTree[Array], PyTree[Array]]:
@@ -274,8 +274,8 @@ class TreeConstraint(AbstractConstraint):
                 return node
             return node.bounds[1]
                 
-        lower = jax.tree_util.tree_map(get_lower, self.constraints, is_leaf=is_constraint)
-        upper = jax.tree_util.tree_map(get_upper, self.constraints, is_leaf=is_constraint)
+        lower = jax.tree_util.tree_map(get_lower, self.tree, is_leaf=is_constraint)
+        upper = jax.tree_util.tree_map(get_upper, self.tree, is_leaf=is_constraint)
         
         return lower, upper
 
@@ -293,7 +293,7 @@ class TreeConstraint(AbstractConstraint):
                 return node
             return node.bijector
         
-        bijector = jax.tree_util.tree_map(get_bijector, self.constraints, is_leaf=is_constraint)
+        bijector = jax.tree_util.tree_map(get_bijector, self.tree, is_leaf=is_constraint)
 
         return TreeMap(bijector)
     

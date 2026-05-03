@@ -67,5 +67,5 @@ from parax.filters import (
     is_bijector as is_bijector,
 )
 
-# from parax import optimize as optimize
+from parax import optimize as optimize
 # from parax import experimental as experimental

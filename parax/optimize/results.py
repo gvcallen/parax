@@ -11,8 +11,8 @@ class OptimizeResults(eqx.Module):
     #: The fully reconstructed parax model with optimized parameters.
     model: PyTree
 
-    #: The final fn value
-    final_value: Scalar
+    #: The final objective value
+    objective: Scalar
 
     #: Auxiliary data returned by the objective function on the final evaluation step.
     #: Will be None if `has_aux=False`.

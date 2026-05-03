@@ -1,8 +1,8 @@
 """
-An abstract interface for a constant node in a model.
+Abstract interfaces for defining constant (fixed/frozen) nodes in a model.
 
-This is the canonical `tag` in Parax used to filter out
-fixed parameters and frozen layers.
+This module provides the canonical `AbstractConstant` tag used by Parax to 
+filter out fixed parameters and frozen layers during PyTree partitioning.
 """
 
 from abc import abstractmethod
@@ -15,36 +15,36 @@ T = TypeVar('T')
 
 class AbstractConstant(eqx.Module, Generic[T]):
     """
-    An abstract interface for a constant node in a model.
+    An abstract interface and structural tag for a constant node.
      
-    This class is simply used as a tag for a node that is currently
-    constant and can potentially be set as free. It is used as a
-    type-check for `parax.is_constant` and `parax.is_free_array`
-    as the main filters in Parax for partitioning.
-    
-    Note that this class does not guarantee that the underlying
-    type implements stop gradients. For concrete classes that do,
-    for example for freezing modules or fixing Parax variables,
-    see `parax.Frozen` and `parax.Fixed`.
+    This class is primarily used as a type-check for `parax.is_constant` 
+    and `parax.is_free_array` to facilitate PyTree partitioning.
+
+    **Note:** This interface *only* provides the structural tagging required 
+    by Parax. It does not automatically apply `jax.lax.stop_gradient` during 
+    computations. Concrete implementations (like `parax.Frozen` and `parax.Fixed`) 
+    handle the actual JAX-level gradient stopping and unwrapping logic.
     """
 
     @abstractmethod
     def as_free(self) -> T:
-        """Return a freed version of self."""
+        """Return the underlying value, stripping the constant tag."""
         pass
 
 
 def as_free(value: Union[AbstractConstant[T], T]) -> T:
     """
-    Returns a version of `value` that is not fixed.
+    Returns a freed version of `value` by stripping any constant wrappers.
       
-    Calls `value.as_free()` if value is `AbstractConstant` else returns `value`.
+    If `value` implements `AbstractConstant`, this calls `value.as_free()`.
+    Otherwise, it acts as a safe no-op and returns `value` unchanged. This
+    makes it safe to use directly within a `jax.tree_map` over mixed PyTrees.
 
     Args:
-        value: An arbitrary value, potentially wrapped in an AbstractConstant.
+        value: An arbitrary value, potentially wrapped in an `AbstractConstant`.
 
     Returns:
-        The unwrapped parameter, or the original value if it wasn't wrapped.
+        The freed parameter, or the original value if it was not fixed.
     """    
     if isinstance(value, AbstractConstant):
         return value.as_free()

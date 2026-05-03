@@ -1,5 +1,9 @@
 """
-Computable JAX arrays with metadata.
+Computable JAX arrays with metadata and constraints.
+
+This module provides the core variable types for Parax. They act as 
+array-like objects that can be directly injected into JAX computations 
+or unwrapped prior to execution.
 """
 from abc import abstractmethod
 from typing import Any, Iterator, Callable
@@ -25,14 +29,17 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     All parameters in Parax, such as `parax.Param`,
     `parax.Constrained` etc., derive from this class.
 
-    By inheriting from this class, your class becomes
-    a `parax.AbstractUnwrappable`, and automatically has
-    relevant dunder/array-like methods implemented.
+    **Corner Case Note (Math & Dunders):** Because this class implements the 
+    `__jax_array__` protocol and all standard math dunder methods, variables 
+    can be used directly in JAX expressions *without* explicitly calling 
+    `unwrap()`. However, applying any math operation (e.g., `var + 1`) instantly 
+    evaluates the value and returns a standard `jax.Array`, stripping away 
+    the metadata and constraint wrappers.
     """
     @property
     @abstractmethod
     def value(self) -> Array:
-        """Returns the underlying value of the variable."""
+        """Returns the underlying, fully computed value of the variable."""
         pass    
 
     def unwrap(self) -> Array:
@@ -97,14 +104,15 @@ class AbstractConstrained(AbstractVariable, strict=True):
     """
     The abstract interface for a constrained variable.
 
-    Used as a type check for `parax.is_constrained`.
+    Used as a type check for `parax.is_constrained`. Exposes a multi-stage 
+    evaluation pipeline (`raw` -> `base` -> `value`) to support bounded optimizers.
     """
     #: The underlying constraint
     constraint: eqx.AbstractVar[AbstractConstraint]
 
-    #: The value in constrained "base" space i.e. after the constraint is applied
-    #: but before any additional transformations to the final space.
-    #: Useful for bounded optimizers.
+    #: The value in constrained "base" space i.e., after the physical constraint 
+    #: is applied, but before any secondary transformations (like physical scaling).
+    #: Crucial for bounded optimizers tracking physical limits.
     base_value: eqx.AbstractVar[Array]
 
     #: Returns the final output value from a given base value.
@@ -133,6 +141,76 @@ class Param(AbstractVariable, AbstractHasMetadata):
     @property
     def value(self) -> Array:
         return self.raw_value
+    
+
+def as_param(value: Any) -> Param:
+    """
+    Returns `value` as a `parax.Param`, wrapping it if necessary.
+
+    Args:
+        value: An arbitrary value or array.
+
+    Returns:
+        The instantiated parameter.
+    """    
+    if isinstance(value, Param):
+        return value
+    return Param(raw_value=value)
+
+
+class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
+    """
+    A wrapper to fix another variable and stop gradients.
+    
+    Implements `AbstractConstant` for structural filtering during partitioning.
+     
+    **Corner Case Note:** This class implements `__getattr__` to forward all 
+    unrecognized attribute lookups to the underlying wrapped variable. This means 
+    a `Fixed(Constrained(...))` object will still safely expose `.constraint`, 
+    `.bounds`, and `.metadata` to the user as if it weren't wrapped at all.
+    """
+    #: The underlying variable that is being fixed.
+    variable: AbstractVariable | ArrayLike
+
+    def __init__(self, variable: AbstractVariable | ArrayLike):
+        """
+        Args:
+            variable: The variable or array to freeze. Safely absorbs nested 
+                `Fixed` objects to prevent double-wrapping.
+        """
+        if isinstance(variable, Fixed):
+            variable = variable.variable
+        self.variable = variable
+
+    def as_free(self) -> AbstractVariable:
+        return self.variable
+
+    @property
+    def value(self) -> Array:
+        value = self.variable
+        if isinstance(self.variable, AbstractVariable):
+            value = value.value
+        return jax.lax.stop_gradient(value)
+    
+    def __getattr__(self, name):
+        if hasattr(self.variable, name):
+            return getattr(self.variable, name)
+        return super().__getattribute__(name)
+
+
+def as_fixed(value: AbstractVariable) -> Fixed:
+    """
+    Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
+
+    Args:
+        value: An arbitrary variable.
+
+    Returns:
+        A fixed version of the variable.
+    """    
+    if isinstance(value, Fixed):
+        return value
+    return Fixed(value)
        
 
 class Derived(AbstractVariable, AbstractHasMetadata):
@@ -142,7 +220,7 @@ class Derived(AbstractVariable, AbstractHasMetadata):
 
     This is ideal for one-way transformations, projections, or normalizations 
     where a strict bijector (with an inverse) is not required or mathematically 
-    possible (e.g., `jax.nn.softmax` for probabilities).
+    possible (e.g., applying `jax.nn.softmax` to raw logits).
     """
     #: The raw value used by optimizers and samplers.
     raw_value: Array = eqx.field(converter=jnp.asarray)
@@ -165,16 +243,16 @@ class Derived(AbstractVariable, AbstractHasMetadata):
 
 class Constrained(AbstractConstrained, AbstractHasMetadata):
     """
-    A parameter constrained by an arbitrary `parax.AbstractConstraint` constraint.
+    A parameter bounded by a `parax.AbstractConstraint`.
 
-    The constraint is automatically applied as a bijection during unwrapping.
-    However, since each constraint implements a `bounds` property,
-    this property can easily be inspected for use in a bounded optimization.
+    The constraint is automatically applied as a bijection mapping during 
+    evaluation. Exposes a `bounds` property via the constraint for integration 
+    with bounded optimizers.
     """
-    #: The raw value used by optimizers and samplers.
+    #: The raw, unconstrained value mapping to the real number line.
     raw_value: Array = eqx.field(converter=jnp.asarray)
 
-    #: The parameter constraint in base space. Useful to define conditioning and bounds for optimization.
+    #: The parameter constraint defining bounds and bijector mappings.
     constraint: AbstractConstraint = eqx.field(converter=as_frozen)
 
     #: Additional arbitrary metadata.
@@ -190,10 +268,11 @@ class Constrained(AbstractConstrained, AbstractHasMetadata):
     ):
         """
         Args:
-            value: The output (constrained) array value. Mutually exclusive with `raw_value`.
-            constraint: A parax constraint defining base bounds and mappings.
-                        If None is passed, an `Unconstrained` constraint is created internally.
-            raw_value: The raw (unconstrained) value. Mutually exclusive with `value`.
+            value: The desired output (constrained) value. If provided, the internal 
+                `raw_value` is computed dynamically via the constraint's inverse bijector. 
+                Mutually exclusive with `raw_value`.
+            constraint: A Parax constraint. If None, defaults to `RealLine` (unconstrained).
+            raw_value: The unconstrained optimizer-space value. Mutually exclusive with `value`.
             metadata: Additional static metadata.        
         """
         # Error checking
@@ -234,16 +313,15 @@ class Physical(AbstractConstrained, AbstractHasMetadata):
     """
     A physically scaled and constrained parameter.
 
-    Useful for scientific modeling.
-
-    Combines an optimizer-friendly unbounded raw space with constraints 
-    and a linear physical scale (e.g., units or preconditioning).
+    Useful for scientific modeling. Combines an optimizer-friendly unbounded 
+    raw space with physical bounds, and applies a linear physical scale 
+    (e.g., units or preconditioning) as the final evaluation step.
     """
-    #: The raw value used by optimizers and samplers.
+    #: The raw, unconstrained value mapping to the real number line.
     raw_value: jax.Array = eqx.field(converter=jnp.asarray)
     
-    #: Linear preconditioning factor or physical unit (e.g., unxt.Quantity).
-    scale: Any = eqx.field(converter=as_frozen)
+    #: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
+    scale: ArrayLike = eqx.field(converter=as_fixed)
     
     #: The parameter constraint in base space.
     constraint: AbstractConstraint = eqx.field(converter=as_frozen)
@@ -262,10 +340,11 @@ class Physical(AbstractConstrained, AbstractHasMetadata):
     ):
         """
         Args:
-            base_value: The base array value. Mutually exclusive with `raw_value`.
-            scale: Linear multiplier or unit string. If a string, is converted using `unxt.unit()`.
-            raw_value: The unconstrained value. Mutually exclusive with `base_value`.
-            constraint: A parax constraint defining base bounds and mappings.
+            base_value: The constrained, un-scaled array value. Mutually exclusive with `raw_value`.
+            scale: Linear multiplier or unit string. If a string is provided, 
+                it is converted automatically using `unxt.unit()`.
+            raw_value: The unconstrained optimizer-space value. Mutually exclusive with `base_value`.
+            constraint: A Parax constraint. If None, defaults to `RealLine` (unconstrained).
             metadata: Additional static metadata.
         """
         if base_value is None and raw_value is None:
@@ -307,57 +386,27 @@ class Physical(AbstractConstrained, AbstractHasMetadata):
     @property
     def base_value(self) -> Array:
         """
-        The value in base space.
+        The value in base bounded space (before physical scaling).
         Returns the constraint's bijector applied to the raw value.
         """
         return self.constraint.bijector.forward(self.raw_value)
     
     def value_from_base(self, base_value: Array) -> Array:
         return base_value * self.scale
-
-
-class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
-    """
-    A wrapper to fix another variable.
-    
-    Wraps another variable while forwarding all attributes.
-     
-    Can be used either as a tag or to apply stopping gradients.
-    """
-    #: The underlying value that is being fixed.
-    variable: AbstractVariable | ArrayLike
-
-    def __init__(self, variable: AbstractVariable | ArrayLike):
-        if isinstance(variable, Fixed):
-            variable = variable.variable
-        self.variable = variable
-
-    def as_free(self) -> AbstractVariable:
-        return self.variable
-
-    @property
-    def value(self) -> Array:
-        value = self.variable
-        if isinstance(self.variable, AbstractVariable):
-            value = value.value
-        return jax.lax.stop_gradient(value)
-    
-    def __getattr__(self, name):
-        if hasattr(self.variable, name):
-            return getattr(self.variable, name)
-        return super().__getattribute__(name)
     
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
     """
-    Maps all `parax.AbstractVariable` variables in a PyTree using a callable.
+    Maps a callable over all `parax.AbstractVariable` nodes in a PyTree.
+
+    Safely bypasses standard arrays or PyTree structural nodes.
 
     Args:
-        f: The callable.
+        f: The callable mapping function.
         pytree: Any JAX PyTree containing `parax.AbstractVariable` leaves.
 
     Returns:
-        A PyTree with `parax.AbstractVariable` mapped using `f`. 
+        A new PyTree with the variables mapped. 
     """
     from parax.filters import is_variable
     return jax.tree.map(lambda x: f(x) if is_variable(x) else x, pytree, is_leaf=is_variable)
@@ -365,14 +414,15 @@ def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTre
 
 def map_variables_with_path(f: Callable[[Any, AbstractVariable], Any], pytree: PyTree) -> PyTree:
     """
-    Maps all `parax.AbstractVariable` variables in a PyTree using a callable that takes a path.
+    Maps a callable (which takes a key path) over all `parax.AbstractVariable` 
+    nodes in a PyTree.
 
     Args:
-        f: The callable.
+        f: The callable mapping function taking `(path, variable)`.
         pytree: Any JAX PyTree containing `parax.AbstractVariable` leaves.
 
     Returns:
-        A PyTree with `parax.AbstractVariable` mapped using `f`. 
+        A new PyTree with the variables mapped.
     """
     from parax.filters import is_variable
     return jax.tree.map_with_path(lambda p, x: f(p, x) if is_variable(x) else x, pytree, is_leaf=is_variable)
@@ -381,17 +431,21 @@ def map_variables_with_path(f: Callable[[Any, AbstractVariable], Any], pytree: P
 # ==========================================
 # Parameter Dataclass Field Helpers
 # ==========================================
+# Note: These helpers use `eqx.field` converters. If a user provides an already
+# instantiated `AbstractVariable` to the dataclass init, the converter passes 
+# it through without double-wrapping it.
 
 def param(
     raw_value: Array = dataclasses.MISSING,
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a field for a standard Parax `Param` within a dataclass.
+    Specifies a dataclass field for a standard Parax `Param`.
 
     Args:
-        raw_value: The default raw value. If omitted, this field becomes required by the user.
-        metadata: Additional static metadata to store in the parameter.
+        raw_value: The default raw value. If omitted, this field becomes required 
+            by the user during instantiation.
+        metadata: Additional static metadata to store.
     """
     if metadata is None: metadata = {}
 
@@ -414,12 +468,12 @@ def derived(
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a field for a Parax `Derived` variable within a dataclass.
+    Specifies a dataclass field for a Parax `Derived` variable.
 
     Args:
         fn: The callable used to transform the raw value.
         raw_value: The default raw value. If omitted, this field becomes required.
-        metadata: Additional static metadata to store in the parameter.
+        metadata: Additional static metadata to store.
     """
     if metadata is None: metadata = {}
 
@@ -442,12 +496,12 @@ def constrained(
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a field for a Parax `Constrained` parameter within a dataclass.
+    Specifies a dataclass field for a Parax `Constrained` parameter.
 
     Args:
         default_value: The default constrained value. If omitted, this field becomes required.
         constraint: The abstract constraint defining base bounds and mappings.
-        metadata: Additional static metadata to store in the parameter.
+        metadata: Additional static metadata to store.
     """
     if metadata is None: metadata = {}
 
@@ -471,13 +525,13 @@ def physical(
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a field for a Parax `Physical` parameter within a dataclass.
+    Specifies a dataclass field for a Parax `Physical` parameter.
 
     Args:
         default_base: The default base array value. If omitted, this field becomes required.
         scale: Linear preconditioning factor or unit string (e.g., "mm").
-        constraint: A parax constraint defining base bounds and mappings.
-        metadata: Additional static metadata to store in the parameter.
+        constraint: A Parax constraint defining base bounds and mappings.
+        metadata: Additional static metadata to store.
     """
     if metadata is None: metadata = {}
 
@@ -491,36 +545,6 @@ def physical(
         field_kwargs["default"] = default_base
         
     return eqx.field(**field_kwargs)
-
-
-def as_param(value: Any) -> Param:
-    """
-    Returns `value` as a `parax.Param` by creating one if needed.
-
-    Args:
-        value: An arbitrary value.
-
-    Returns:
-        The parameter.
-    """    
-    if isinstance(value, Param):
-        return value
-    return Param(raw_value=value)
-
-
-def as_fixed(value: AbstractVariable) -> Param:
-    """
-    Returns `value` as a `parax.Fixed` variable by creating one if needed.
-
-    Args:
-        value: An arbitrary variable.
-
-    Returns:
-        A fixed version of the variable.
-    """    
-    if isinstance(value, Fixed):
-        return value
-    return Fixed(value)
 
 
 Variable = AbstractVariable | ArrayLike

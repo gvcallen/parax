@@ -1,3 +1,10 @@
+"""
+Physical constraints and bijector mappings for parametric modeling.
+
+This module provides the tools to map unconstrained optimizer spaces 
+(spanning the real line) into bounded physical spaces.
+"""
+
 from typing import Union, Any
 
 import jax
@@ -15,23 +22,32 @@ from distreqx.bijectors import (
 
 class AbstractConstraint(eqx.Module):
     """
-    The base class for all physical constraints in parax.
+    The base class for all physical constraints in Parax.
     
     A constraint acts as a bridge between hard physical boundaries (used by 
-    bounded optimizers) and topological mappings (used by unconstrained ML optimizers).
+    bounded optimizers or user inspection) and topological mappings (used by 
+    unconstrained ML optimizers).
 
-    Constraints may be used directly on arrays or on PyTrees,
-    depending on the type of constraint.
+    Constraints may be used directly on arrays or mapped over PyTrees.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
 
 
 class RealLine(AbstractConstraint):
-    """Represents a value that can span the entire real number line."""
+    """
+    Represents a value that can span the entire real number line.
+    
+    Effectively a structural no-op constraint using an Identity bijector, 
+    useful for maintaining consistent types in mixed parameter sets.
+    """
     shape: Any = eqx.field(static=True)
 
     def __init__(self, shape: Any = ()):
+        """
+        Args:
+            shape: The expected shape of the unconstrained parameter.
+        """
         self.shape = shape
     
     @property
@@ -51,12 +67,14 @@ class RealLine(AbstractConstraint):
 
 
 class GreaterThan(AbstractConstraint):
-    """
-    Represents a value strictly greater than a lower bound.
-    """
+    """Represents a value strictly greater than a lower bound."""
     lower: jnp.ndarray
     
     def __init__(self, lower: Union[float, Array]):
+        """
+        Args:
+            lower: The exclusive lower bound.
+        """
         self.lower = jnp.asarray(lower, dtype=float)
         
     @property
@@ -75,12 +93,14 @@ class GreaterThan(AbstractConstraint):
 
 
 class LessThan(AbstractConstraint):
-    """
-    Represents a value strictly less than an upper bound.
-    """
+    """Represents a value strictly less than an upper bound."""
     upper: jnp.ndarray
 
     def __init__(self, upper: Union[float, Array]):
+        """
+        Args:
+            upper: The exclusive upper bound.
+        """
         self.upper = jnp.asarray(upper, dtype=float)
 
     @property
@@ -94,6 +114,9 @@ class LessThan(AbstractConstraint):
         except:
             from parax._bijectors import Softplus
 
+        # Corner Case Note: To implement a LessThan constraint using Softplus 
+        # (which inherently bounds > 0), we apply a double affine flip:
+        # invert -> softplus -> invert -> shift.
         return Chain([
             Shift(self.upper),
             ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(-1.0)),
@@ -103,13 +126,16 @@ class LessThan(AbstractConstraint):
 
 
 class Interval(AbstractConstraint):
-    """
-    Represents a value strictly bounded between a lower and upper value.
-    """
+    """Represents a value strictly bounded between a lower and upper value."""
     lower: jnp.ndarray
     upper: jnp.ndarray
 
     def __init__(self, lower: Union[float, Array], upper: Union[float, Array]):
+        """
+        Args:
+            lower: The exclusive lower bound.
+            upper: The exclusive upper bound.
+        """
         self.lower = jnp.asarray(lower)
         self.upper = jnp.asarray(upper)
 
@@ -128,24 +154,30 @@ class Interval(AbstractConstraint):
 
 
 class Positive(GreaterThan):
-    """
-    Convenience constraint for values that must be strictly positive (> 0).
-    """
+    """Convenience constraint for values that must be strictly positive (> 0)."""
     def __init__(self, shape: Any = (), dtype: Any = None):
+        """
+        Args:
+            shape: The shape of the parameter array.
+            dtype: The JAX data type of the parameter array.
+        """
         super().__init__(lower=jnp.zeros(shape, dtype=dtype))
 
 
 class Negative(LessThan):
-    """
-    Convenience constraint for values that must be strictly negative (< 0).
-    """
+    """Convenience constraint for values that must be strictly negative (< 0)."""
     def __init__(self, shape: Any = (), dtype: Any = None):
+        """
+        Args:
+            shape: The shape of the parameter array.
+            dtype: The JAX data type of the parameter array.
+        """
         super().__init__(upper=jnp.zeros(shape, dtype=dtype))
 
 
 class TransformedConstraint(AbstractConstraint):
     """
-    A constraint modified by an arbitrary bijector.
+    A constraint modified by an arbitrary distreqx bijector.
     
     The custom bijector is applied *after* the base constraint. This allows 
     for complex normalizations or transformations on top of physical boundaries.
@@ -161,7 +193,7 @@ class TransformedConstraint(AbstractConstraint):
         """
         Args:
             constraint: The base physical constraint (e.g., Positive, Interval).
-            bijector: The distreqx bijector to apply on top of the base constraint.
+            bijector: The bijector to apply on top of the base constraint.
         """
         self.base_constraint = constraint
         self.custom_bijector = bijector
@@ -171,6 +203,10 @@ class TransformedConstraint(AbstractConstraint):
         """
         Calculates the new topological bounds by passing the base extrema 
         through the custom bijector.
+
+        **Corner Case Note:** Uses `jnp.minimum` and `jnp.maximum` to gracefully 
+        handle monotonically decreasing bijectors that might invert the order 
+        of the lower and upper bounds.
         """
         lower, upper = self.base_constraint.bounds
         
@@ -192,7 +228,10 @@ class TransformedConstraint(AbstractConstraint):
 
 class TreeConstraint(AbstractConstraint):
     """
-    Represents a PyTree of constraints over a PyTree of inputs.
+    Represents a PyTree of constraints mapping over a PyTree of inputs.
+    
+    Useful for applying heterogeneous constraints to complex nested structures 
+    (like `equinox.Module` instances) simultaneously.
     """
     constraints: PyTree[AbstractConstraint]
 
@@ -200,6 +239,15 @@ class TreeConstraint(AbstractConstraint):
         self, 
         constraints: PyTree[AbstractConstraint],
     ):
+        """
+        Args:
+            constraints: A PyTree containing `AbstractConstraint` leaves.
+                Non-constraint leaves are ignored.
+        
+        Raises:
+            ValueError: If the provided PyTree contains no constraint leaves.
+        """
+        # Local import prevents circular dependency at initialization time
         from parax.filters import is_constraint
 
         leaves = jax.tree.leaves(constraints, is_leaf=is_constraint)
@@ -210,6 +258,10 @@ class TreeConstraint(AbstractConstraint):
 
     @property
     def bounds(self) -> tuple[PyTree[Array], PyTree[Array]]:
+        """
+        Extracts a PyTree of lower bounds and a PyTree of upper bounds.
+        Non-constraint nodes in the original PyTree are left unmodified.
+        """
         from parax.filters import is_constraint
 
         def get_lower(node: Any) -> Any:
@@ -229,6 +281,10 @@ class TreeConstraint(AbstractConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
+        """
+        Returns a `distreqx.TreeMap` bijector that applies each respective 
+        leaf constraint's bijector.
+        """
         from parax.filters import is_constraint
         from distreqx.bijectors import TreeMap
 
@@ -242,10 +298,10 @@ class TreeConstraint(AbstractConstraint):
         return TreeMap(bijector)
     
 
-
 class CustomConstraint(AbstractConstraint):
     """
-    An escape hatch for power users who need a specific distreqx bijector.
+    An escape hatch for power users who need a specific distreqx bijector 
+    mapping with predefined physical bounds.
     """
     _custom_bijector: AbstractBijector
     _custom_bounds: tuple[Array, Array]
@@ -255,6 +311,12 @@ class CustomConstraint(AbstractConstraint):
         bijector: AbstractBijector, 
         bounds: tuple[Array, Array] = (jnp.array(-jnp.inf), jnp.array(jnp.inf))
     ):
+        """
+        Args:
+            bijector: The custom `distreqx` bijector.
+            bounds: A tuple of `(lower, upper)` defining the physical 
+                boundaries of the constrained space. Defaults to `(-inf, inf)`.
+        """
         self._custom_bijector = bijector
         self._custom_bounds = tuple(jnp.asarray(b) for b in bounds)
 

@@ -5,9 +5,9 @@ from jaxtyping import PyTree
 import jax
 import jax.numpy as jnp
 
-from parax.utils.path import path_to_pseudoname
-from parax.constrained import Param
-from parax.filters import is_free_array
+from parax.utils.tree import path_to_pseudoname
+from parax.variables import AbstractVariable
+from parax.filters import is_variable
 
 
 def iterate(
@@ -15,8 +15,8 @@ def iterate(
     param_filter: str | Sequence[str] | Callable[[str], bool] = None,
     *,
     include_fixed: bool = False,
-) -> Iterator[tuple[str, Param]]:
-    path_and_nodes, _ = jax.tree.flatten_with_path(pytree, is_leaf=is_free_array)
+) -> Iterator[tuple[str, AbstractVariable]]:
+    path_and_nodes, _ = jax.tree.flatten_with_path(pytree, is_leaf=is_variable)
     allowed_param_ids = None
 
     filter_is_seq_str = False
@@ -28,7 +28,7 @@ def iterate(
         if isinstance(param_filter, str):
             param_filter = {param_filter} 
             filter_is_seq_str = True
-        elif isinstance(param_filter, Param):
+        elif isinstance(param_filter, AbstractVariable):
             filter_ids = {id(param_filter)}
             filter_is_seq_param = True
         elif isinstance(param_filter, Sequence):

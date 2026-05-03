@@ -12,14 +12,14 @@ from distreqx.bijectors import AbstractBijector, Chain
 
 from parax.utils.array import format_array
 
-def serialize_transform(t: Any | None) -> dict | None:
+def serialize_bijector(t: Any | None) -> dict | None:
     r"""
-    Serialize an arbitrary transform (bijector or callable) to a lightweight dictionary.
+    Serialize an arbitrary bijector (bijector or callable) to a lightweight dictionary.
 
     Parameters
     ----------
     t : Any or None
-        The transform to serialize. Can be a distreqx bijector, a standard function,
+        The bijector to serialize. Can be a distreqx bijector, a standard function,
         a Partial function, or a stateful callable class/Equinox module.
 
     Returns
@@ -40,7 +40,7 @@ def serialize_transform(t: Any | None) -> dict | None:
         return {
             "class": "Chain",
             "module": "distreqx.bijectors",
-            "transforms": [serialize_transform(p) for p in t.bijectors]
+            "bijectors": [serialize_bijector(p) for p in t.bijectors]
         }
 
     # Handle Partial functions (extremely common in JAX/Equinox workflows)
@@ -48,9 +48,9 @@ def serialize_transform(t: Any | None) -> dict | None:
         return {
             "class": "Partial",
             "module": "functools",
-            "func": serialize_transform(t.func),
-            "args": [serialize_transform(arg) if callable(arg) else arg for arg in t.args],
-            "keywords": {k: serialize_transform(v) if callable(v) else v for k, v in t.keywords.items()}
+            "func": serialize_bijector(t.func),
+            "args": [serialize_bijector(arg) if callable(arg) else arg for arg in t.args],
+            "keywords": {k: serialize_bijector(v) if callable(v) else v for k, v in t.keywords.items()}
         }
         
     # Handle stateless functions / standard callables / JAX primitives
@@ -84,8 +84,8 @@ def serialize_transform(t: Any | None) -> dict | None:
         if isinstance(v, jnp.ndarray):
             params[k] = v.tolist()
         elif isinstance(v, AbstractBijector) or callable(v):
-            # Recursively serialize nested transforms if they exist
-            params[k] = serialize_transform(v)
+            # Recursively serialize nested bijectors if they exist
+            params[k] = serialize_bijector(v)
         else:
             params[k] = v
             
@@ -96,24 +96,24 @@ def serialize_transform(t: Any | None) -> dict | None:
     }
 
 
-def deserialize_transform(dct: dict | None) -> Any | None:
+def deserialize_bijector(dct: dict | None) -> Any | None:
     r"""
-    Deserialize a transform from a dictionary.
+    Deserialize a bijector from a dictionary.
 
     Parameters
     ----------
     dct : dict or None
-        A dictionary produced by [`serialize_transform`][].
+        A dictionary produced by [`serialize_bijector`][].
 
     Returns
     -------
     Any or None
-        The reconstructed transform (bijector, function, or callable), or ``None``.
+        The reconstructed bijector (bijector, function, or callable), or ``None``.
     
     Raises
     ------
     ValueError
-        If the transform class or function cannot be located.
+        If the bijector class or function cannot be located.
     """
     if dct is None:
         return None
@@ -123,14 +123,14 @@ def deserialize_transform(dct: dict | None) -> Any | None:
     
     # Special handling for composed bijectors
     if cls_name == "Chain":
-        parts = [deserialize_transform(p) for p in dct.get("transforms", [])]
+        parts = [deserialize_bijector(p) for p in dct.get("bijectors", [])]
         return Chain(parts)
 
     # Reconstruct Partials safely using jax.tree_util
     if cls_name == "Partial":
-        func = deserialize_transform(dct["func"])
-        args = [deserialize_transform(a) if isinstance(a, dict) and "class" in a else a for a in dct.get("args", [])]
-        keywords = {k: deserialize_transform(v) if isinstance(v, dict) and "class" in v else v for k, v in dct.get("keywords", {}).items()}
+        func = deserialize_bijector(dct["func"])
+        args = [deserialize_bijector(a) if isinstance(a, dict) and "class" in a else a for a in dct.get("args", [])]
+        keywords = {k: deserialize_bijector(v) if isinstance(v, dict) and "class" in v else v for k, v in dct.get("keywords", {}).items()}
         return jax.tree_util.Partial(func, *args, **keywords)
         
     # Handle stateless functions
@@ -162,27 +162,27 @@ def deserialize_transform(dct: dict | None) -> Any | None:
         cls = getattr(bijectors, cls_name, None)
         
     if cls is None:
-        raise ValueError(f"Unknown transform class: {cls_name} in module {mod_name}")
+        raise ValueError(f"Unknown bijector class: {cls_name} in module {mod_name}")
         
     params = dct.get("params", {})
     for k, v in params.items():
         if isinstance(v, dict) and "class" in v:
-            # Recursively deserialize nested transforms
-            params[k] = deserialize_transform(v)
+            # Recursively deserialize nested bijectors
+            params[k] = deserialize_bijector(v)
                 
     return cls(**params)
 
 
-def format_transform(t: Any) -> str:
+def format_bijector(t: Any) -> str:
     """
-    Format a transform, callable, or bijector dynamically for string representation.
+    Format a bijector, callable, or bijector dynamically for string representation.
     """
     if isinstance(t, Chain):
-        parts_str = ", ".join([format_transform(p) for p in t.bijectors])
+        parts_str = ", ".join([format_bijector(p) for p in t.bijectors])
         return f"Chain([{parts_str}])"
 
     if isinstance(t, (functools.partial, jax.tree_util.Partial)):
-        return f"Partial({format_transform(t.func)})"
+        return f"Partial({format_bijector(t.func)})"
         
     if inspect.isfunction(t) or inspect.isbuiltin(t) or (callable(t) and not hasattr(t, '__dict__')):
         return getattr(t, "__name__", "callable")
@@ -200,5 +200,5 @@ def format_transform(t: Any) -> str:
     if args:
         return f"{class_name}({', '.join(args)})"
         
-    # Fallback for transforms with no standard parameters (e.g., Exp)
+    # Fallback for bijectors with no standard parameters (e.g., Exp)
     return f"{class_name}()"

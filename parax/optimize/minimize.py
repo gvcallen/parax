@@ -82,8 +82,10 @@ def minimize(
     *,
     args: PyTree = None,
     max_steps: int = 256,
+    bounded: bool = None,
     has_aux: bool = False,
-    param_spec: Any = is_free_param,
+    filter_spec: Any = eqx.is_inexact_array,
+    is_leaf: Any = is_constant,
     **kwargs
 ) -> OptimizeResults:
     """
@@ -99,8 +101,13 @@ def minimize(
         solver = OptimistixMinimise(solver)
 
     # Setup problem
-    params, static = eqx.partition(y0, param_spec, is_leaf=is_free_variable)
-    bounded = solver.supports_bounds
+    params, static = eqx.partition(y0, filter_spec, is_leaf=is_leaf)
+    if bounded is None:
+        bounded = solver.supports_bounds
+    else:
+        if bounded is True and not solver.supports_bounds:
+            raise Exception("Solver does not support bounds but `bounded=True`")
+    bounded = bounded and solver.supports_bounds
 
     # Extract constraints, scales, and tree bijectors
     constraint = map_params(lambda x: x.constraint, params)

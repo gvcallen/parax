@@ -12,9 +12,10 @@ def tree_replace(
     **kwargs: PyTree
 ) -> PyTree:
     """
-    (not fully tested) Creates a new PyTree with its leaves replaced by leaves in parallel PyTrees.
+    Creates a new PyTree with its leaves replaced by corresponding fields in parallel PyTrees.
 
-    This extends `dataclasses.replace` to work over JAX PyTrees. 
+    This extends `dataclasses.replace` to work over JAX PyTrees, broadcasting 
+    kwargs gracefully (e.g. replacing a field universally, or replacing it with a structured tree).
     
     Note: The nodes defined as "leaves" by the `is_leaf` callable MUST be 
     valid dataclasses (e.g., Equinox Modules). If `is_leaf` is None, JAX will 
@@ -23,14 +24,19 @@ def tree_replace(
     Args:
         pytree: The base PyTree to update.
         is_leaf: A function that returns True for the nodes that should be treated 
-                 as dataclass leaves (e.g., `parax.is_param`). Defaults to None,
-                 in which case the root PyTree is replaced (standard `replace` behaviour.)
+                 as dataclass leaves (e.g., `parax.is_param`). Defaults to `is_dataclass`.
+                 If set to None, standard `replace` behavior applies but will fail
+                 if the tree contains non-dataclass leaves like raw arrays.
         **kwargs: Parallel PyTrees or PyTree prefixes containing the new values for specific fields.
+
+    Returns:
+        A new PyTree with the specified fields replaced.
     """
     if not kwargs:
         return pytree
     
-    true_leaves = jax.tree.map(lambda x: True if is_leaf(x) or is_leaf is None else None, pytree, is_leaf=is_leaf)
+    # Fixed lambda short-circuit to safely handle is_leaf=None
+    true_leaves = jax.tree.map(lambda x: True if is_leaf is None or is_leaf(x) else None, pytree, is_leaf=is_leaf)
 
     field_names = list(kwargs.keys())
     field_trees = list(kwargs.values())
@@ -53,4 +59,4 @@ def tree_replace(
         pytree,
         *field_trees,
         is_leaf=is_leaf
-    )    
+    )

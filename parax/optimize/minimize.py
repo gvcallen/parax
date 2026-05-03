@@ -5,7 +5,7 @@ from jaxtyping import PyTree, Scalar
 import equinox as eqx
 import optimistix as optx
 
-from parax.filters import where_free_array
+from parax.filters import is_variable, is_constant
 from parax.replace import tree_replace
 from parax.constraints import RealLine
 

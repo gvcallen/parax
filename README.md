@@ -6,14 +6,14 @@
 | **Homepage** | [github.com/parax/parax](https://github.com/parax/parax) |
 | **Docs** | [gvcallen.github.io/parax](https://gvcallen.github.io/parax) |
 
-**Parax** is a mini-framework for parametric modeling in [JAX](https://github.com/jax-ml/jax).
+**Parax** is a library for parametric modeling in [JAX](https://github.com/jax-ml/jax).
 
 ## Features
 
-- Computable/derived parameters
-- PyTree parameterizations
-- Metadata and constraints support
-- Filtering and PyTree manipulation tools
+- Derived/fixed parameters
+- PyTree parameterizations and freezing
+- Built-in constraints and metadata support
+- Filtering and PyTree manipulation tools.
 
 ## Installation
 Parax can be installed using pip:
@@ -28,21 +28,17 @@ You may need a custom `distreqx` branch for some constraints:
 pip install git+https://github.com/gvcallen/distreqx.git
 ``
 
-## Motivation
+## Overview
 
-**Parax** aims to provide a parametric modeling foundation for libraries like [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** aims to provide a foundation for **parametric modeling**, with focus on library like [Equinox](https://github.com/patrick-kidger/equinox). "Parametric modeling" means modeling with focus on the concept of a parameter as an *array with metadata*. This includes parameterizations, constraints, units and more. Note that although the features in this library are strictly *opt-in* (i.e. they can be used alongside existing PyTree models), Parax also aims to be a foundation for frameworks to be built on top of, and therefore several handy tools are provided to make this more accessible.
 
-Although Equinox has a strong filtering system, it lacks the ability to attach metadata and natively apply constraints/parameterizations to model parameters. This is desired in both machine learning and scientific modeling (for example, in constrained optimization or probabilistic inference).
-
-This library implements a number of features to make these tasks more accessible while still following Equinox's core principles.
-
-The design was motivated by several libraries which offer similar solutions, such as [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
+The design was motivated by several others libraries, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
 
 ## Example 1: Constrained Parameters
 
-`parax.Param` represents a simple wrapper around a JAX array, whereas `parax.Constrained` allows for arbitrary constraints to be used by both bounded and unbounded optimizers. Both classes implement `parax.AbstractFreeVariable` and `parax.AbstractVariable`. The latter implements several dunders via the experimental `__jax_array__` interface, allowing `Array`-like behaviour without explicit unwrapping.
+While `parax.Param` simply represents a JAX array with metadata, `parax.Constrained` also caters for built-in *constraints*. Both classes override `parax.AbstractVariable`, providing array-like behaviour via `__jax_array__`.
 
-The example below demonstrates defining a parameter with an interval constraint, and then using it in an expression.
+The example below demonstrates defining a constrained parameter, and then using it in a JAX expression.
 
 ```python
 import jax.numpy as jnp
@@ -65,7 +61,7 @@ assert jnp.allclose(prx.unwrap(p), 8.0)
 
 ## Example 2: Optimizing a Model using Optimistix
 
-In this example, we define a damped pendulum model using `equinox.Module`. We set the first parameter is unconstrained, the second as only positive with a scale of "mm", and the third is a fixed variable.
+In this example, we define a damped pendulum model using `equinox.Module`. We set the first parameter as unconstrained, the second as only positive with a scale of "mm", and the third as a fixed variable.
 
 ```python
 import jax
@@ -77,13 +73,13 @@ from dataclasses import replace
 import parax as prx 
 
 class DampedPendulum(eqx.Module):
-    # Unconstrained parameter (creates a prx.Param)
+    # Unconstrained variable (creates a prx.Param).
     friction: prx.Variable = prx.param(0.1) 
     
-    # Constrained parameter (creates a prx.Physical)
+    # Constrained variable (creates a prx.Physical)
     length: prx.Variable = prx.physical(9.81, scale='mm', constraint=prx.Positive())
 
-    # Dummy multiplier to be fixed
+    # Dummy variable (to be fixed)
     k: prx.Variable = prx.param(1.0)
 
     def __call__(self, state):
@@ -93,7 +89,8 @@ class DampedPendulum(eqx.Module):
 initial_model = DampedPendulum()
 initial_model = replace(initial_model, k=prx.Fixed(initial_model.k))
 
-# Partition the model and define the loss function
+# Partition the model, stopping at any constants e.g. `prx.Fixed` variables and `prx.Frozen` layers.
+# Then, define the loss function.
 params, static = eqx.partition(initial_model, eqx.is_inexact_array, is_leaf=prx.is_constant)
 def loss_fn(params, args):
     model = prx.unwrap(eqx.combine(params, static))

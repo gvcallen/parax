@@ -39,6 +39,7 @@ from parax.variables import (
     constrained as constrained,
     physical as physical,
     as_param as as_param,
+    as_fixed as as_fixed,
     map_variables as map_variables,
     map_variables_with_path as map_variables_with_path,
 )

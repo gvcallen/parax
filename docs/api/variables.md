@@ -24,6 +24,8 @@
 
 ::: parax.as_param
 
+::: parax.as_fixed
+
 ::: parax.map_variables
 
 ::: parax.map_variables_with_path

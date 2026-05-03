@@ -7,6 +7,7 @@ import optimistix as optx
 
 from parax.filters import is_variable, is_constant
 from parax.replace import tree_replace
+from parax.variables import map_variables
 from parax.constraints import RealLine
 
 from parax.optimize.results import OptimizeResults

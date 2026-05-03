@@ -30,7 +30,7 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-**Parax** aims to provide a foundation for "parametric modeling", with focus on libraries such as [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** aims to provide a foundation for "parametric modeling", with focus on interoperatibility with libraries such as [Equinox](https://github.com/patrick-kidger/equinox).
 
 Parametric modeling here means modeling with a focus on the concept of a model parameter as a *derived array with metadata*. This means supporting parameterizations, constraints, units, arbitrary metadata, etc.
 

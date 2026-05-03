@@ -23,6 +23,7 @@ docs = [
     "mkdocs",
     "mkdocs-material",
     "mkdocs-macros-plugin",
+    "mkdocs-include-markdown-plugin",
     "mkdocstrings[python]"
 ]
 test = [

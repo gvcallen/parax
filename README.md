@@ -6,7 +6,7 @@
 | **Homepage** | [github.com/parax/parax](https://github.com/parax/parax) |
 | **Docs** | [gvcallen.github.io/parax](https://gvcallen.github.io/parax) |
 
-**Parax** is a library for parametric modeling in [JAX](https://github.com/jax-ml/jax).
+**Parax** is a library for *parametric modeling* in [JAX](https://github.com/jax-ml/jax).
 
 ## Features
 
@@ -30,9 +30,9 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-**Parax** aims to provide a foundation for **parametric modeling**, with focus on libraries such as [Equinox](https://github.com/patrick-kidger/equinox).
+**Parax** aims to provide a foundation for *parametric modeling*, with focus on libraries such as [Equinox](https://github.com/patrick-kidger/equinox).
 
-"Parametric modeling" means modeling with a focus on the concept of a *parameter as an array with metadata*. This means supporting parameterizations, constraints, units, etc.
+"Parametric modeling" means modeling with a focus on the concept of a model parameter as a *derived array with metadata*. This means supporting parameterizations, constraints, units, arbitrary metadata, etc.
 
 The design was motivated by several others libraries, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
 

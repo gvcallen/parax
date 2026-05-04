@@ -51,8 +51,8 @@ nav:
   - Getting started: index.md
   - Overview: overview.md
   - Examples:
-    - Defining and optimizing a model using Equinox and Optimistix: examples/modeling_and_optimization.md
-    - Bounded optimization using JAXopt/SciPy: examples/bounded_optimization.md
+    - Modeling and unconstrained optimization (Equinox/Optimistix: examples/modeling_and_optimization.md
+    - Bounded optimization (JAXopt): examples/bounded_optimization.md
   - API:
     - Base Interfaces:
       - Constant: api/constant.md

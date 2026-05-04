@@ -181,7 +181,6 @@ class Derived(AbstractVariable):
     Attributes:
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
-        metadata: Additional arbitrary metadata.
     """
     raw_value: ParamLike = eqx.field(converter=_as_param_like)
     fn: Callable = eqx.field(static=True)
@@ -320,7 +319,9 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
 
 class Physical(AbstractVariable):
     """
-    A `parax.ParamLike` scaled wrapper by an `ArrayLike` float or unit.
+    A physical variable with a scale.
+    
+    Multiplies the underlying `parax.ParamLike` by an `ArrayLike` float or unit.
 
     Useful for scientific modeling. Applies a linear physical scale 
     (e.g., units or preconditioning) as the final evaluation step on top of 
@@ -329,7 +330,6 @@ class Physical(AbstractVariable):
     Attributes:
         variable: The underlying parameter or array being scaled.
         scale: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
-        metadata: Additional arbitrary metadata.
     """
     raw_value: ParamLike
     scale: ArrayLike = eqx.field(converter=Fixed)
@@ -344,7 +344,6 @@ class Physical(AbstractVariable):
             raw_value: The underlying base variable (e.g., `Constrained`, `Param`, or Array).
             scale: Linear multiplier or unit string. If a string is provided, 
                 it is converted automatically using `unxt.unit()`.
-            metadata: Additional static metadata.
         """
         # Scale standardization
         if isinstance(scale, (float, int, Array)):
@@ -460,7 +459,7 @@ def constrained(
     constraint: AbstractConstraint | None = None,
 ) -> Any:
     """
-    Specifies a dataclass field for a Parax `Constrained` parameter.
+    Specifies a dataclass field for a Parax `parax.Constrained` variable.
 
     Args:
         default_value: The default constrained value. If omitted, this field becomes required.
@@ -474,6 +473,33 @@ def constrained(
         if isinstance(x, AbstractVariable):
             return x
         return Constrained(x, constraint=constraint)
+
+    field_kwargs = {"converter": converter}
+    if default_value is not dataclasses.MISSING:
+        field_kwargs["default"] = default_value
+        
+    return eqx.field(**field_kwargs)
+
+
+def random(
+    default_value: ParamLike = dataclasses.MISSING,
+    distribution: AbstractDistribution | None = None,
+) -> Any:
+    """
+    Specifies a dataclass field for a Parax `parax.Random` variable.
+
+    Args:
+        default_value: The default value. If omitted, this field becomes required.
+        constraint: The abstract constraint defining base bounds and mappings.
+        metadata: Additional static metadata to store.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
+    """
+    def converter(x: Any) -> AbstractVariable:
+        if isinstance(x, AbstractVariable):
+            return x
+        return Random(x, distribution=distribution)
 
     field_kwargs = {"converter": converter}
     if default_value is not dataclasses.MISSING:

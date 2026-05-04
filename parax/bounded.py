@@ -38,25 +38,43 @@ class AbstractBounded(eqx.Module, Generic[Base]):
         raise NotImplementedError    
   
     @abstractmethod
-    def convert(self, base: Base) -> Physical:
+    def transform_to_physical(self, base: Base) -> Physical:
         """
         Converts a new base PyTree to a physical PyTree.
+
+        Args:
+            base: The base-space PyTree to transform.
+
+        Returns:
+            The transformed PyTree in the physical (forward-pass) space.
         """
         pass
     
     @abstractmethod
-    def replace(self, base: Base) -> "AbstractBounded":
+    def update_from_base(self, base: Base) -> "AbstractBounded":
         """
-        Returns a new instance of this object with
-        a new base PyTree.
+        Returns a new instance of this object with a new base PyTree.
+
+        Args:
+            base: The new base-space PyTree representing the updated state.
+
+        Returns:
+            A new instance of the bounded object, updated to reflect the new base.
         """
         pass
     
 
-def tree_bounded_base(model: PyTree) -> PyTree:
+def tree_base(model: PyTree) -> PyTree:
     """
     Extracts a PyTree of base values from a model. 
+    
     Standard inexact arrays are left intact.
+
+    Args:
+        model: The original PyTree model potentially containing bounded nodes.
+
+    Returns:
+        A PyTree containing the extracted base values.
     """
     from parax.filters import is_bounded
     def _extract(x):
@@ -67,10 +85,17 @@ def tree_bounded_base(model: PyTree) -> PyTree:
     return jax.tree_util.tree_map(_extract, model, is_leaf=is_bounded)
 
 
-def tree_bounded_lower(tree: PyTree) -> PyTree:
+def tree_lower(tree: PyTree) -> PyTree:
     """
-    Extracts the lower bounds of a potentially bounded
-    PyTree in base space. Standard arrays default to (-inf, inf).
+    Extracts the lower bounds of a potentially bounded PyTree in base space. 
+    
+    Standard arrays default to (-inf, inf).
+
+    Args:
+        tree: The PyTree model to extract lower bounds from.
+
+    Returns:
+        A PyTree representing the lower bounds in base space.
     """
     from parax.filters import is_bounded
 
@@ -85,10 +110,17 @@ def tree_bounded_lower(tree: PyTree) -> PyTree:
     return lower
 
 
-def tree_bounded_upper(tree: PyTree) -> PyTree:
+def tree_upper(tree: PyTree) -> PyTree:
     """
-    Extracts the upper bounds of a potentially bounded
-    PyTree in base space. Standard arrays default to (-inf, inf).
+    Extracts the upper bounds of a potentially bounded PyTree in base space. 
+    
+    Standard arrays default to (-inf, inf).
+
+    Args:
+        tree: The PyTree model to extract upper bounds from.
+
+    Returns:
+        A PyTree representing the upper bounds in base space.
     """
     from parax.filters import is_bounded
 
@@ -103,42 +135,66 @@ def tree_bounded_upper(tree: PyTree) -> PyTree:
     return upper
 
 
-def tree_bounded_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
+def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
     """
     Extracts two PyTrees (lower and upper) representing the boundaries of 
-    the base space. Standard arrays default to (-inf, inf).
+    the base space. 
+    
+    Standard arrays default to (-inf, inf).
+
+    Args:
+        tree: The PyTree model to extract bounds from.
+
+    Returns:
+        A tuple of two PyTrees `(lower_bounds, upper_bounds)`.
     """
-    return tree_bounded_lower(tree), tree_bounded_upper(tree)
+    return tree_lower(tree), tree_upper(tree)
 
 
-def tree_bounded_replace(model: PyTree, base_model: PyTree) -> PyTree:
+def tree_transform_to_physical(base_model: PyTree, original_model: PyTree) -> PyTree:
     """
-    Takes an updated base-space PyTree and injects it back into the 
-    original bounded model structure using `replace_from_base`.
-    """
-    from parax.filters import is_bounded
+    Takes a base-space PyTree and projects it to the external physical space.
 
-    def _rebuild(orig, base):
-        if is_bounded(orig):
-            return orig.replace(base)
-        return base
-        
-    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_bounded)
+    Args:
+        base_model: The PyTree containing the base-space values (e.g., from an optimizer).
+        original_model: The original PyTree model containing the `AbstractBounded` 
+            nodes used to perform the transformation.
 
-
-def tree_bounded_convert(base_model: PyTree, original_model: PyTree) -> PyTree:
-    """
-    Takes a base-space PyTree and projects it to the external space.
+    Returns:
+        A PyTree representing the fully evaluated model in the physical space.
     """
     from parax.filters import is_bounded
 
     def evaluate_base(orig_node, base_node):
         from parax.filters import is_bounded
         if is_bounded(orig_node):
-            return orig_node.convert(base_node)
+            return orig_node.transform_to_physical(base_node)
         return base_node
         
     evaluated_model = jax.tree_util.tree_map(
         evaluate_base, original_model, base_model, is_leaf=is_bounded
     )
     return evaluated_model
+
+
+def tree_update_from_base(model: PyTree, base_model: PyTree) -> PyTree:
+    """
+    Takes an updated base-space PyTree and injects it back into the 
+    original bounded model structure using `update_from_base`.
+
+    Args:
+        model: The original PyTree model containing the bounded nodes.
+        base_model: The updated PyTree containing the new base values.
+
+    Returns:
+        A new PyTree model with its internal states reconstructed to reflect 
+        the updated base values.
+    """
+    from parax.filters import is_bounded
+
+    def _rebuild(orig, base):
+        if is_bounded(orig):
+            return orig.update_from_base(base)
+        return base
+        
+    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_bounded)

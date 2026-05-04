@@ -102,6 +102,12 @@ class AbstractVariable(AbstractUnwrappable[Array]):
 
 
 ParamLike = AbstractVariable | Inexact[Array, "..."]
+"""
+A type alias representing any parameter-like object.
+
+This includes any Parax variables (like `Param`, `Constrained`, `Physical`) 
+as well as standard JAX inexact arrays.
+"""
 
 
 class Param(AbstractVariable, AbstractTagged):
@@ -110,11 +116,12 @@ class Param(AbstractVariable, AbstractTagged):
     
     Represents an unconstrained, trainable parameter
     with a single underlying `raw_value`.
-    """
-    #: The raw value used by optimizers and samplers.
-    raw_value: Array = eqx.field(converter=jnp.asarray)
 
-    #: Additional arbitrary metadata.
+    Attributes:
+        raw_value: The raw value used by optimizers and samplers.
+        metadata: Additional arbitrary metadata.
+    """
+    raw_value: Array = eqx.field(converter=jnp.asarray)
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     @property
@@ -132,8 +139,10 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     unrecognized attribute lookups to the underlying wrapped variable. This means 
     a `Fixed(Constrained(...))` object will still safely expose `.constraint`, 
     `.bounds`, and `.metadata` to the user as if it weren't wrapped at all.
+
+    Attributes:
+        variable: The underlying variable that is being fixed.
     """
-    #: The underlying variable that is being fixed.
     variable: ParamLike
 
     def __init__(self, variable: ParamLike):
@@ -170,14 +179,14 @@ class Derived(AbstractVariable, AbstractTagged):
     This is ideal for one-way transformations, projections, or normalizations 
     where a strict bijector (with an inverse) is not required or mathematically 
     possible (e.g., applying `jax.nn.softmax` to raw logits).
-    """
-    #: The raw value used by optimizers and samplers.
-    raw_value: Array = eqx.field(converter=jnp.asarray)
 
-    #: The callable used to transform the raw value.
+    Attributes:
+        raw_value: The raw value used by optimizers and samplers.
+        fn: The callable used to transform the raw value.
+        metadata: Additional arbitrary metadata.
+    """
+    raw_value: Array = eqx.field(converter=jnp.asarray)
     fn: Callable = eqx.field(static=True)
-    
-    #: Additional arbitrary metadata.
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     @property
@@ -197,14 +206,14 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     The constraint is automatically applied as a bijection mapping during 
     evaluation. Exposes a `bounds` property via the constraint for integration 
     with bounded optimizers.
+
+    Attributes:
+        raw_value: The raw, unconstrained value mapping to the real number line.
+        constraint: The parameter constraint defining bounds and bijector mappings.
+        metadata: Additional arbitrary metadata.
     """
-    #: The raw, unconstrained value mapping to the real number line.
     raw_value: Array = eqx.field(converter=jnp.asarray)
-
-    #: The parameter constraint defining bounds and bijector mappings.
     constraint: AbstractConstraint = eqx.field(converter=Frozen)
-
-    #: Additional arbitrary metadata.
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     def __init__(
@@ -261,16 +270,16 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    def convert(self, base: Array) -> Array:
+    def transform_to_physical(self, base: Array) -> Array:
         return base
     
-    def replace(self, base: Array) -> Array:
+    def update_from_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.convert(self.base)
+        return self.transform_to_physical(self.base)
     
 
 class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
@@ -280,17 +289,16 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     Useful for scientific modeling. Combines an optimizer-friendly unbounded 
     raw space with physical bounds, and applies a linear physical scale 
     (e.g., units or preconditioning) as the final evaluation step.
+
+    Attributes:
+        raw_value: The raw, unconstrained value mapping to the real number line.
+        scale: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
+        constraint: The parameter constraint in base space.
+        metadata: Additional arbitrary metadata.
     """
-    #: The raw, unconstrained value mapping to the real number line.
     raw_value: jax.Array = eqx.field(converter=jnp.asarray)
-    
-    #: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
     scale: ArrayLike = eqx.field(converter=Fixed)
-    
-    #: The parameter constraint in base space.
     constraint: AbstractConstraint = eqx.field(converter=Fixed)
-    
-    #: Additional arbitrary metadata.
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     def __init__(
@@ -358,16 +366,16 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         upper = jnp.broadcast_to(constraint_bounds[1], self.raw_value.shape)
         return lower, upper
     
-    def convert(self, base: Array) -> Array:
+    def transform_to_physical(self, base: Array) -> Array:
         return self.scale * base
     
-    def replace(self, base: Array) -> Array:
+    def update_from_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.convert(self.base)
+        return self.transform_to_physical(self.base)
 
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
@@ -421,6 +429,9 @@ def param(
         raw_value: The default raw value. If omitted, this field becomes required 
             by the user during instantiation.
         metadata: Additional static metadata to store.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
     """
     if metadata is None: metadata = {}
 
@@ -449,6 +460,9 @@ def derived(
         fn: The callable used to transform the raw value.
         raw_value: The default raw value. If omitted, this field becomes required.
         metadata: Additional static metadata to store.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
     """
     if metadata is None: metadata = {}
 
@@ -477,6 +491,9 @@ def constrained(
         default_value: The default constrained value. If omitted, this field becomes required.
         constraint: The abstract constraint defining base bounds and mappings.
         metadata: Additional static metadata to store.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
     """
     if metadata is None: metadata = {}
 
@@ -507,6 +524,9 @@ def physical(
         scale: Linear preconditioning factor or unit string (e.g., "mm").
         constraint: A Parax constraint defining base bounds and mappings.
         metadata: Additional static metadata to store.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
     """
     if metadata is None: metadata = {}
 

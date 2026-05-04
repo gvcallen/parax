@@ -17,13 +17,8 @@ from parax.tagged import (
 
 from parax.bounded import (
     AbstractBounded as AbstractBounded,
-    tree_bounded_base as tree_bounded_base,
-    tree_bounded_lower as tree_bounded_lower,
-    tree_bounded_upper as tree_bounded_upper,
-    tree_bounded_bounds as tree_bounded_bounds,
-    tree_bounded_convert as tree_bounded_convert,
-    tree_bounded_replace as tree_bounded_replace,
 )
+import parax.bounded as bounded
 
 from parax.probabilistic import (
     AbstractProbabilistic as AbstractProbabilistic,

@@ -8,12 +8,12 @@ import equinox as eqx
 from jax.flatten_util import ravel_pytree
 
 from parax.unwrappables import unwrap
-from parax.bounded import tree_bounded_base, tree_bounded_bounds, tree_bounded_replace, tree_bounded_convert
+from parax.bounded import tree_base, tree_bounds, tree_update_from_base, tree_transform_to_physical
 from parax.filters import is_constant
 
 def minimize_scipy(
     fn: Callable[[Any, tuple], jax.Array], 
-    model: PyTree, 
+    y0: PyTree, 
     args: tuple = (), 
     method: str = "L-BFGS-B",
     use_grad: bool = True,
@@ -37,7 +37,7 @@ def minimize_scipy(
     Args:
         fn (Callable): The objective function to minimize. It must take the 
             unwrapped model and `args` as arguments, and return a scalar JAX array.
-        model (Any): The PyTree model to optimize.
+        y0 (Any): The initial parameters to optimize.
         args (tuple, optional): Additional arguments passed to the objective function. 
             Defaults to ().
         method (str, optional): The type of solver. Should be one of the methods 
@@ -50,17 +50,17 @@ def minimize_scipy(
         filter_spec (Any, optional): The specification used by `equinox.partition` to 
             filter the arrays to optimize. Defaults to `eqx.is_inexact_array`.
         is_leaf (Callable, optional): A function specifying custom leaf nodes during 
-            PyTree traversal and partitioning. Defaults to `parax.constant.is_constant`.
+            PyTree traversal and partitioning. Defaults to `parax.is_constant`.
         **kwargs: Additional keyword arguments forwarded directly to `scipy.optimize.minimize`.
 
     Returns:
         tuple: A tuple containing:
-            - The fully reconstructed and optimized PyTree model.
+            - The fully reconstructed and optimized parameters.
             - The `scipy.optimize.OptimizeResult` object containing solver metrics.
     """
     # 1. Extract the numerical base space and bounds
-    base_model = tree_bounded_base(model)
-    lower_model, upper_model = tree_bounded_bounds(model)
+    base_model = tree_base(y0)
+    lower_model, upper_model = tree_bounds(y0)
 
     gradient_free_methods = {'nelder-mead', 'powell', 'cobyla'}
     use_grad = use_grad and (method.lower() not in gradient_free_methods)
@@ -83,7 +83,7 @@ def minimize_scipy(
     def flat_objective(flat_x):
         base_p = unflatten_fn(flat_x)
         current_base_model = eqx.combine(base_p, static)
-        projected_model = tree_bounded_convert(current_base_model, model)
+        projected_model = tree_transform_to_physical(current_base_model, y0)
         full_model = unwrap(projected_model)
         return fn(full_model, args)
        
@@ -116,6 +116,6 @@ def minimize_scipy(
     # 7. Reconstruct the final optimized model
     opt_base_params = unflatten_fn(jnp.asarray(result.x))
     opt_base_model = eqx.combine(opt_base_params, static)
-    opt_model = tree_bounded_replace(model, opt_base_model)
+    opt_model = tree_update_from_base(y0, opt_base_model)
     
     return opt_model, result

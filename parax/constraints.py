@@ -29,6 +29,10 @@ class AbstractConstraint(eqx.Module):
     unconstrained ML optimizers).
 
     Constraints may be used directly on arrays or mapped over PyTrees.
+
+    Attributes:
+        bounds: A tuple containing the lower and upper bounds of the constrained space.
+        bijector: The underlying mapping from the unconstrained real line to the bounded space.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
@@ -40,6 +44,9 @@ class RealLine(AbstractConstraint):
     
     Effectively a structural no-op constraint using an Identity bijector, 
     useful for maintaining consistent types in mixed parameter sets.
+
+    Attributes:
+        shape: The expected shape of the unconstrained parameter.
     """
     shape: Any = eqx.field(static=True)
 
@@ -67,7 +74,12 @@ class RealLine(AbstractConstraint):
 
 
 class GreaterThan(AbstractConstraint):
-    """Represents a value strictly greater than a lower bound."""
+    """
+    Represents a value strictly greater than a lower bound.
+    
+    Attributes:
+        lower: The exclusive lower bound array or scalar.
+    """
     lower: jnp.ndarray
     
     def __init__(self, lower: Union[float, Array]):
@@ -93,7 +105,12 @@ class GreaterThan(AbstractConstraint):
 
 
 class LessThan(AbstractConstraint):
-    """Represents a value strictly less than an upper bound."""
+    """
+    Represents a value strictly less than an upper bound.
+    
+    Attributes:
+        upper: The exclusive upper bound array or scalar.
+    """
     upper: jnp.ndarray
 
     def __init__(self, upper: Union[float, Array]):
@@ -126,7 +143,13 @@ class LessThan(AbstractConstraint):
 
 
 class Interval(AbstractConstraint):
-    """Represents a value strictly bounded between a lower and upper value."""
+    """
+    Represents a value strictly bounded between a lower and upper value.
+    
+    Attributes:
+        lower: The exclusive lower bound.
+        upper: The exclusive upper bound.
+    """
     lower: jnp.ndarray
     upper: jnp.ndarray
 
@@ -181,6 +204,10 @@ class TransformedConstraint(AbstractConstraint):
     
     The custom bijector is applied *after* the base constraint. This allows 
     for complex normalizations or transformations on top of physical boundaries.
+
+    Attributes:
+        base_constraint: The underlying physical constraint applied first.
+        custom_bijector: The bijector applied on top of the base constraint.
     """
     base_constraint: AbstractConstraint
     custom_bijector: AbstractBijector
@@ -232,6 +259,9 @@ class TreeConstraint(AbstractConstraint):
     
     Useful for applying heterogeneous constraints to complex nested structures 
     (like `equinox.Module` instances) simultaneously.
+
+    Attributes:
+        tree: The PyTree containing `AbstractConstraint` leaves.
     """
     tree: PyTree[AbstractConstraint]
 
@@ -302,6 +332,10 @@ class CustomConstraint(AbstractConstraint):
     """
     An escape hatch for power users who need a specific distreqx bijector 
     mapping with predefined physical bounds.
+
+    Attributes:
+        _custom_bijector: The internal, user-defined distreqx bijector.
+        _custom_bounds: The manually defined physical boundaries `(lower, upper)`.
     """
     _custom_bijector: AbstractBijector
     _custom_bounds: tuple[Array, Array]

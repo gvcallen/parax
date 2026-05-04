@@ -7,8 +7,6 @@ from typing import Any
 import equinox as eqx
 from typing import TypeVar
 
-from parax.unwrappables import AbstractUnwrappable
-
 T = TypeVar("T")
 
 class AbstractHasMetadata(eqx.Module):
@@ -22,9 +20,9 @@ class AbstractHasMetadata(eqx.Module):
     metadata: eqx.AbstractVar[dict[Any, Any]]
 
 
-class MetadataWrapper(AbstractUnwrappable[T]):
+class MetadataContainer(AbstractHasMetadata):
+    """
+    A general container for attaching arbitrary metadata to a PyTree.
+    """
     tree: T
     metadata: dict[Any, Any] = eqx.field(converter=dict, static=True, kw_only=True)
-
-    def unwrap(self):
-        return self.tree

@@ -4,9 +4,9 @@
 
 ::: parax.is_param_like
 
-::: parax.is_constrained
-
 ::: parax.is_unwrappable
+
+::: parax.is_bounded
 
 ::: parax.is_constraint
 

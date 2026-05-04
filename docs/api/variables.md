@@ -1,16 +1,14 @@
 ::: parax.AbstractVariable
 
-::: parax.AbstractConstrained
-
 ::: parax.Param
 
-::: parax.Fixed
-
-::: parax.Derived
+::: parax.param
 
 ::: parax.as_param
 
-::: parax.ParamLike
+::: parax.Fixed
+
+::: parax.as_fixed
 
 ::: parax.Derived
 

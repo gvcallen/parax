@@ -53,18 +53,18 @@ def is_bounded(x: Any) -> TypeGuard[AbstractBounded]:
     return isinstance(x, AbstractBounded)
 
 
-def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
-    """
-    Returns True if `x` is an instance of `parax.AbstractConstraint`.
-    """
-    return isinstance(x, AbstractConstraint)
-
-
 def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
     """
     Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
     """
     return isinstance(x, AbstractUnwrappable)
+
+
+def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractConstraint`.
+    """
+    return isinstance(x, AbstractConstraint)
 
 
 def is_distribution(x: Any) -> TypeGuard[AbstractDistribution]:

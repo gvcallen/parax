@@ -36,7 +36,7 @@ Although Parax can be used in any JAX code, it places emphasis on interoperatibi
 
 ## Example 1: Constrained Parameters
 
-`parax.Param` represents a simple JAX array with metadata, while `parax.Constrained` also caters for built-in *constraints*. Both classes override `parax.AbstractVariable`, providing array-like behaviour via `__jax_array__`.
+`parax.Param` represents a simple JAX array with metadata, while `parax.Constrained` also caters for built-in *constraints*. Both classes override `parax.AbstractVariable`, providing array-like behaviour via `__jax_array__`. We call variables and/or arrays "param-like".
 
 The example below demonstrates defining a `parax.Constrained` parameter and then using it in a JAX expression.
 
@@ -85,7 +85,7 @@ assert jnp.allclose(unwrapped['b']['y'], jnp.exp(20.0))
 
 ## Example 3: Optimizing an eqx.Model using Optimistix
 
-In this example, we define a damped pendulum model using `equinox.Module`. The first parameter is initialized with standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later.
+In this example, we define a damped pendulum model using `equinox.Module`. The first parameter is initialized with a standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later.
 
 ```python
 import jax

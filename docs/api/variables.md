@@ -4,27 +4,27 @@
 
 ::: parax.Param
 
-::: parax.Derived
-
-::: parax.Constrained
-
-::: parax.Physical
-
-::: parax.Fixed
-
-::: parax.Variable
-
 ::: parax.param
-
-::: parax.derived
-
-::: parax.constrained
-
-::: parax.physical
 
 ::: parax.as_param
 
+::: parax.Fixed
+
 ::: parax.as_fixed
+
+::: parax.Derived
+
+::: parax.derived
+
+::: parax.Constrained
+
+::: parax.constrained
+
+::: parax.Physical
+
+::: parax.physical
+
+::: parax.ParamLike
 
 ::: parax.map_variables
 

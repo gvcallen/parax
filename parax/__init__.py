@@ -12,10 +12,6 @@ from parax.constant import (
     as_free as as_free,
 )
 
-from parax.metadata import (
-    AbstractHasMetadata as AbstractHasMetadata,
-)
-
 from parax.unwrappables import (
     AbstractUnwrappable as AbstractUnwrappable,
     unwrap as unwrap,
@@ -25,9 +21,17 @@ from parax.unwrappables import (
     as_frozen as as_frozen,
 )
 
+from parax.metadata import (
+    AbstractHasMetadata as AbstractHasMetadata,
+    MetadataWrapper as MetadataWrapper,
+)
+
+from parax.bounded import (
+    AbstractBounded as AbstractBounded,
+)
+
 from parax.variables import (
     AbstractVariable as AbstractVariable,
-    AbstractConstrained as AbstractConstrained,
     Param as Param,
     Fixed as Fixed,
     Derived as Derived,
@@ -61,7 +65,7 @@ from parax.filters import (
     is_unwrappable as is_unwrappable,
     is_variable as is_variable,
     is_param_like as is_param_like,
-    is_constrained as is_constrained,
+    is_bounded as is_bounded,
     is_constraint as is_constraint,
     is_distribution as is_distribution,
     is_bijector as is_bijector,

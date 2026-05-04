@@ -9,7 +9,7 @@ import jax.tree_util as jtu
 import jsonpickle
 import jsonpickle.handlers
 
-from parax.constrained import Param
+from parax.bounded import Param
 import equinox as eqx
 
 def _eqx_getstate(self):

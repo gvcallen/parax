@@ -12,7 +12,8 @@ from typing import Any, TypeGuard
 import equinox as eqx
 
 from parax.constant import AbstractConstant
-from parax.variables import AbstractVariable, AbstractConstrained
+from parax.bounded import AbstractBounded
+from parax.variables import AbstractVariable
 from parax.unwrappables import AbstractUnwrappable
 from parax.constraints import AbstractConstraint
 from parax.metadata import AbstractHasMetadata
@@ -45,14 +46,11 @@ def is_param_like(x: Any) -> bool:
     return isinstance(x, AbstractVariable) or eqx.is_inexact_array(x)
 
 
-def is_constrained(x: Any) -> TypeGuard[AbstractConstrained]:
+def is_bounded(x: Any) -> TypeGuard[AbstractBounded]:
     """
-    Returns True if `x` is an instance of `parax.AbstractConstrained`.
-    
-    Useful for filtering out parameters that require physical bounded 
-    optimization steps.
+    Returns True if `x` is an instance of `parax.AbstractBounded`.
     """
-    return isinstance(x, AbstractConstrained)
+    return isinstance(x, AbstractBounded)
 
 
 def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:

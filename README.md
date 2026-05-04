@@ -47,16 +47,20 @@ import parax as prx
 # Define a parameter bounded between 0 and 10
 p = prx.Constrained(8.0, prx.Interval(0.0, 10.0))
 
-# We can print any constraint's bounds
-print(f"Bounds: {p.constraint.bounds}")
+p.constraint.bounds
+# (Array(0., dtype=float32), Array(10., dtype=float32))
 
-# We can use the parameter directly in an equation and print the result
-result = jnp.sin(p) + (p * 2.0)
-print(f"Result: {result}") 
-print(f"Raw (unconstrained) value: {p.raw_value}")
+# We can use the parameter directly in an equation
+jnp.sin(p) + (p * 2.0)
+# Array(16.989359, dtype=float32)
 
-# We could have also unwrapped directly
-assert jnp.allclose(prx.unwrap(p), 8.0)
+# The raw (unconstrained) value used by optimizers under the hood
+p.raw_value
+# Array(1.3862944, dtype=float32)
+
+# We can also unwrap it explicitly
+prx.unwrap(p)
+# Array(8., dtype=float32)
 ```
 
 ## Example 2: PyTree Parameterizations
@@ -76,11 +80,10 @@ pytree = {'a': 1.0, 'b': {'x': 10.0, 'y': 20.0}}
 wrapped = prx.Computed(pytree, jnp.exp)
 
 # Unwrap the Pytree, applying the computation
-unwrapped = prx.unwrap(wrapped)
-
-assert jnp.allclose(unwrapped['a'], jnp.exp(1.0))
-assert jnp.allclose(unwrapped['b']['x'], jnp.exp(10.0))
-assert jnp.allclose(unwrapped['b']['y'], jnp.exp(20.0))
+prx.unwrap(wrapped)
+# {'a': Array(2.7182817, dtype=float32),
+#  'b': {'x': Array(22026.465, dtype=float32), 
+#        'y': Array(4.851652e+08, dtype=float32)}}
 ```
 
 ## Example 3: Optimizing an eqx.Model using Optimistix
@@ -118,6 +121,7 @@ initial_model = dataclasses.replace(initial_model, k=prx.Fixed(initial_model.k))
 # Partition the model, stopping at any constants e.g. `prx.Fixed` variables and `prx.Frozen` layers.
 # Then, define the loss function.
 params, static = eqx.partition(initial_model, eqx.is_inexact_array, is_leaf=prx.is_constant)
+
 def loss_fn(params, args):
     model = prx.unwrap(eqx.combine(params, static))
     x, y = args
@@ -138,9 +142,12 @@ results = optx.minimise(
     args=(x_data, y_data),
 )
 
-# Print the results
+# Reconstruct the optimized model
 final_model = prx.unwrap(eqx.combine(results.value, static))
-print(f"Optimized Friction: {final_model.friction:.4f}")
-print(f"Optimized Length: {final_model.length:.4f}")
-print(f"Optimized Ratio: {final_model.friction / final_model.length:.4f}")
+final_model.friction # Array(2.4575772, dtype=float32)
+final_model.length # Array(9.834487, dtype=float32)
+
+# The optimizer found our ratio of 0.25
+final_model.friction / final_model.length 
+# Array(0.24989378, dtype=float32)
 ```

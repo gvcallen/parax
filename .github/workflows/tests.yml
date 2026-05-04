@@ -29,9 +29,15 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install git+https://github.com/gvcallen/distreqx.git
-        pip install -e .[test]
+        # Install your package with test extras, plus the codeblocks plugin
+        pip install -e .[test] pytest-codeblocks
 
-    - name: Run pytest
+    - name: Run standard test suite
       run: |
         # Run all tests in the tests/ directory
         pytest tests/
+
+    - name: Test documentation examples
+      run: |
+        # Run the codeblocks inside your markdown files
+        pytest --codeblocks docs/

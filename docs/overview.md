@@ -1,0 +1,5 @@
+**Parax** aims to provide a foundation for "parametric modeling", i.e. modeling with a focus on the concept of a parameter as a *derived array with metadata*. This means supporting parameterizations, constraints, bounds, priors, units, and arbitrary metadata, which are needed in both machine learning and scientific modeling. 
+
+To avoid being a framework, this is accomplished in an entirely general manner by providing a common set of *abstract interfaces* along with filters and tree utilities that use these interfaces. The goal is then to provide a range of tools and concrete classes to minimize boilerplate for users, while still keeping the library extendable and opt-in.
+
+Although **Parax** can be used in any JAX code, it places emphasis on interoperatibility with [Equinox](https://github.com/patrick-kidger/equinox). For example, `parax.AbstractConstant` and `parax.is_constant` allow easy partitioning of model parameters using `eqx.partition`, with `parax.Fixed` and `parax.Frozen` providing concrete implementations.

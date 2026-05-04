@@ -48,17 +48,24 @@ markdown_extensions:
       base_path: ["."]  # This grants permission to read files in your repo root!
 
 nav:
-  - Home: index.md
-  - API Reference:
-    - Constant: api/constant.md
-    - Tagged: api/tagged.md
-    - Bounded: api/bounded.md
-    - Probabilistic: api/probabilistic.md
-    - Unwrappables: api/unwrappables.md
-    - Variables: api/variables.md
-    - Constraints: api/constraints.md
-    - Filters: api/filters.md
-    - Converters: api/converters.md
+  - Getting started: index.md
+  - Overview: overview.md
+  - Examples:
+    - Defining and optimizing a model using Equinox and Optimistix: examples/modeling_and_optimization.md
+    - Bounded optimization using JAXopt/SciPy: examples/bounded_optimization.md
+  - API:
+    - Base Interfaces:
+      - Constant: api/constant.md
+      - Tagged: api/tagged.md
+      - Bounded: api/bounded.md
+      - Probabilistic: api/probabilistic.md
+    - Parameters:
+      - Unwrappables: api/unwrappables.md
+      - Variables: api/variables.md
+      - Constraints: api/constraints.md
+    - Misc:
+      - Filters: api/filters.md
+      - Converters: api/converters.md
   - License: license.md
 
 extra_javascript:

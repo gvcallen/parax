@@ -1,6 +1,6 @@
 [project]
 name = "parax"
-version = "0.5.9"
+version = "0.5.10"
 description = "Parametric modeling in JAX"
 readme = "README.md"
 authors = [
@@ -24,6 +24,8 @@ docs = [
 test = [
     "pytest",
     "optimistix",
+    "jaxopt",
+    "pytest-codeblocks",
 ]
 
 [project.urls]

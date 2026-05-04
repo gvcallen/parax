@@ -2,7 +2,6 @@ from typing import TypeVar, Union, Any
 
 from parax.constant import AbstractConstant
 from parax.variables import Param, ParamLike, Fixed
-from parax.constant import AbstractConstant
 from parax.unwrappables import Frozen
 
 T = TypeVar('T')

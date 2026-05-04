@@ -89,7 +89,7 @@ def test_constrained_initialization_modes():
 def test_physical_scaling():
     """Test that Physical applies the scale correctly after the constraint."""
     # We want a base value of 5.0, scaled by 10.0 -> final value 50.0
-    phys = Physical(base_value=5.0, scale=10.0, constraint=Positive())
+    phys = Physical(Constrained(5.0, constraint=Positive()), scale=10.0)
     
     assert jnp.allclose(phys.base, 5.0)
     assert jnp.allclose(phys.value, 50.0)
@@ -98,23 +98,6 @@ def test_physical_scaling():
 # ==========================================
 # Fixed Wrapper Tests
 # ==========================================
-
-def test_fixed_attribute_forwarding():
-    """Test that Fixed masquerades as the underlying variable."""
-    base_param = Constrained(value=5.0, constraint=Positive(), metadata={"layer": 1})
-    f = Fixed(base_param)
-    
-    # We should be able to access the constraint and metadata through the Fixed wrapper
-    assert f.metadata["layer"] == 1
-    
-    # NOTE: f.constraint is wrapped in a Frozen object internally by Constrained.
-    # We test attribute forwarding by accessing the bounds of the underlying constraint,
-    # which proves BOTH Fixed and Frozen are successfully forwarding attributes!
-    assert f.constraint.bounds[0] == 0.0
-    
-    # Value should remain identical
-    assert jnp.allclose(f.value, 5.0)
-
 
 def test_fixed_stops_gradients():
     """Mathematically prove that Fixed disconnects the gradient graph."""

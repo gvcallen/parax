@@ -141,35 +141,24 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     `.bounds`, and `.metadata` to the user as if it weren't wrapped at all.
 
     Attributes:
-        variable: The underlying variable that is being fixed.
+        raw_value: The underlying variable that is being fixed.
     """
-    variable: ParamLike
+    raw_value: ParamLike
 
-    def __init__(self, variable: ParamLike):
-        """
-        Args:
-            variable: The variable or array to freeze. Safely absorbs nested 
-                `Fixed` objects to prevent double-wrapping.
-        """
-        if isinstance(variable, Fixed):
-            variable = variable.variable
-        self.variable = variable
+    def __post_init__(self):
+        if isinstance(self.raw_value, Fixed):
+            self.raw_value = self.raw_value.raw_value
 
     def as_free(self) -> AbstractVariable:
-        return self.variable
+        return self.raw_value
 
     @property
     def value(self) -> Array:
-        value = self.variable
-        if isinstance(self.variable, AbstractVariable):
+        value = self.raw_value
+        if isinstance(self.raw_value, AbstractVariable):
             value = value.value
         return jax.lax.stop_gradient(value)
-    
-    def __getattr__(self, name):
-        if hasattr(self.variable, name):
-            return getattr(self.variable, name)
-        return super().__getattribute__(name)
-     
+   
 
 class Derived(AbstractVariable, AbstractTagged):
     """
@@ -261,11 +250,13 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
        
     @property
     def base(self) -> Array:
-        return self.constraint.bijector.forward(self.raw_value)
+        from parax.converters import as_free
+        return as_free(self.constraint).bijector.forward(self.raw_value)
     
     @property
     def bounds(self) -> tuple[Array, Array]:
-        constraint_bounds = self.constraint.bounds
+        from parax.converters import as_free
+        constraint_bounds = as_free(self.constraint).bounds
         lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
@@ -274,7 +265,8 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         return base
     
     def update_from_base(self, base: Array) -> Array:
-        new_raw = self.constraint.bijector.inverse(base)
+        from parax.converters import as_free
+        new_raw = as_free(self.constraint).bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
@@ -284,46 +276,35 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
 
 class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     """
-    A physically scaled and constrained parameter.
+    A physically scaled wrapper around another parameter or array.
 
-    Useful for scientific modeling. Combines an optimizer-friendly unbounded 
-    raw space with physical bounds, and applies a linear physical scale 
-    (e.g., units or preconditioning) as the final evaluation step.
+    Useful for scientific modeling. Applies a linear physical scale 
+    (e.g., units or preconditioning) as the final evaluation step on top of 
+    an underlying variable (such as a `Constrained` or `Param` instance).
 
     Attributes:
-        raw_value: The raw, unconstrained value mapping to the real number line.
+        variable: The underlying parameter or array being scaled.
         scale: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
-        constraint: The parameter constraint in base space.
         metadata: Additional arbitrary metadata.
     """
-    raw_value: jax.Array = eqx.field(converter=jnp.asarray)
+    raw_value: ParamLike
     scale: ArrayLike = eqx.field(converter=Fixed)
-    constraint: AbstractConstraint = eqx.field(converter=Fixed)
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     def __init__(
         self,
-        base_value: Any | None = None,
+        raw_value: ParamLike,
         scale: Any = 1.0,
         *,
-        raw_value: Any | None = None,
-        constraint: AbstractConstraint | None = None,
         metadata: dict | None = None,
     ):
         """
         Args:
-            base_value: The constrained, un-scaled array value. Mutually exclusive with `raw_value`.
+            raw_value: The underlying base variable (e.g., `Constrained`, `Param`, or Array).
             scale: Linear multiplier or unit string. If a string is provided, 
                 it is converted automatically using `unxt.unit()`.
-            raw_value: The unconstrained optimizer-space value. Mutually exclusive with `base_value`.
-            constraint: A Parax constraint. If None, defaults to `RealLine` (unconstrained).
             metadata: Additional static metadata.
         """
-        if base_value is None and raw_value is None:
-            raise ValueError("Must provide either `base_value` or `raw_value`.")
-        if base_value is not None and raw_value is not None:
-            raise ValueError("Cannot provide both `base_value` and `raw_value`.")
-        
         # Scale standardization
         if isinstance(scale, (float, int, Array)):
             scale = jnp.asarray(scale, dtype=float)
@@ -334,47 +315,62 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
                 raise Exception("Using units as scales requires the `unxt` package")
             scale = jnp.array(1.0) * unxt.unit(scale)
 
-        # Array standardization
-        if raw_value is not None:
-            raw_value = jnp.asarray(raw_value, dtype=float)
-            shape = raw_value.shape
-        else:
-            base_value = jnp.asarray(base_value, dtype=float)
-            shape = base_value.shape
-        
-        # Constraint standardization
-        if constraint is None:
-            constraint = RealLine(shape=shape)
-        
-        # Raw value standardization
-        if base_value is not None:
-            raw_value = constraint.bijector.inverse(base_value)
-
         self.raw_value = raw_value
         self.scale = scale
-        self.constraint = constraint
         self.metadata = metadata if metadata is not None else {}
 
     @property
     def base(self) -> Array:
-        return self.constraint.bijector.forward(self.raw_value)
+        """Returns the base state of the underlying variable."""
+        return jnp.asarray(self.raw_value)
 
     @property
     def bounds(self) -> tuple[Array, Array]:
-        constraint_bounds = self.constraint.bounds
-        lower = jnp.broadcast_to(constraint_bounds[0], self.raw_value.shape)
-        upper = jnp.broadcast_to(constraint_bounds[1], self.raw_value.shape)
-        return lower, upper
-    
+        """
+        Dynamically scales the bounds of the underlying variable.
+        Returns unconstrained bounds (-inf, inf) if the wrapped variable has no bounds.
+        """
+        from parax.filters import is_bounded
+        if is_bounded(self.raw_value):
+            lower, upper = self.raw_value.bounds
+            scaled_1 = lower * self.scale
+            scaled_2 = upper * self.scale
+            return jnp.minimum(scaled_1, scaled_2), jnp.maximum(scaled_1, scaled_2)
+        
+        inf = jnp.full_like(self.base, jnp.inf)
+        return -inf, inf
+
     def transform_to_physical(self, base: Array) -> Array:
-        return self.scale * base
-    
-    def update_from_base(self, base: Array) -> Array:
-        new_raw = self.constraint.bijector.inverse(base)
-        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
-    
+        """
+        Converts a base state to the physical state by delegating to the 
+        underlying variable (if applicable) and applying the scale factor.
+        """
+        from parax.filters import is_bounded
+        if is_bounded(self.raw_value):
+            phys = self.raw_value.transform_to_physical(base)
+        else:
+            phys = base
+        
+        return self.scale * phys
+
+    def update_from_base(self, base: Array) -> "Physical":
+        """
+        Delegates the base update to the underlying variable and returns 
+        a new instance of this Physical wrapper.
+        """
+        from parax.filters import is_bounded
+        if is_bounded(self.raw_value):
+            new_var = self.raw_value.update_from_base(base)
+        elif eqx.is_array_like(self.raw_value):
+            new_var = base
+        else:
+            raise Exception("Cannot wrap a non array-like variable in `parax.Physical`")
+            
+        return eqx.tree_at(lambda x: x.raw_value, self, new_var)
+
     @property
     def value(self) -> Array:
+        """Returns the physically scaled value."""
         return self.transform_to_physical(self.base)
 
 
@@ -439,7 +435,7 @@ def param(
         if isinstance(x, AbstractVariable):
             return x
         
-        return Param(raw_value=x, metadata=metadata)
+        return Param(x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
     if raw_value is not dataclasses.MISSING:
@@ -469,7 +465,7 @@ def derived(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Derived(raw_value=x, fn=fn, metadata=metadata)
+        return Derived(x, fn=fn, metadata=metadata)
 
     field_kwargs = {"converter": converter}
     if raw_value is not dataclasses.MISSING:
@@ -500,7 +496,7 @@ def constrained(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Constrained(value=x, constraint=constraint, metadata=metadata)
+        return Constrained(x, constraint=constraint, metadata=metadata)
 
     field_kwargs = {"converter": converter}
     if default_value is not dataclasses.MISSING:
@@ -510,19 +506,18 @@ def constrained(
 
 
 def physical(
-    default_base: Any = dataclasses.MISSING,
+    default_variable: Any = dataclasses.MISSING,
     scale: Any = 1.0,
     *,
-    constraint: AbstractConstraint | None = None,
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a dataclass field for a Parax `Physical` parameter.
+    Specifies a dataclass field for a Parax `Physical` parameter wrapper.
 
     Args:
-        default_base: The default base array value. If omitted, this field becomes required.
+        default_variable: The default underlying variable (e.g. `Constrained`, `Param`, or Array). 
+            If omitted, this field becomes required by the user during instantiation.
         scale: Linear preconditioning factor or unit string (e.g., "mm").
-        constraint: A Parax constraint defining base bounds and mappings.
         metadata: Additional static metadata to store.
         
     Returns:
@@ -531,12 +526,13 @@ def physical(
     if metadata is None: metadata = {}
 
     def converter(x: Any) -> AbstractVariable:
-        if isinstance(x, AbstractVariable):
+        # Avoid double-wrapping if the user passes an already instantiated Physical
+        if isinstance(x, Physical):
             return x
-        return Physical(base_value=x, scale=scale, constraint=constraint, metadata=metadata)
+        return Physical(x, scale=scale, metadata=metadata)
 
     field_kwargs = {"converter": converter}
-    if default_base is not dataclasses.MISSING:
-        field_kwargs["default"] = default_base
+    if default_variable is not dataclasses.MISSING:
+        field_kwargs["default"] = default_variable
         
     return eqx.field(**field_kwargs)

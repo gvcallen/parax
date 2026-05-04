@@ -151,8 +151,3 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
     def unwrap(self) -> T:
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
-    
-    def __getattr__(self, name):
-        if hasattr(self.tree, name):
-            return getattr(self.tree, name)
-        return super().__getattribute__(name)    

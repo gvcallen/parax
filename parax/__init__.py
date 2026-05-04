@@ -7,18 +7,6 @@ except PackageNotFoundError:
 
 from parax.replace import tree_replace as tree_replace
 
-from parax.constant import (
-    AbstractConstant as AbstractConstant,
-)
-
-from parax.tagged import (
-    AbstractTagged as AbstractTagged,
-)
-
-from parax.bounded import (
-    AbstractBounded as AbstractBounded,
-)
-
 from parax.unwrappables import (
     AbstractUnwrappable as AbstractUnwrappable,
     Frozen as Frozen,
@@ -63,6 +51,7 @@ from parax.filters import (
     is_param_like as is_param_like,
     is_unwrappable as is_unwrappable,
     is_bounded as is_bounded,
+    is_probabilistic as is_probabilistic,
     is_constraint as is_constraint,
     is_distribution as is_distribution,
     is_bijector as is_bijector,
@@ -80,6 +69,7 @@ from parax import (
     constant as constant,
     tagged as tagged,
     bounded as bounded,
+    probabilistic as probabilistic,
     unwrappables as unwrappables,
     variables as variables,
     constraints as constraints,

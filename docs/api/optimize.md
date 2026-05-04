@@ -1,1 +1,0 @@
-::: parax.optimize.minimize_scipy

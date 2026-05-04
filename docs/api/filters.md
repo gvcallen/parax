@@ -10,6 +10,8 @@
 
 ::: parax.is_bounded
 
+::: parax.is_probabilistic
+
 ::: parax.is_constraint
 
 ::: parax.is_distribution

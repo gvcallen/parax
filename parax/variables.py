@@ -220,7 +220,7 @@ class Derived(AbstractVariable, AbstractHasMetadata):
         return self.fn(self.raw_value)
 
 
-class Constrained(AbstractVariable, AbstractBounded, AbstractHasMetadata):
+class Constrained(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
     """
     A parameter bounded by a `parax.AbstractConstraint`.
 
@@ -291,19 +291,19 @@ class Constrained(AbstractVariable, AbstractBounded, AbstractHasMetadata):
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    def unwrap_from_base(self, base: Array) -> Array:
+    def evaluate_base(self, base: Array) -> Array:
         return base
     
-    def replace_from_base(self, base: Array) -> Array:
+    def replace_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.unwrap_from_base(self.base)
+        return self.evaluate_base(self.base)
     
 
-class Physical(AbstractVariable, AbstractBounded, AbstractHasMetadata):
+class Physical(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
     """
     A physically scaled and constrained parameter.
 
@@ -388,16 +388,16 @@ class Physical(AbstractVariable, AbstractBounded, AbstractHasMetadata):
         upper = jnp.broadcast_to(constraint_bounds[1], self.raw_value.shape)
         return lower, upper
     
-    def unwrap_from_base(self, base: Array) -> Array:
+    def evaluate_base(self, base: Array) -> Array:
         return self.scale * base
     
-    def replace_from_base(self, base: Array) -> Array:
+    def replace_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.unwrap_from_base(self.base)
+        return self.evaluate_base(self.base)
 
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:

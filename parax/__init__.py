@@ -28,6 +28,9 @@ from parax.metadata import (
 
 from parax.bounded import (
     AbstractBounded as AbstractBounded,
+    tree_base as tree_base,
+    tree_bounds as tree_bounds,
+    tree_replace_base as tree_replace_base,
 )
 
 from parax.variables import (

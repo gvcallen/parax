@@ -54,9 +54,7 @@ In the above example, `prx.Computed` operates on the whole PyTree, while `prx.De
 
 ## Documentation
 
-Documentation is available [here](https://gvcallen.github.io/parax/).
-
-Examples can be found on basic model setup and optimization, as well as bounded optimization.
+Documentation is available [here](https://gvcallen.github.io/parax/), demonstrating using **Parax** in real optimization workflows (unconstrained/bounded).
 
 ## Related
 

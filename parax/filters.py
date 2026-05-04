@@ -25,25 +25,9 @@ def is_constant(x: Any) -> TypeGuard[AbstractConstant]:
     """
     Returns True if `x` is an instance of `parax.AbstractConstant`.
     
-    Useful for partitioning a model to freeze standard parameters.
+    Useful as `is_leaf` when partitioning a model to freeze standard parameters.
     """
     return isinstance(x, AbstractConstant)
-
-
-def is_not_constant(x: Any) -> bool:
-    """
-    Returns True if `x` is not an instance of `parax.AbstractConstant`.
-    
-    Useful as the inverse filter for identifying free/active parameters.
-    """
-    return not isinstance(x, AbstractConstant)
-
-
-def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
-    """
-    Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
-    """
-    return isinstance(x, AbstractUnwrappable)
 
 
 def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
@@ -51,6 +35,14 @@ def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
     Returns True if `x` is an instance of `parax.AbstractVariable`.
     """
     return isinstance(x, AbstractVariable)
+
+
+def is_param_like(x: Any) -> bool:
+    """
+    Returns True if `x` is an instance of `parax.AbstractVariable`
+    or returns True for `eqx.is_inexact_array`.
+    """
+    return isinstance(x, AbstractVariable) or eqx.is_inexact_array(x)
 
 
 def is_constrained(x: Any) -> TypeGuard[AbstractConstrained]:
@@ -68,6 +60,13 @@ def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
     Returns True if `x` is an instance of `parax.AbstractConstraint`.
     """
     return isinstance(x, AbstractConstraint)
+
+
+def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
+    """
+    return isinstance(x, AbstractUnwrappable)
 
 
 def is_distribution(x: Any) -> TypeGuard[AbstractDistribution]:

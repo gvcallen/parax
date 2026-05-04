@@ -10,9 +10,9 @@
 
 ## Features
 
-- Derived/constrained/fixed parameters with array-like behaviour
-- Computed/parameterized/frozen PyTrees via unwrapping
-- Built-in constraints and metadata support
+- Derived/fixed parameters
+- Computed/frozen PyTrees and callable parameterizations
+- Array constraints and metadata
 - Filtering and manipulation tools
 
 ## Installation
@@ -85,7 +85,7 @@ assert jnp.allclose(unwrapped['b']['y'], jnp.exp(20.0))
 
 ## Example 3: Optimizing an eqx.Model using Optimistix
 
-In this example, we define a damped pendulum model using `equinox.Module`. We set the first parameter as unconstrained, the second as only positive with a scale of "mm", and the third as a fixed variable.
+In this example, we define a damped pendulum model using `equinox.Module`. The first parameter is initialized with standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later.
 
 ```python
 import jax
@@ -93,25 +93,27 @@ import jax.numpy as jnp
 import jax.random as jr
 import equinox as eqx
 import optimistix as optx
-from dataclasses import replace
-import parax as prx 
+import dataclasses
+import parax as prx
 
 class DampedPendulum(eqx.Module):
-    # Unconstrained variable (creates a prx.Param).
-    friction: prx.Variable = prx.param(0.1) 
+    # Non-default parameters
+    k: prx.ParamLike
+    friction: prx.ParamLike
     
-    # Constrained variable (creates a prx.Physical)
-    length: prx.Variable = prx.physical(9.81, scale='mm', constraint=prx.Positive())
-
-    # Dummy variable (to be fixed)
-    k: prx.Variable = prx.param(1.0)
+    # Default physical parameters (creates a prx.Physical)
+    length: prx.ParamLike = prx.physical(scale='mm', constraint=prx.Positive())
 
     def __call__(self, state):
         return self.k * state * self.friction / self.length
     
 # Create our model and fix the multiplier
-initial_model = DampedPendulum()
-initial_model = replace(initial_model, k=prx.Fixed(initial_model.k))
+initial_model = DampedPendulum(
+    k=jnp.array(1.0),
+    friction=prx.Param(0.1, metadata={'hello': 'world'}),
+    length=9.81,
+)
+initial_model = dataclasses.replace(initial_model, k=prx.Fixed(initial_model.k))
 
 # Partition the model, stopping at any constants e.g. `prx.Fixed` variables and `prx.Frozen` layers.
 # Then, define the loss function.

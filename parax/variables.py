@@ -11,7 +11,7 @@ import dataclasses
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree, ArrayLike
+from jaxtyping import Array, PyTree, Inexact, ArrayLike
 import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
@@ -100,6 +100,9 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     def __round__(self, ndigits: int = 0) -> Array: return jnp.round(self.value, ndigits) 
 
 
+ParamLike = AbstractVariable | Inexact[Array, "..."]
+
+
 class AbstractConstrained(AbstractVariable, strict=True):
     """
     The abstract interface for a constrained variable.
@@ -170,9 +173,9 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     `.bounds`, and `.metadata` to the user as if it weren't wrapped at all.
     """
     #: The underlying variable that is being fixed.
-    variable: AbstractVariable | ArrayLike
+    variable: ParamLike
 
-    def __init__(self, variable: AbstractVariable | ArrayLike):
+    def __init__(self, variable: ParamLike):
         """
         Args:
             variable: The variable or array to freeze. Safely absorbs nested 
@@ -198,7 +201,7 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
         return super().__getattribute__(name)
 
 
-def as_fixed(value: AbstractVariable | ArrayLike) -> Fixed:
+def as_fixed(value: ParamLike) -> Fixed:
     """
     Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
 
@@ -545,6 +548,3 @@ def physical(
         field_kwargs["default"] = default_base
         
     return eqx.field(**field_kwargs)
-
-
-Variable = AbstractVariable | ArrayLike

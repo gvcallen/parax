@@ -29,17 +29,16 @@ from parax.variables import (
     AbstractVariable as AbstractVariable,
     AbstractConstrained as AbstractConstrained,
     Param as Param,
+    Fixed as Fixed,
     Derived as Derived,
     Constrained as Constrained,
     Physical as Physical,
-    Fixed as Fixed,
-    Variable as Variable,
+    ParamLike as ParamLike,
     param as param,
     derived as derived,
     constrained as constrained,
     physical as physical,
     as_param as as_param,
-    as_fixed as as_fixed,
     map_variables as map_variables,
     map_variables_with_path as map_variables_with_path,
 )
@@ -59,14 +58,11 @@ from parax.constraints import (
 
 from parax.filters import (
     is_constant as is_constant,
-    is_not_constant as is_not_constant,
     is_unwrappable as is_unwrappable,
     is_variable as is_variable,
+    is_param_like as is_param_like,
     is_constrained as is_constrained,
     is_constraint as is_constraint,
     is_distribution as is_distribution,
     is_bijector as is_bijector,
 )
-
-# from parax import optimize as optimize
-# from parax import experimental as experimental

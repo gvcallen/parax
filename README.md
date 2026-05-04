@@ -10,12 +10,11 @@
 
 ## Features
 
-- Derived parameters
+- Derived/constrained parameters with metadata
 - Computed PyTrees and callable parameterizations
-- Built-in constraints system and parameter metadata
-- Interfaces for PyTree and parameter fixing, bounds, an
+- Interfaces for PyTree/parameter fixing, bounds and priors
 - Filtering and manipulation tools
-- Wrapper for bounded minimization using SciPy
+- Built-in wrapper for SciPy bounded minimization
 
 ## Installation
 Parax can be installed using pip:

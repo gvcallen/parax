@@ -56,7 +56,7 @@ In the above example, `prx.Computed` operates on the whole PyTree, while `prx.De
 
 Documentation is available [here](https://gvcallen.github.io/parax/).
 
-- For a guide on settup up a model using Equinox and optimizing it using Optimistix, see ``
+Examples can be found on basic model setup and optimization, as well as bounded optimization.
 
 ## Related
 

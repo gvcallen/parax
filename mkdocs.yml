@@ -53,6 +53,7 @@ nav:
     - Constant: api/constant.md
     - Tagged: api/tagged.md
     - Bounded: api/bounded.md
+    - Probabilistic: api/probabilistic.md
     - Unwrappables: api/unwrappables.md
     - Variables: api/variables.md
     - Constraints: api/constraints.md

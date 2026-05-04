@@ -319,7 +319,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
 
 class Physical(AbstractVariable):
     """
-    A physical variable with a scale.
+    A physical variable with a scale or unit.
     
     Multiplies the underlying `parax.ParamLike` by an `ArrayLike` float or unit.
 

@@ -4,15 +4,15 @@
 
 ::: parax.Param
 
+::: parax.Fixed
+
 ::: parax.Derived
 
 ::: parax.Constrained
 
 ::: parax.Physical
 
-::: parax.Fixed
-
-::: parax.Variable
+::: parax.ParamLike
 
 ::: parax.param
 

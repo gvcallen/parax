@@ -8,8 +8,9 @@ import equinox as eqx
 from jax.flatten_util import ravel_pytree
 
 from parax.unwrappables import unwrap
-from parax.bounded import tree_base, tree_bounds, tree_update_from_base, tree_transform_to_physical
 from parax.filters import is_constant
+
+import parax.bounded as bounded
 
 def minimize_scipy(
     fn: Callable[[Any, tuple], jax.Array], 
@@ -59,8 +60,8 @@ def minimize_scipy(
             - The `scipy.optimize.OptimizeResult` object containing solver metrics.
     """
     # 1. Extract the numerical base space and bounds
-    base_model = tree_base(y0)
-    lower_model, upper_model = tree_bounds(y0)
+    base_model = bounded.tree_base(y0)
+    lower_model, upper_model = bounded.tree_bounds(y0)
 
     gradient_free_methods = {'nelder-mead', 'powell', 'cobyla'}
     use_grad = use_grad and (method.lower() not in gradient_free_methods)
@@ -83,7 +84,7 @@ def minimize_scipy(
     def flat_objective(flat_x):
         base_p = unflatten_fn(flat_x)
         current_base_model = eqx.combine(base_p, static)
-        projected_model = tree_transform_to_physical(current_base_model, y0)
+        projected_model = bounded.tree_transform_to_physical(current_base_model, y0)
         full_model = unwrap(projected_model)
         return fn(full_model, args)
        
@@ -116,6 +117,6 @@ def minimize_scipy(
     # 7. Reconstruct the final optimized model
     opt_base_params = unflatten_fn(jnp.asarray(result.x))
     opt_base_model = eqx.combine(opt_base_params, static)
-    opt_model = tree_update_from_base(y0, opt_base_model)
+    opt_model = bounded.tree_update_from_base(y0, opt_base_model)
     
     return opt_model, result

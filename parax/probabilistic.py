@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from distreqx.distributions import AbstractDistribution, ImproperUniform
+from distreqx.distributions import AbstractDistribution
 
 T = TypeVar("T")
 
@@ -24,6 +24,9 @@ class AbstractProbabilistic(eqx.Module, Generic[T]):
     however this may be generalized in the future.
     
     Used as a type check for `parax.is_probabilistic`. 
+
+    Attributes:
+        distribution: The probability distribution associated with this PyTree node.
     """
     distribution: eqx.AbstractVar[AbstractDistribution]
 
@@ -31,7 +34,15 @@ class AbstractProbabilistic(eqx.Module, Generic[T]):
 def tree_distribution(tree: PyTree) -> PyTree:
     """
     Extracts the probability distributions of a PyTree.
+    
     Standard arrays default to `distreqx.ImproperUniform`.
+
+    Args:
+        tree: The PyTree model containing probabilistic nodes or standard arrays.
+
+    Returns:
+        A PyTree of the exact same structure containing the extracted 
+        probability distributions.
     """
     from parax.filters import is_probabilistic
 
@@ -39,6 +50,7 @@ def tree_distribution(tree: PyTree) -> PyTree:
         if is_probabilistic(x):
             return x.distribution
         if eqx.is_inexact_array(x):
+            from distreqx.distributions import ImproperUniform
             return ImproperUniform(shape=jnp.shape(x))
         return x
 

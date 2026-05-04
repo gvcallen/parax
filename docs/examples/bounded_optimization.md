@@ -1,6 +1,6 @@
 # Bounded Optimization (JAXopt)
 
-Parax's `parax.bounded` module caters for easy extraction of bounds from models containing `parax.AbstractBounded` PyTrees (such as `parax.Constrained` and `parax.Physical` variables), while also handling raw arrays alongside them.
+Parax's `parax.bounded` module caters for easy extraction of bounds from models containing `parax.AbstractBounded` PyTrees (such as `parax.Constrained` and `parax.Physical` variables), while also handling raw arrays alongside them. This is done projecting values to a *base* space using `parax.bounded.tree_base`, and then updating the original model after optimization using `parax.bounded.tree_update`.
 
 Below is a minimal example demonstrating bounded optimization using `jaxopt.ScipyBoundedMinimize`.
 
@@ -38,11 +38,7 @@ upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 def objective(p, static_structure):
     # Recombine the base state
     current_base = eqx.combine(p, static_structure)
-    
-    # Project to physical space and resolve Parax nodes
-    projected = bounded.tree_transform_to_physical(current_base, initial_model)
-    model = prx.unwrap(projected)
-    
+    model = prx.unwrap(current_base)
     return model()
 
 # 5. Run the optimization
@@ -55,8 +51,8 @@ results = solver.run(
 
 # 6. Reconstruct the final optimized model
 opt_base = eqx.combine(results.params, static)
-final_model = bounded.tree_update_from_base(initial_model, opt_base)
+final_model = bounded.tree_update(initial_model, opt_base)
 
-print(f"Optimized x: {final_model.x}") # ~3.0
-print(f"Optimized y: {final_model.y}") # ~2.0
+print(f"Optimized x: {final_model.x.value}") # ~3.0
+print(f"Optimized y: {final_model.y.value}") # ~2.0
 ```

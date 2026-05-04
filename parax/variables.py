@@ -16,6 +16,7 @@ import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
 from parax.unwrappables import AbstractUnwrappable, as_frozen
+from parax.bounded import AbstractBounded
 from parax.constant import AbstractConstant
 from parax.metadata import AbstractHasMetadata
 
@@ -101,31 +102,6 @@ class AbstractVariable(AbstractUnwrappable[Array]):
 
 
 ParamLike = AbstractVariable | Inexact[Array, "..."]
-
-
-class AbstractConstrained(AbstractVariable, strict=True):
-    """
-    The abstract interface for a constrained variable.
-
-    Used as a type check for `parax.is_constrained`. Exposes a multi-stage 
-    evaluation pipeline (`raw` -> `base` -> `value`) to support bounded optimizers.
-    """
-    #: The underlying constraint
-    constraint: eqx.AbstractVar[AbstractConstraint]
-
-    #: The value in constrained "base" space i.e., after the physical constraint 
-    #: is applied, but before any secondary transformations (like physical scaling).
-    #: Crucial for bounded optimizers tracking physical limits.
-    base_value: eqx.AbstractVar[Array]
-
-    #: Returns the final output value from a given base value.
-    @abstractmethod
-    def value_from_base(self, base_value: Array) -> Array:
-        pass
-
-    @property
-    def value(self) -> Array:
-        return self.value_from_base(self.base_value)
 
 
 class Param(AbstractVariable, AbstractHasMetadata):
@@ -244,7 +220,7 @@ class Derived(AbstractVariable, AbstractHasMetadata):
         return self.fn(self.raw_value)
 
 
-class Constrained(AbstractConstrained, AbstractHasMetadata):
+class Constrained(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
     """
     A parameter bounded by a `parax.AbstractConstraint`.
 
@@ -305,14 +281,29 @@ class Constrained(AbstractConstrained, AbstractHasMetadata):
         self.metadata = metadata if metadata is not None else {}
        
     @property
-    def base_value(self) -> Array:
+    def base(self) -> Array:
         return self.constraint.bijector.forward(self.raw_value)
     
-    def value_from_base(self, base_value: Array):
-        return base_value
+    @property
+    def bounds(self) -> tuple[Array, Array]:
+        constraint_bounds = self.constraint.bounds
+        lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
+        upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
+        return lower, upper
+    
+    def convert(self, base: Array) -> Array:
+        return base
+    
+    def replace(self, base: Array) -> Array:
+        new_raw = self.constraint.bijector.inverse(base)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
+    
+    @property
+    def value(self) -> Array:
+        return self.convert(self.base)
     
 
-class Physical(AbstractConstrained, AbstractHasMetadata):
+class Physical(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
     """
     A physically scaled and constrained parameter.
 
@@ -387,16 +378,27 @@ class Physical(AbstractConstrained, AbstractHasMetadata):
         self.metadata = metadata if metadata is not None else {}
 
     @property
-    def base_value(self) -> Array:
-        """
-        The value in base bounded space (before physical scaling).
-        Returns the constraint's bijector applied to the raw value.
-        """
+    def base(self) -> Array:
         return self.constraint.bijector.forward(self.raw_value)
+
+    @property
+    def bounds(self) -> tuple[Array, Array]:
+        constraint_bounds = self.constraint.bounds
+        lower = jnp.broadcast_to(constraint_bounds[0], self.raw_value.shape)
+        upper = jnp.broadcast_to(constraint_bounds[1], self.raw_value.shape)
+        return lower, upper
     
-    def value_from_base(self, base_value: Array) -> Array:
-        return base_value * self.scale
+    def convert(self, base: Array) -> Array:
+        return self.scale * base
     
+    def replace(self, base: Array) -> Array:
+        new_raw = self.constraint.bijector.inverse(base)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
+    
+    @property
+    def value(self) -> Array:
+        return self.convert(self.base)
+
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
     """

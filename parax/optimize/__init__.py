@@ -1,0 +1,1 @@
+from parax.optimize.scipy import minimize_scipy as minimize_scipy

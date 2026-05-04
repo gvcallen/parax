@@ -1,0 +1,144 @@
+"""
+An abstract interface for PyTrees that have "bounds".
+"""
+from abc import abstractmethod
+import jax
+import jax.numpy as jnp
+from typing import TypeVar, Generic
+import equinox as eqx
+from jaxtyping import PyTree
+
+Base = TypeVar("Base")
+Physical = TypeVar("Physical")
+
+class AbstractBounded(eqx.Module, Generic[Base]):
+    """
+    The abstract interface for a bounded PyTree.
+
+    Makes use of the concept of a "base" space,
+    where bounded optimizers operate, and a
+    "physical" space, where the forward pass operates.
+    
+    Used as a type check for `parax.is_bounded`. 
+    """
+    @property
+    @abstractmethod
+    def base(self) -> Base:
+        """Returns the current PyTree in base space."""
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def bounds(self) -> tuple[Base, Base]:
+        """
+        Returns the current PyTree bounds in base space.
+        
+        Must have a matching PyTree structure as `self.base`.
+        """
+        raise NotImplementedError    
+  
+    @abstractmethod
+    def convert(self, base: Base) -> Physical:
+        """
+        Converts a new base PyTree to a physical PyTree.
+        """
+        pass
+    
+    @abstractmethod
+    def replace(self, base: Base) -> "AbstractBounded":
+        """
+        Returns a new instance of this object with
+        a new base PyTree.
+        """
+        pass
+    
+
+def tree_bounded_base(model: PyTree) -> PyTree:
+    """
+    Extracts a PyTree of base values from a model. 
+    Standard inexact arrays are left intact.
+    """
+    from parax.filters import is_bounded
+    def _extract(x):
+        if not is_bounded(x):
+            return x
+        return x.base
+
+    return jax.tree_util.tree_map(_extract, model, is_leaf=is_bounded)
+
+
+def tree_bounded_lower(tree: PyTree) -> PyTree:
+    """
+    Extracts the lower bounds of a potentially bounded
+    PyTree in base space. Standard arrays default to (-inf, inf).
+    """
+    from parax.filters import is_bounded
+
+    def _get_lower(x):
+        if is_bounded(x):
+            return x.bounds[0]
+        if eqx.is_inexact_array(x):
+            return jnp.full_like(x, -jnp.inf)
+        return x
+
+    lower = jax.tree_util.tree_map(_get_lower, tree, is_leaf=is_bounded)
+    return lower
+
+
+def tree_bounded_upper(tree: PyTree) -> PyTree:
+    """
+    Extracts the upper bounds of a potentially bounded
+    PyTree in base space. Standard arrays default to (-inf, inf).
+    """
+    from parax.filters import is_bounded
+
+    def _get_upper(x):
+        if is_bounded(x):
+            return x.bounds[1]
+        if eqx.is_inexact_array(x):
+            return jnp.full_like(x, jnp.inf)
+        return x
+
+    upper = jax.tree_util.tree_map(_get_upper, tree, is_leaf=is_bounded)
+    return upper
+
+
+def tree_bounded_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
+    """
+    Extracts two PyTrees (lower and upper) representing the boundaries of 
+    the base space. Standard arrays default to (-inf, inf).
+    """
+    return tree_bounded_lower(tree), tree_bounded_upper(tree)
+
+
+def tree_bounded_replace(model: PyTree, base_model: PyTree) -> PyTree:
+    """
+    Takes an updated base-space PyTree and injects it back into the 
+    original bounded model structure using `replace_from_base`.
+    """
+    from parax.filters import is_bounded
+
+    def _rebuild(orig, base):
+        if is_bounded(orig):
+            return orig.replace(base)
+        return base
+        
+    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_bounded)
+
+
+def tree_bounded_convert(base_model: PyTree, original_model: PyTree) -> PyTree:
+    """
+    Takes a base-space PyTree and projects it to the external space.
+    """
+    from parax.filters import is_bounded
+
+    def evaluate_base(orig_node, base_node):
+        from parax.filters import is_bounded
+        if is_bounded(orig_node):
+            return orig_node.convert(base_node)
+        return base_node
+        
+    evaluated_model = jax.tree_util.tree_map(
+        evaluate_base, original_model, base_model, is_leaf=is_bounded
+    )
+    return evaluated_model

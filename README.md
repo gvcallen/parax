@@ -10,10 +10,11 @@
 
 ## Features
 
-- Derived/fixed parameters
-- Computed/frozen PyTrees and callable parameterizations
-- Array constraints and metadata
+- Derived/constrained parameters with metadata
+- Computed PyTrees and callable parameterizations
+- Interfaces for PyTree/parameter fixing, bounds and priors
 - Filtering and manipulation tools
+- Built-in wrapper for SciPy bounded minimization
 
 ## Installation
 Parax can be installed using pip:
@@ -30,9 +31,13 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Overview
 
-**Parax** aims to provide a foundation for "parametric modeling", i.e. modeling with a focus on the concept of a parameter as a *derived array with metadata*. This means supporting parameterizations, constraints, units, and arbitrary metadata, which are needed in both machine learning and scientific modeling.
+**Parax** aims to provide a foundation for "parametric modeling", i.e. modeling with a focus on the concept of a parameter as a *derived array with metadata*. This means supporting parameterizations, constraints, bounds, priors, units, and arbitrary metadata, which are needed in both machine learning and scientific modeling.
 
-Although Parax can be used in any JAX code, it places emphasis on interoperatibility with [Equinox](https://github.com/patrick-kidger/equinox). The library's design was inspired by several others, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
+**Parax** accomplishes the above in a general manner by providing a common set of *abstract interfaces* along with filters and tree utilities that use these interfaces. The goal is then to provide a range of tools and concrete classes to minimize boilerplate for users, while still keeping the library extendable and opt-in.
+
+Although **Parax** can be used in any JAX code, it places emphasis on interoperatibility with [Equinox](https://github.com/patrick-kidger/equinox). For example, `parax.AbstractConstant` and `parax.is_constant` allow easy partitioning of model parameters using `eqx.partition`, with `parax.Fixed` and `parax.Frozen` providing concrete implementations.
+
+The library's design was inspired by several others who deserve mention, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).
 
 ## Example 1: Constrained Parameters
 
@@ -88,7 +93,7 @@ prx.unwrap(wrapped)
 
 ## Example 3: Optimizing an eqx.Model using Optimistix
 
-In this example, we define a damped pendulum model using `equinox.Module`. The first parameter is initialized with a standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later.
+In this example, we define a damped pendulum model using `equinox.Module` and optimize it using `optimistix`. The first parameter is initialized with a standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later. Note that for bounded optimization, you can use the built-in wrapper at `parax.optimize.minimize_scipy`.
 
 ```python
 import jax

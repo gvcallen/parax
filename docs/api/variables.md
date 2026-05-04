@@ -4,13 +4,13 @@
 
 ::: parax.Param
 
-::: parax.param
+::: parax.Fixed
+
+::: parax.Derived
 
 ::: parax.as_param
 
-::: parax.Fixed
-
-::: parax.as_fixed
+::: parax.ParamLike
 
 ::: parax.Derived
 

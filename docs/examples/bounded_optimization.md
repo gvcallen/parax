@@ -11,24 +11,26 @@ import jaxopt
 import parax as prx
 import parax.bounded as bounded
 
-# 1. Define a trivial model with bounded parameters
+# 1. Define a trivial model with bounded parameters.
 class SimpleModel(eqx.Module):
-    x: prx.ParamLike = prx.constrained(0.0, constraint=prx.Interval(-5.0, 5.0))
-    y: prx.ParamLike = prx.constrained(0.1, constraint=prx.Positive())
+    # We can applying scaling (or any transformation)
+    # and the bounds apply in the space we define them
+    x: prx.ParamLike = prx.constrained(0.0, prx.Interval(-5.0, 5.0))
+    y: prx.ParamLike = prx.physical(prx.Constrained(1.0, prx.Positive()), scale=1e-3)
 
     def __call__(self):
-        # Dummy objective: minimize (x - 3)^2 + (y - 2)^2
-        return (self.x - 3.0)**2 + (self.y - 2.0)**2
+        # Dummy objective: minimize (x - 3e-3)^2 + 1e-6 * (y - 2)^2
+        return (self.x - 3.0)**2 + 1e6 * (self.y - 2.0e-3)**2
 
 initial_model = SimpleModel()
 
 # 2. Extract base values and structural bounds for the optimizer
-base_model = bounded.tree_base(initial_model)
+initial_base = bounded.tree_base(initial_model)
 lower_bounds, upper_bounds = bounded.tree_bounds(initial_model)
 
 # 3. Partition out static metadata
 filter_spec = eqx.is_inexact_array
-params, static = eqx.partition(base_model, filter_spec, is_leaf=prx.is_constant)
+params, static = eqx.partition(initial_base, filter_spec, is_leaf=prx.is_constant)
 lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 
@@ -40,7 +42,7 @@ def objective(p, static_structure):
     return model()
 
 # 5. Run the optimization
-solver = jaxopt.ScipyBoundedMinimize(fun=objective, method="L-BFGS-B")
+solver = jaxopt.ScipyBoundedMinimize(fun=objective)
 results = solver.run(
     init_params=params, 
     bounds=(lower, upper), 

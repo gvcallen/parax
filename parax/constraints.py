@@ -159,8 +159,8 @@ class Interval(AbstractConstraint):
             lower: The exclusive lower bound.
             upper: The exclusive upper bound.
         """
-        self.lower = jnp.asarray(lower)
-        self.upper = jnp.asarray(upper)
+        self.lower = jnp.asarray(lower, dtype=float)
+        self.upper = jnp.asarray(upper, dtype=float)
 
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:

@@ -315,7 +315,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
     @property
     def value(self) -> Array:
         return self.raw_value
-    
+
 
 class Physical(AbstractVariable):
     """
@@ -331,7 +331,7 @@ class Physical(AbstractVariable):
         variable: The underlying parameter or array being scaled.
         scale: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
     """
-    raw_value: ParamLike
+    raw_value: ParamLike = eqx.field(converter=_as_param_like)
     scale: ArrayLike = eqx.field(converter=Fixed)
 
     def __init__(
@@ -361,7 +361,8 @@ class Physical(AbstractVariable):
     @property
     def value(self) -> Array:
         """Returns the physically scaled value."""
-        return self.scale * self.raw_value
+        from parax.converters import as_free
+        return as_free(self.scale) * self.raw_value
 
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:

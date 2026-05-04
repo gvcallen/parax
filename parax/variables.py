@@ -405,7 +405,7 @@ def param(
     Specifies a dataclass field for a standard Parax `Param`.
 
     Args:
-        `default`: The default value. If omitted, this field becomes required 
+        default: The default value. If omitted, this field becomes required 
             by the user during instantiation.
         metadata: Additional static metadata to store.
         
@@ -429,15 +429,14 @@ def param(
 
 def derived(
     fn: Callable,
-    raw_value: ParamLike = dataclasses.MISSING,
+    default: ParamLike = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.
 
     Args:
         fn: The callable used to transform the raw value.
-        raw_value: The default raw value. If omitted, this field becomes required.
-        metadata: Additional static metadata to store.
+        default: The default raw value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -448,23 +447,22 @@ def derived(
         return Derived(x, fn=fn)
 
     field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
         
     return eqx.field(**field_kwargs)
 
 
 def constrained(
-    default_value: ParamLike = dataclasses.MISSING,
+    default: ParamLike = dataclasses.MISSING,
     constraint: AbstractConstraint | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Constrained` variable.
 
     Args:
-        default_value: The default constrained value. If omitted, this field becomes required.
+        default: The default constrained value. If omitted, this field becomes required.
         constraint: The abstract constraint defining base bounds and mappings.
-        metadata: Additional static metadata to store.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -475,23 +473,22 @@ def constrained(
         return Constrained(x, constraint=constraint)
 
     field_kwargs = {"converter": converter}
-    if default_value is not dataclasses.MISSING:
-        field_kwargs["default"] = default_value
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
         
     return eqx.field(**field_kwargs)
 
 
 def random(
-    default_value: ParamLike = dataclasses.MISSING,
+    default: ParamLike = dataclasses.MISSING,
     distribution: AbstractDistribution | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Random` variable.
 
     Args:
-        default_value: The default value. If omitted, this field becomes required.
+        default: The default value. If omitted, this field becomes required.
         constraint: The abstract constraint defining base bounds and mappings.
-        metadata: Additional static metadata to store.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -502,24 +499,23 @@ def random(
         return Random(x, distribution=distribution)
 
     field_kwargs = {"converter": converter}
-    if default_value is not dataclasses.MISSING:
-        field_kwargs["default"] = default_value
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
         
     return eqx.field(**field_kwargs)
 
 
 def physical(
-    default_variable: ParamLike = dataclasses.MISSING,
+    default: ParamLike = dataclasses.MISSING,
     scale: Any = 1.0,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Physical` parameter wrapper.
 
     Args:
-        default_variable: The default underlying variable (e.g. `Constrained`, `Param`, or Array). 
+        default: The default underlying variable (e.g. `Constrained`, `Param`, or Array). 
             If omitted, this field becomes required by the user during instantiation.
         scale: Linear preconditioning factor or unit string (e.g., "mm").
-        metadata: Additional static metadata to store.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -531,7 +527,7 @@ def physical(
         return Physical(x, scale=scale)
 
     field_kwargs = {"converter": converter}
-    if default_variable is not dataclasses.MISSING:
-        field_kwargs["default"] = default_variable
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
         
     return eqx.field(**field_kwargs)

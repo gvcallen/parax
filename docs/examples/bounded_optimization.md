@@ -2,9 +2,7 @@
 
 Parax's `parax.bounded` module caters for easy extraction of bounds from models containing `parax.AbstractBounded` PyTrees (such as `parax.Constrained` and `parax.Physical` variables), while also handling raw arrays alongside them. This is done projecting values to a *base* space using `parax.bounded.tree_base`, and then updating the original model after optimization using `parax.bounded.tree_update`.
 
-Below is a minimal example demonstrating bounded optimization using `jaxopt.ScipyBoundedMinimize`.
-
-*A note on spaces*: While the optimizer itself operates in "base" space, `parax.bounded` allows for this space to be "sandwiched" in between a `raw` and a `physical` space. In other words, arbitrary transformations are allowed on either side. Mapping between spaces can then be done using `parax.bounded.tree_transform_to_physical` and `parax.bounded.tree_update_from_base`, as demonstrated below.
+Below is a minimal example demonstrating bounded optimization using `jaxopt.ScipyBoundedMinimize`. Note that, thanks to Parax's constraint system, the model is compatible with both unconstrained and bounded optimizers - it is up to use to decided if we want to optimize in *base space*, or in *unconstrained space* with unwrapping.
 
 ```python
 import jax.numpy as jnp

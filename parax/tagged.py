@@ -9,7 +9,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-class AbstractHasMetadata(eqx.Module):
+class AbstractTagged(eqx.Module):
     """
     An abstract interface for an Equinox module that carries arbitrary metadata.
 
@@ -20,9 +20,3 @@ class AbstractHasMetadata(eqx.Module):
     metadata: eqx.AbstractVar[dict[Any, Any]]
 
 
-class MetadataContainer(AbstractHasMetadata):
-    """
-    A general container for attaching arbitrary metadata to a PyTree.
-    """
-    tree: T
-    metadata: dict[Any, Any] = eqx.field(converter=dict, static=True, kw_only=True)

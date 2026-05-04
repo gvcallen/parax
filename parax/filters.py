@@ -16,7 +16,7 @@ from parax.bounded import AbstractBounded
 from parax.variables import AbstractVariable
 from parax.unwrappables import AbstractUnwrappable
 from parax.constraints import AbstractConstraint
-from parax.metadata import AbstractHasMetadata
+from parax.tagged import AbstractTagged
 
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector
@@ -29,6 +29,14 @@ def is_constant(x: Any) -> TypeGuard[AbstractConstant]:
     Useful as `is_leaf` when partitioning a model to freeze standard parameters.
     """
     return isinstance(x, AbstractConstant)
+
+
+def is_tagged(x: Any) -> TypeGuard[AbstractTagged]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractTagged`
+    (i.e. has metadata).
+    """
+    return isinstance(x, AbstractTagged)
 
 
 def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
@@ -79,8 +87,3 @@ def is_bijector(x: Any) -> TypeGuard[AbstractBijector]:
     Returns True if `x` is an instance of `distreqx.AbstractBijector`.
     """
     return isinstance(x, AbstractBijector)
-
-
-def has_metadata(x: Any) -> TypeGuard[AbstractHasMetadata]:
-    """Returns True if `x` is an instance of  `distreqx.AbstractHasMetadata`."""
-    return isinstance(x, AbstractHasMetadata)

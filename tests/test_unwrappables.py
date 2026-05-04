@@ -6,7 +6,6 @@ from parax.unwrappables import (
     Parameterized,
     Computed,
     Frozen,
-    as_frozen,
 )
 
 def test_standard_pytree_unwrap():
@@ -90,14 +89,3 @@ def test_frozen_as_free():
     
     freed = f.as_free()
     assert freed is tree
-
-def test_as_frozen_helper():
-    """Test the as_frozen wrapper acts as an identity if already frozen."""
-    tree = {"a": jnp.array(1.0)}
-    
-    f1 = as_frozen(tree)
-    assert isinstance(f1, Frozen)
-    
-    f2 = as_frozen(f1)
-    # Should return the exact same instance, not a new one
-    assert f2 is f1

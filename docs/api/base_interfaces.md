@@ -1,10 +1,6 @@
 ::: parax.AbstractConstant
 
-::: parax.as_free
-
-::: parax.AbstractHasMetadata
-
-::: parax.MetadataContainer
+::: parax.AbstractTagged
 
 ::: parax.AbstractBounded
 

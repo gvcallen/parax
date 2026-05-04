@@ -156,18 +156,3 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
         if hasattr(self.tree, name):
             return getattr(self.tree, name)
         return super().__getattribute__(name)    
-    
-
-def as_frozen(pytree: Union[T | Frozen[T]]) -> T:
-    """
-    Returns `pytree` wrapped in a `parax.Frozen` module, creating one if needed.
-
-    Args:
-        pytree: An arbitrary PyTree.
-
-    Returns:
-        A frozen version of the PyTree. If it is already frozen, returns it directly.
-    """    
-    if isinstance(pytree, Frozen):
-        return pytree
-    return Frozen(pytree)

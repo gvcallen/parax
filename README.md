@@ -12,7 +12,7 @@
 
 - Derived/constrained parameters with metadata
 - Computed PyTrees and callable parameterizations
-- Interfaces for PyTree and parameter fixing, bounds, distributions and more
+- Abstract interfaces for fixed, bounded, and probabilistic PyTrees and parameters
 - Filtering and manipulation tools
 - Built-in wrapper for SciPy bounded optimization
 

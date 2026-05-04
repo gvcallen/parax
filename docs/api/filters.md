@@ -1,5 +1,7 @@
 ::: parax.is_constant
 
+::: parax.is_tagged
+
 ::: parax.is_variable
 
 ::: parax.is_param_like

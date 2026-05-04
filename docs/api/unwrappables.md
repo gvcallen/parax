@@ -4,8 +4,6 @@
 
 ::: parax.Frozen
 
-::: parax.as_frozen
-
 ::: parax.Parameterized
 
 ::: parax.Computed

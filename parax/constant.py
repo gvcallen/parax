@@ -6,7 +6,7 @@ filter out fixed parameters and frozen layers during PyTree partitioning.
 """
 
 from abc import abstractmethod
-from typing import Generic, TypeVar, Union
+from typing import Generic, TypeVar
 
 import equinox as eqx
 
@@ -30,22 +30,3 @@ class AbstractConstant(eqx.Module, Generic[T]):
     def as_free(self) -> T:
         """Return the underlying value, stripping the constant tag."""
         pass
-
-
-def as_free(value: Union[AbstractConstant[T], T]) -> T:
-    """
-    Returns a freed version of `value` by stripping any constant wrappers.
-      
-    If `value` implements `AbstractConstant`, this calls `value.as_free()`.
-    Otherwise, it acts as a safe no-op and returns `value` unchanged. This
-    makes it safe to use directly within a `jax.tree_map` over mixed PyTrees.
-
-    Args:
-        value: An arbitrary value, potentially wrapped in an `AbstractConstant`.
-
-    Returns:
-        The freed parameter, or the original value if it was not fixed.
-    """    
-    if isinstance(value, AbstractConstant):
-        return value.as_free()
-    return value

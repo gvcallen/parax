@@ -15,10 +15,10 @@ from jaxtyping import Array, PyTree, Inexact, ArrayLike
 import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
-from parax.unwrappables import AbstractUnwrappable, as_frozen
+from parax.unwrappables import AbstractUnwrappable, Frozen
 from parax.bounded import AbstractBounded
 from parax.constant import AbstractConstant
-from parax.metadata import AbstractHasMetadata
+from parax.tagged import AbstractTagged
 
 class AbstractVariable(AbstractUnwrappable[Array]):
     """
@@ -104,7 +104,7 @@ class AbstractVariable(AbstractUnwrappable[Array]):
 ParamLike = AbstractVariable | Inexact[Array, "..."]
 
 
-class Param(AbstractVariable, AbstractHasMetadata):
+class Param(AbstractVariable, AbstractTagged):
     """
     A simple parameter with metadata.
     
@@ -120,21 +120,6 @@ class Param(AbstractVariable, AbstractHasMetadata):
     @property
     def value(self) -> Array:
         return self.raw_value
-    
-
-def as_param(value: Any) -> Param:
-    """
-    Returns `value` as a `parax.Param`, wrapping it if necessary.
-
-    Args:
-        value: An arbitrary value or array.
-
-    Returns:
-        The instantiated parameter.
-    """    
-    if isinstance(value, Param):
-        return value
-    return Param(raw_value=value)
 
 
 class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
@@ -175,24 +160,9 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
         if hasattr(self.variable, name):
             return getattr(self.variable, name)
         return super().__getattribute__(name)
+     
 
-
-def as_fixed(value: ParamLike) -> Fixed:
-    """
-    Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
-
-    Args:
-        value: An arbitrary variable or array-like object.
-
-    Returns:
-        A fixed version of the variable.
-    """    
-    if isinstance(value, Fixed):
-        return value
-    return Fixed(value)
-       
-
-class Derived(AbstractVariable, AbstractHasMetadata):
+class Derived(AbstractVariable, AbstractTagged):
     """
     A parameter whose value is dynamically derived from its raw state 
     via an arbitrary callable.
@@ -220,7 +190,7 @@ class Derived(AbstractVariable, AbstractHasMetadata):
         return self.fn(self.raw_value)
 
 
-class Constrained(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
+class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     """
     A parameter bounded by a `parax.AbstractConstraint`.
 
@@ -232,7 +202,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata)
     raw_value: Array = eqx.field(converter=jnp.asarray)
 
     #: The parameter constraint defining bounds and bijector mappings.
-    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
+    constraint: AbstractConstraint = eqx.field(converter=Frozen)
 
     #: Additional arbitrary metadata.
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
@@ -303,7 +273,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata)
         return self.convert(self.base)
     
 
-class Physical(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
+class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     """
     A physically scaled and constrained parameter.
 
@@ -315,10 +285,10 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractHasMetadata):
     raw_value: jax.Array = eqx.field(converter=jnp.asarray)
     
     #: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
-    scale: ArrayLike = eqx.field(converter=as_fixed)
+    scale: ArrayLike = eqx.field(converter=Fixed)
     
     #: The parameter constraint in base space.
-    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
+    constraint: AbstractConstraint = eqx.field(converter=Fixed)
     
     #: Additional arbitrary metadata.
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)

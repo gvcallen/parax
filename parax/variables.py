@@ -17,8 +17,11 @@ import equinox as eqx
 from parax.constraints import AbstractConstraint, RealLine
 from parax.unwrappables import AbstractUnwrappable, Frozen
 from parax.bounded import AbstractBounded
+from parax.probabilistic import AbstractProbabilistic
 from parax.constant import AbstractConstant
 from parax.tagged import AbstractTagged
+
+from distreqx.distributions import AbstractDistribution, ImproperUniform
 
 class AbstractVariable(AbstractUnwrappable[Array]):
     """
@@ -112,10 +115,10 @@ as well as standard JAX inexact arrays.
 
 class Param(AbstractVariable, AbstractTagged):
     """
-    A simple parameter with metadata.
-    
-    Represents an unconstrained, trainable parameter
-    with a single underlying `raw_value`.
+    A canonical parameter with metadata.
+
+    Represents an simple, trainable variable
+    with a single underlying `raw_value` and metadata.
 
     Attributes:
         raw_value: The raw value used by optimizers and samplers.
@@ -127,11 +130,17 @@ class Param(AbstractVariable, AbstractTagged):
     @property
     def value(self) -> Array:
         return self.raw_value
+    
+
+def _as_param_like(x):
+    if isinstance(x, Param):
+        return x
+    return jnp.asarray(x)
 
 
 class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     """
-    A wrapper to fix another variable and stop gradients.
+    A fixed variable.
     
     Implements `AbstractConstant` for structural filtering during partitioning.
      
@@ -160,10 +169,11 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
         return jax.lax.stop_gradient(value)
    
 
-class Derived(AbstractVariable, AbstractTagged):
+class Derived(AbstractVariable):
     """
-    A parameter whose value is dynamically derived from its raw state 
-    via an arbitrary callable.
+    A derived variable.
+     
+    The parameter's value is dynamically derived via an arbitrary callable.
 
     This is ideal for one-way transformations, projections, or normalizations 
     where a strict bijector (with an inverse) is not required or mathematically 
@@ -174,9 +184,8 @@ class Derived(AbstractVariable, AbstractTagged):
         fn: The callable used to transform the raw value.
         metadata: Additional arbitrary metadata.
     """
-    raw_value: Array = eqx.field(converter=jnp.asarray)
+    raw_value: ParamLike = eqx.field(converter=_as_param_like)
     fn: Callable = eqx.field(static=True)
-    metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     @property
     def value(self) -> Array:
@@ -185,42 +194,40 @@ class Derived(AbstractVariable, AbstractTagged):
         
         Returns the raw state transformed by the derivation function.
         """
-        return self.fn(self.raw_value)
+        return self.fn(jnp.asarray(self.raw_value))
 
 
-class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
+class Constrained(AbstractVariable, AbstractBounded[Array]):
     """
-    A parameter bounded by a `parax.AbstractConstraint`.
+    A constrained variable.
+    
+    The constraint is specified via a `parax.AbstractConstraint`.
 
     The constraint is automatically applied as a bijection mapping during 
-    evaluation. Exposes a `bounds` property via the constraint for integration 
-    with bounded optimizers.
+    evaluation. Implements the `parax.bounded.AbstractBounded` interface
+    for integration with bounded optimizers.
 
     Attributes:
         raw_value: The raw, unconstrained value mapping to the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
-        metadata: Additional arbitrary metadata.
     """
-    raw_value: Array = eqx.field(converter=jnp.asarray)
+    raw_value: ParamLike = eqx.field(converter=_as_param_like)
     constraint: AbstractConstraint = eqx.field(converter=Frozen)
-    metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     def __init__(
         self,
         value: Array | None = None,
         constraint: AbstractConstraint | None = None,
         *,
-        raw_value: Array | None = None,
-        metadata: dict | None = None,
+        raw_value: ParamLike | None = None,
     ):
         """
         Args:
             value: The desired output (constrained) value. If provided, the internal 
                 `raw_value` is computed dynamically via the constraint's inverse bijector. 
                 Mutually exclusive with `raw_value`.
-            constraint: A Parax constraint. If None, defaults to `RealLine` (unconstrained).
+            constraint: A Parax constraint. If None, defaults to `parax.RealLine` (unconstrained).
             raw_value: The unconstrained optimizer-space value. Mutually exclusive with `value`.
-            metadata: Additional static metadata.        
         """
         # Error checking
         if value is None and raw_value is None:
@@ -230,7 +237,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         
         # Array standardization
         if raw_value is not None:
-            raw_value = jnp.asarray(raw_value)
+            raw_value = _as_param_like(raw_value)
             shape = raw_value.shape
         else:
             value = jnp.asarray(value)
@@ -246,7 +253,6 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
 
         self.constraint = constraint
         self.raw_value = raw_value
-        self.metadata = metadata if metadata is not None else {}
        
     @property
     def base(self) -> Array:
@@ -261,22 +267,61 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    def transform_to_physical(self, base: Array) -> Array:
-        return base
-    
-    def update_from_base(self, base: Array) -> Array:
+    def update(self, base: Array) -> Array:
         from parax.converters import as_free
         new_raw = as_free(self.constraint).bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.transform_to_physical(self.base)
+        return self.base
     
 
-class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
+class Random(AbstractVariable, AbstractProbabilistic[Array]):
     """
-    A physically scaled wrapper around another parameter or array.
+    A random variable.
+    
+    The distribution is specified via a `distreqx.distributions.AbstractDistribution`.
+
+    The variable implements the `parax.probabilistic.AbstractProbabilistic` interface
+    to integrate with stochastic samplers and other algorithms.
+
+    Attributes:
+        raw_value: The raw un-probabilistic value.
+        distribution: The probability distribution of `raw_value`.
+    """
+    raw_value: ParamLike = eqx.field(converter=_as_param_like)
+    distribution: AbstractDistribution = eqx.field(converter=Frozen)
+
+    def __init__(
+        self,
+        raw_value: ParamLike = None,
+        distribution: AbstractDistribution | None = None,
+    ):
+        """
+        Args:
+            raw_value: The un-probabilistic raw value.
+            distribution: The probability distribution. If None, defaults to `distreqx.distributions.ImproperUniform.
+        """
+        # Array standardization
+        raw_value = _as_param_like(raw_value)
+        shape = raw_value.shape
+        
+        # Distribution standardization
+        if distribution is None:
+            distribution = ImproperUniform(shape=shape)
+        
+        self.distribution = distribution
+        self.raw_value = raw_value
+
+    @property
+    def value(self) -> Array:
+        return self.raw_value
+    
+
+class Physical(AbstractVariable):
+    """
+    A `parax.ParamLike` scaled wrapper by an `ArrayLike` float or unit.
 
     Useful for scientific modeling. Applies a linear physical scale 
     (e.g., units or preconditioning) as the final evaluation step on top of 
@@ -289,14 +334,11 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
     """
     raw_value: ParamLike
     scale: ArrayLike = eqx.field(converter=Fixed)
-    metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     def __init__(
         self,
         raw_value: ParamLike,
         scale: Any = 1.0,
-        *,
-        metadata: dict | None = None,
     ):
         """
         Args:
@@ -317,61 +359,11 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
 
         self.raw_value = raw_value
         self.scale = scale
-        self.metadata = metadata if metadata is not None else {}
-
-    @property
-    def base(self) -> Array:
-        """Returns the base state of the underlying variable."""
-        return jnp.asarray(self.raw_value)
-
-    @property
-    def bounds(self) -> tuple[Array, Array]:
-        """
-        Dynamically scales the bounds of the underlying variable.
-        Returns unconstrained bounds (-inf, inf) if the wrapped variable has no bounds.
-        """
-        from parax.filters import is_bounded
-        if is_bounded(self.raw_value):
-            lower, upper = self.raw_value.bounds
-            scaled_1 = lower * self.scale
-            scaled_2 = upper * self.scale
-            return jnp.minimum(scaled_1, scaled_2), jnp.maximum(scaled_1, scaled_2)
-        
-        inf = jnp.full_like(self.base, jnp.inf)
-        return -inf, inf
-
-    def transform_to_physical(self, base: Array) -> Array:
-        """
-        Converts a base state to the physical state by delegating to the 
-        underlying variable (if applicable) and applying the scale factor.
-        """
-        from parax.filters import is_bounded
-        if is_bounded(self.raw_value):
-            phys = self.raw_value.transform_to_physical(base)
-        else:
-            phys = base
-        
-        return self.scale * phys
-
-    def update_from_base(self, base: Array) -> "Physical":
-        """
-        Delegates the base update to the underlying variable and returns 
-        a new instance of this Physical wrapper.
-        """
-        from parax.filters import is_bounded
-        if is_bounded(self.raw_value):
-            new_var = self.raw_value.update_from_base(base)
-        elif eqx.is_array_like(self.raw_value):
-            new_var = base
-        else:
-            raise Exception("Cannot wrap a non array-like variable in `parax.Physical`")
-            
-        return eqx.tree_at(lambda x: x.raw_value, self, new_var)
 
     @property
     def value(self) -> Array:
         """Returns the physically scaled value."""
-        return self.transform_to_physical(self.base)
+        return self.scale * self.raw_value
 
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
@@ -446,8 +438,7 @@ def param(
 
 def derived(
     fn: Callable,
-    raw_value: Array = dataclasses.MISSING,
-    metadata: dict | None = None,
+    raw_value: ParamLike = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.
@@ -460,12 +451,10 @@ def derived(
     Returns:
         An `equinox.field` properly configured for the field type.
     """
-    if metadata is None: metadata = {}
-
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Derived(x, fn=fn, metadata=metadata)
+        return Derived(x, fn=fn)
 
     field_kwargs = {"converter": converter}
     if raw_value is not dataclasses.MISSING:
@@ -475,10 +464,8 @@ def derived(
 
 
 def constrained(
-    default_value: Array = dataclasses.MISSING,
-    *,
+    default_value: ParamLike = dataclasses.MISSING,
     constraint: AbstractConstraint | None = None,
-    metadata: dict | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Constrained` parameter.
@@ -491,12 +478,10 @@ def constrained(
     Returns:
         An `equinox.field` properly configured for the field type.
     """
-    if metadata is None: metadata = {}
-
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Constrained(x, constraint=constraint, metadata=metadata)
+        return Constrained(x, constraint=constraint)
 
     field_kwargs = {"converter": converter}
     if default_value is not dataclasses.MISSING:
@@ -506,10 +491,8 @@ def constrained(
 
 
 def physical(
-    default_variable: Any = dataclasses.MISSING,
+    default_variable: ParamLike = dataclasses.MISSING,
     scale: Any = 1.0,
-    *,
-    metadata: dict | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Physical` parameter wrapper.
@@ -523,13 +506,11 @@ def physical(
     Returns:
         An `equinox.field` properly configured for the field type.
     """
-    if metadata is None: metadata = {}
-
     def converter(x: Any) -> AbstractVariable:
         # Avoid double-wrapping if the user passes an already instantiated Physical
         if isinstance(x, Physical):
             return x
-        return Physical(x, scale=scale, metadata=metadata)
+        return Physical(x, scale=scale)
 
     field_kwargs = {"converter": converter}
     if default_variable is not dataclasses.MISSING:

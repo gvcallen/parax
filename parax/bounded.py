@@ -8,16 +8,16 @@ from typing import TypeVar, Generic
 import equinox as eqx
 from jaxtyping import PyTree
 
+
 Base = TypeVar("Base")
-Physical = TypeVar("Physical")
+
 
 class AbstractBounded(eqx.Module, Generic[Base]):
     """
     The abstract interface for a bounded PyTree.
 
-    Makes use of the concept of a "base" space,
-    where bounded optimizers operate, and a
-    "physical" space, where the forward pass operates.
+    Makes use of the concept of a "base" space
+    where bounded optimizers operate.
     
     Used as a type check for `parax.is_bounded`. 
     """
@@ -38,22 +38,9 @@ class AbstractBounded(eqx.Module, Generic[Base]):
         raise NotImplementedError    
   
     @abstractmethod
-    def transform_to_physical(self, base: Base) -> Physical:
+    def update(self, base: Base) -> "AbstractBounded":
         """
-        Converts a new base PyTree to a physical PyTree.
-
-        Args:
-            base: The base-space PyTree to transform.
-
-        Returns:
-            The transformed PyTree in the physical (forward-pass) space.
-        """
-        pass
-    
-    @abstractmethod
-    def update_from_base(self, base: Base) -> "AbstractBounded":
-        """
-        Returns a new instance of this object with a new base PyTree.
+        Returns a new instance of this object updated with a new base PyTree.
 
         Args:
             base: The new base-space PyTree representing the updated state.
@@ -151,33 +138,7 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
     return tree_lower(tree), tree_upper(tree)
 
 
-def tree_transform_to_physical(base_model: PyTree, original_model: PyTree) -> PyTree:
-    """
-    Takes a base-space PyTree and projects it to the external physical space.
-
-    Args:
-        base_model: The PyTree containing the base-space values (e.g., from an optimizer).
-        original_model: The original PyTree model containing the `AbstractBounded` 
-            nodes used to perform the transformation.
-
-    Returns:
-        A PyTree representing the fully evaluated model in the physical space.
-    """
-    from parax.filters import is_bounded
-
-    def evaluate_base(orig_node, base_node):
-        from parax.filters import is_bounded
-        if is_bounded(orig_node):
-            return orig_node.transform_to_physical(base_node)
-        return base_node
-        
-    evaluated_model = jax.tree_util.tree_map(
-        evaluate_base, original_model, base_model, is_leaf=is_bounded
-    )
-    return evaluated_model
-
-
-def tree_update_from_base(model: PyTree, base_model: PyTree) -> PyTree:
+def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
     """
     Takes an updated base-space PyTree and injects it back into the 
     original bounded model structure using `update_from_base`.
@@ -194,7 +155,7 @@ def tree_update_from_base(model: PyTree, base_model: PyTree) -> PyTree:
 
     def _rebuild(orig, base):
         if is_bounded(orig):
-            return orig.update_from_base(base)
+            return orig.update(base)
         return base
         
     return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_bounded)

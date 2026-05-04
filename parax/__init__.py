@@ -31,19 +31,6 @@ from parax.variables import (
     map_variables_with_path as map_variables_with_path,
 )
 
-from parax.constraints import (
-    AbstractConstraint as AbstractConstraint,
-    RealLine as RealLine,
-    GreaterThan as GreaterThan,
-    LessThan as LessThan,
-    Interval as Interval,
-    Positive as Positive,
-    Negative as Negative,
-    TransformedConstraint as TransformedConstraint,
-    TreeConstraint as TreeConstraint,
-    CustomConstraint as CustomConstraint,
-)
-
 from parax.filters import (
     is_constant as is_constant,
     is_tagged as is_tagged,
@@ -67,6 +54,7 @@ from parax.converters import (
 
 from parax import (
     constant as constant,
+    constraints as constraints,
     tagged as tagged,
     bounded as bounded,
     probabilistic as probabilistic,

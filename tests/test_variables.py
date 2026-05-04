@@ -91,7 +91,7 @@ def test_physical_scaling():
     # We want a base value of 5.0, scaled by 10.0 -> final value 50.0
     phys = Physical(Constrained(5.0, constraint=Positive()), scale=10.0)
     
-    assert jnp.allclose(phys.base, 5.0)
+    assert jnp.allclose(phys.raw_value.value, 5.0)
     assert jnp.allclose(phys.value, 50.0)
 
 

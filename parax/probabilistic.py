@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from distreqx.distributions import AbstractDistribution
+from distreqx.distributions import AbstractDistribution, Joint
 
 T = TypeVar("T")
 
@@ -56,3 +56,20 @@ def tree_distribution(tree: PyTree) -> PyTree:
 
     distributions = jax.tree_util.tree_map(_get_distribution, tree, is_leaf=is_probabilistic)
     return distributions
+
+
+def tree_joint(tree: PyTree) -> Joint:
+    """
+    Extracts the single joint probability distributions of a PyTree.
+    
+    Wraps the output of `parax.probabilistic.tree_distribution`
+    in a `distreqx.distributions.Joint` distribution to define
+    a single distribution that matches the shape of `tree`.
+
+    Args:
+        tree: The PyTree model containing probabilistic nodes or standard arrays.
+
+    Returns:
+        A single joint distribution whose samples match the structure of `tree`.
+    """
+    return Joint(tree_distribution(tree))

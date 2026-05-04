@@ -13,6 +13,7 @@ import equinox as eqx
 
 from parax.constant import AbstractConstant
 from parax.bounded import AbstractBounded
+from parax.probabilistic import AbstractProbabilistic
 from parax.variables import AbstractVariable
 from parax.unwrappables import AbstractUnwrappable
 from parax.constraints import AbstractConstraint
@@ -59,6 +60,13 @@ def is_bounded(x: Any) -> TypeGuard[AbstractBounded]:
     Returns True if `x` is an instance of `parax.AbstractBounded`.
     """
     return isinstance(x, AbstractBounded)
+
+
+def is_probabilistic(x: Any) -> TypeGuard[AbstractProbabilistic]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractProbabilistic`.
+    """
+    return isinstance(x, AbstractProbabilistic)
 
 
 def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:

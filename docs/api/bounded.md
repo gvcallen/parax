@@ -1,4 +1,4 @@
-::: parax.AbstractBounded
+::: parax.bounded.AbstractBounded
 
 ::: parax.bounded.tree_base
 

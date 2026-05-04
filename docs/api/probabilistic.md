@@ -1,5 +1,5 @@
-::: parax.AbstractProbabilistic
+::: parax.probabilistic.AbstractProbabilistic
 
-::: parax.tree_distribution
+::: parax.probabilistic.tree_distribution
 
-::: parax.tree_joint
+::: parax.probabilistic.tree_joint

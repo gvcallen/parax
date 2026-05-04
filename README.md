@@ -1,4 +1,4 @@
-![Parax Logo](https://raw.githubusercontent.com/gvcallen/parax/main/assets/logo.png)
+# Parax
 
 | **Parax** |  |
 |-------------|-------|
@@ -14,7 +14,6 @@
 - Computed PyTrees and callable parameterizations
 - Abstract interfaces for fixed, bounded, and probabilistic PyTrees and parameters
 - Filtering and manipulation tools
-- Built-in wrapper for SciPy bounded optimization
 
 ## Installation
 Parax can be installed using pip:
@@ -93,7 +92,7 @@ prx.unwrap(wrapped)
 
 ## Example 3: Optimizing an eqx.Model using Optimistix
 
-In this example, we define a damped pendulum model using `equinox.Module` and optimize it using `optimistix`. The first parameter is initialized with a standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later. Note that for bounded optimization, you can use the built-in wrapper at `parax.optimize.minimize_scipy`.
+In this example, we define a damped pendulum model using `equinox.Module` and optimize it using `optimistix`. The first parameter is initialized with a standard JAX array which we then fix. The second parameter is initialized with an unconstrained `prx.Param` with dummy metadata. The final parameter is given a default physical scale and constraint during model definition, which we then initialize using a simple float value later.
 
 ```python
 import jax

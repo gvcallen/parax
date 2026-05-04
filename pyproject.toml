@@ -1,6 +1,6 @@
 [project]
 name = "parax"
-version = "0.5.8"
+version = "0.5.9"
 description = "Parametric modeling in JAX"
 readme = "README.md"
 authors = [
@@ -11,11 +11,6 @@ dependencies = [
     "jax",
     "jaxtyping",
     "distreqx",
-    "jsonpickle",
-    "optimistix",
-    "tqdm",
-    "scipy",
-    "blackjax",
 ]
 
 [project.optional-dependencies]

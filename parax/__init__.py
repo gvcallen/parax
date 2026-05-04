@@ -18,7 +18,6 @@ from parax.tagged import (
 from parax.bounded import (
     AbstractBounded as AbstractBounded,
 )
-import parax.bounded as bounded
 
 from parax.unwrappables import (
     AbstractUnwrappable as AbstractUnwrappable,
@@ -76,4 +75,14 @@ from parax.converters import (
     as_param as as_param,
 )
 
-from parax import optimize as optimize
+
+from parax import (
+    constant as constant,
+    tagged as tagged,
+    bounded as bounded,
+    unwrappables as unwrappables,
+    variables as variables,
+    constraints as constraints,
+    filters as filters,
+    converters as converters,
+)

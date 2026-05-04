@@ -51,7 +51,7 @@ nav:
   - Getting started: index.md
   - Overview: overview.md
   - Examples:
-    - Modeling and unconstrained optimization (Equinox/Optimistix): examples/modeling_and_optimization.md
+    - Modeling and optimization (Equinox/Optimistix): examples/modeling_and_optimization.md
     - Bounded optimization (JAXopt): examples/bounded_optimization.md
   - API:
     - Base Interfaces:

@@ -22,6 +22,10 @@ For some constraints and probabilistic features, you may need this `distreqx` br
 pip install git+https://github.com/gvcallen/distreqx.git
 ``
 
+## Documentation
+
+Documentation is available [here](https://gvcallen.github.io/parax/), with examples on unconstrained/bounded optimization and more.
+
 ## Quick example
 
 Parax provides array-like variables that hold metadata and can be parameterized/constrained:
@@ -51,10 +55,6 @@ prx.unwrap(wrapped)
 #        'y': Array(3.0)}}
 ```
 In the above example, `prx.Computed` operates on the whole PyTree, while `prx.Derived` is an array-like `prx.AbstractVariable`.
-
-## Documentation
-
-Documentation is available [here](https://gvcallen.github.io/parax/), with examples on unconstrained/bounded optimization and more.
 
 ## Related
 

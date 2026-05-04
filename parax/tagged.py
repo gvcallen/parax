@@ -15,8 +15,10 @@ class AbstractTagged(eqx.Module):
 
     In Parax, metadata is typically used to store units, descriptions, tags, 
     or optimization hints alongside the underlying JAX array.
+
+    Attributes:
+        metadata: Returns the underlying metadata dictionary.
     """
-    #: Returns the underlying metadata dictionary.
     metadata: eqx.AbstractVar[dict[Any, Any]]
 
 

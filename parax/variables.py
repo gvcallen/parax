@@ -261,16 +261,16 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    def convert(self, base: Array) -> Array:
+    def transform_to_physical(self, base: Array) -> Array:
         return base
     
-    def replace(self, base: Array) -> Array:
+    def update_from_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.convert(self.base)
+        return self.transform_to_physical(self.base)
     
 
 class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
@@ -358,16 +358,16 @@ class Physical(AbstractVariable, AbstractBounded[Array], AbstractTagged):
         upper = jnp.broadcast_to(constraint_bounds[1], self.raw_value.shape)
         return lower, upper
     
-    def convert(self, base: Array) -> Array:
+    def transform_to_physical(self, base: Array) -> Array:
         return self.scale * base
     
-    def replace(self, base: Array) -> Array:
+    def update_from_base(self, base: Array) -> Array:
         new_raw = self.constraint.bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property
     def value(self) -> Array:
-        return self.convert(self.base)
+        return self.transform_to_physical(self.base)
 
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:

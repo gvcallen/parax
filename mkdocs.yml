@@ -50,7 +50,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - API Reference:
-    - Base Interfaces: api/base_interfaces.md
+    - Constant: api/constant.md
+    - Tagged: api/tagged.md
+    - Bounded: api/bounded.md
     - Unwrappables: api/unwrappables.md
     - Variables: api/variables.md
     - Constraints: api/constraints.md

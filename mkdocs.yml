@@ -58,7 +58,6 @@ nav:
     - Constraints: api/constraints.md
     - Filters: api/filters.md
     - Converters: api/converters.md
-    - Optimize: api/optimize.md
   - License: license.md
 
 extra_javascript:

@@ -126,7 +126,7 @@ def test_dataclass_helpers():
         # Python dataclass rules: fields without defaults MUST come before fields with defaults!
         c_val: AbstractVariable = constrained(constraint=Positive())
         d_val: AbstractVariable = derived(fn=jnp.exp)
-        p_val: AbstractVariable = param(raw_value=1.0)
+        p_val: AbstractVariable = param(default=1.0)
 
     # 1. Provide raw floats (Converters should wrap them)
     model1 = TestModel(c_val=5.0, d_val=2.0)

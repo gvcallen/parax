@@ -112,31 +112,30 @@ This includes any Parax variables (like `Param`, `Constrained`, `Physical`)
 as well as standard JAX inexact arrays.
 """
 
+def _as_param_like(x):
+    if isinstance(x, AbstractVariable):
+        return x
+    return jnp.asarray(x)
+
 
 class Param(AbstractVariable, AbstractTagged):
     """
     A canonical parameter with metadata.
 
-    Represents an simple, trainable variable
+    Represents a simple, trainable variable
     with a single underlying `raw_value` and metadata.
 
     Attributes:
         raw_value: The raw value used by optimizers and samplers.
         metadata: Additional arbitrary metadata.
     """
-    raw_value: Array = eqx.field(converter=jnp.asarray)
+    raw_value: ParamLike = eqx.field(converter=_as_param_like)
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     @property
     def value(self) -> Array:
         return self.raw_value
     
-
-def _as_param_like(x):
-    if isinstance(x, Param):
-        return x
-    return jnp.asarray(x)
-
 
 class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     """
@@ -399,22 +398,15 @@ def map_variables_with_path(f: Callable[[Any, AbstractVariable], Any], pytree: P
     return jax.tree.map_with_path(lambda p, x: f(p, x) if is_variable(x) else x, pytree, is_leaf=is_variable)
 
 
-# ==========================================
-# Parameter Dataclass Field Helpers
-# ==========================================
-# Note: These helpers use `eqx.field` converters. If a user provides an already
-# instantiated `AbstractVariable` to the dataclass init, the converter passes 
-# it through without double-wrapping it.
-
 def param(
-    raw_value: Array = dataclasses.MISSING,
+    default: ParamLike = dataclasses.MISSING,
     metadata: dict | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a standard Parax `Param`.
 
     Args:
-        raw_value: The default raw value. If omitted, this field becomes required 
+        `default`: The default value. If omitted, this field becomes required 
             by the user during instantiation.
         metadata: Additional static metadata to store.
         
@@ -430,8 +422,8 @@ def param(
         return Param(x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
+    if default is not dataclasses.MISSING:
+        field_kwargs["default"] = default
 
     return eqx.field(**field_kwargs)
 

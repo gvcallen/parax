@@ -1,1 +1,1 @@
-::: parax.AbstractTagged
+::: parax.tagged.AbstractTagged

@@ -1,1 +1,1 @@
-::: parax.AbstractConstant
+::: parax.constant.AbstractConstant

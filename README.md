@@ -66,6 +66,14 @@ prx.unwrap(wrapped)
 ```
 In the above example, `prx.Computed` operates on the whole PyTree, while `prx.Derived` is an array-like `prx.AbstractVariable`.
 
+## Next steps
+
+Several tutorials are available in the documentation, for example:
+
+- [Regular optimization (Optimistix)](https://gvcallen.github.io/parax/examples/modeling_and_optimization/)
+- [Bounded optimization (JAXopt)](https://gvcallen.github.io/parax/examples/bounded_optimization/)
+- [Bayesian inference (BlackJAX)](https://gvcallen.github.io/parax/examples/bayesian_inference/)
+
 ## Related
 
 The library's design was inspired by several others that deserve mention, including [Flax](https://github.com/google/flax), [paramax](https://github.com/danielward27/paramax), and [PyTorch](https://github.com/pytorch/pytorch).

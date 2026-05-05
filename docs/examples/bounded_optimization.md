@@ -2,16 +2,13 @@
 
 `parax.bounded` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to project our model to the `base` constrained space before feeding it to the optimizer, and then update it afterwards using `parax.bounded.tree_update`.
 
+First we initialize a dummy model:
+
 ```python
-import jax.numpy as jnp
-import equinox as eqx
-import jaxopt
 import parax as prx
-import parax.bounded as prxb
+import equinox as eqx
 
 class DummyModel(eqx.Module):
-    # We can applying scaling (or any transformation)
-    # and the bounds apply in the space we define them
     x: prx.ParamLike = prx.constrained(0.0, prx.Interval(-5.0, 5.0))
     y: prx.ParamLike = prx.physical(prx.Constrained(1.0, prx.Positive()), scale=1e-3)
 
@@ -19,33 +16,51 @@ class DummyModel(eqx.Module):
         return (self.x - 3.0)**2 + 1e6 * (self.y - 2.0e-3)**2
 
 initial_model = DummyModel()
+```
 
-# Extract base values and bounds
+Note that we can nest parameters (like `y` above) and the constraints apply on the level we define them.
+
+Next, we extract the base values and bounds, and partition the model and bounds into parameters and static metadata.
+
+<!-- pytest-codeblocks:cont -->
+
+```python
+import parax.bounded as prxb
+
 initial_base = prxb.tree_base(initial_model)
 lower_bounds, upper_bounds = prxb.tree_bounds(initial_model)
 
-# Partition and define the objective
 filter_spec = eqx.is_inexact_array
 params, static = eqx.partition(initial_base, filter_spec, is_leaf=prx.is_constant)
 lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
+```
 
-def objective(p, static):
+Finally, we define our objective and run the optimizer:
+
+<!-- pytest-codeblocks:cont -->
+```python
+import jaxopt
+
+def objective(p):
     unwrapped_model = prx.unwrap(eqx.combine(p, static))
     return unwrapped_model()
 
-# Run the optimization
 solver = jaxopt.ScipyBoundedMinimize(fun=objective)
 results = solver.run(
     init_params=params, 
     bounds=(lower, upper), 
-    static=static
 )
 
-# Reconstruct the optimized model
 opt_base = eqx.combine(results.params, static)
 final_model = prxb.tree_update(initial_model, opt_base)
+```
 
-print(f"Optimized x: {jnp.array(final_model.x)}") # ~3.0
-print(f"Optimized y: {jnp.array(final_model.y)}") # ~0.002
+Our parameters match the minimum of the dummy model:
+```python
+final_model.x.value
+# ~3.0
+
+final_model.y.value
+# ~0.002
 ```

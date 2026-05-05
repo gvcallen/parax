@@ -12,6 +12,7 @@ This makes Parax great for:
 - Parameterizations for machine learning
 - Bounded optimization for scientific modeling
 - Bayesian inference for probabilistic modeling
+- Combinations of these
 
 Examples for each of these are available in the documentation.
 

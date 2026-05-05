@@ -151,8 +151,3 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
     def unwrap(self) -> T:
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
-    
-
-def frozen(*args, **kwargs):
-    from parax.converters import as_frozen
-    return eqx.field(*args, converter=as_frozen, **kwargs)

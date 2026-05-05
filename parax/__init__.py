@@ -13,7 +13,6 @@ from parax.unwrappables import (
     Parameterized as Parameterized,
     Computed as Computed,
     unwrap as unwrap,
-    frozen as frozen,
 )
 
 from parax.variables import (

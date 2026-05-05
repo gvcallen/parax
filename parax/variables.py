@@ -182,8 +182,8 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    raw_value: Param = eqx.field(converter=_as_param)
     fn: Callable
+    raw_value: Param = eqx.field(converter=_as_param)
 
     @property
     def value(self) -> Array:
@@ -209,22 +209,22 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         raw_value: The raw, unconstrained value mapping to the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
     """
-    raw_value: Param = eqx.field(converter=_as_param)
     constraint: AbstractConstraint = eqx.field(converter=Frozen)
+    raw_value: Param = eqx.field(converter=_as_param)
 
     def __init__(
         self,
-        value: Array | None = None,
         constraint: AbstractConstraint | None = None,
+        value: Array | None = None,
         *,
         raw_value: Param | None = None,
     ):
         """
         Args:
+            constraint: A Parax constraint. If None, defaults to `parax.RealLine` (unconstrained).
             value: The desired output (constrained) value. If provided, the internal 
                 `raw_value` is computed dynamically via the constraint's inverse bijector. 
                 Mutually exclusive with `raw_value`.
-            constraint: A Parax constraint. If None, defaults to `parax.RealLine` (unconstrained).
             raw_value: The unconstrained optimizer-space value. Mutually exclusive with `value`.
         """
         # Error checking
@@ -390,7 +390,7 @@ def tagged(
         if isinstance(x, AbstractVariable):
             return x
         
-        return Tagged(x, metadata=metadata)
+        return Tagged(raw_value=x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:
@@ -400,8 +400,8 @@ def tagged(
 
 
 def derived(
-    default: Param = dataclasses.MISSING,
     fn: Callable = lambda x: x,
+    default: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.
@@ -416,7 +416,7 @@ def derived(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Derived(x, fn=fn)
+        return Derived(fn=fn, raw_value=x)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:
@@ -426,15 +426,15 @@ def derived(
 
 
 def constrained(
-    default: Param = dataclasses.MISSING,
     constraint: AbstractConstraint | None = None,
+    default: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Constrained` variable.
 
     Args:
-        default: The default constrained value. If omitted, this field becomes required.
         constraint: The abstract constraint defining base bounds and mappings.
+        default: The default constrained value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -442,7 +442,7 @@ def constrained(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Constrained(x, constraint=constraint)
+        return Constrained(constraint=constraint, value=x)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:
@@ -468,7 +468,7 @@ def random(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Random(distribution, raw_value=x)
+        return Random(distribution=distribution, raw_value=x)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:

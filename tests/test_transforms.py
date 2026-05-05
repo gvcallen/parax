@@ -144,18 +144,18 @@ def test_normalize(sample_array):
 
 
 def test_chain():
-    """Tests sequential composition of transformations."""
+    """Tests sequential composition of transformations in mathematical order."""
     x = jnp.array([2.0])
     
-    # Order matters: (x + 3) * 2 = 10
+    # (x * 2) + 3 = 7
     transform = Chain([Shift(3.0), Scale(2.0)])
     out = transform(x)
-    npt.assert_allclose(out, jnp.array([10.0]))
+    npt.assert_allclose(out, jnp.array([7.0]))
     
-    # Reverse order: (x * 2) + 3 = 7
+    # (x + 3) * 2 = 10
     transform_reverse = Chain([Scale(2.0), Shift(3.0)])
     out_reverse = transform_reverse(x)
-    npt.assert_allclose(out_reverse, jnp.array([7.0]))
+    npt.assert_allclose(out_reverse, jnp.array([10.0]))
 
 
 def test_bijector_transform():

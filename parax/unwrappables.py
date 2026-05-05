@@ -95,12 +95,12 @@ class Computed(AbstractUnwrappable[T]):
     (including booleans) while be mapped.
     """
     
-    tree: T
     fn: Callable[..., T]
+    tree: T
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
-    def __init__(self, tree: T, fn: Callable, *args, **kwargs):
+    def __init__(self, fn: Callable, tree: T, *args, **kwargs):
         """
         Args:
             tree: The target PyTree to map the computation over.

@@ -43,7 +43,7 @@ import parax as prx
 import jax.numpy as jnp
 
 p1 = prx.Tagged(1.0, metadata={'hello', 'world'})
-p2 = prx.Constrained(8.0, prx.constraints.Interval(0.0, 10.0))
+p2 = prx.Constrained(prx.constraints.Interval(0.0, 10.0), value=8.0)
 
 p2.raw_value, p2.bounds
 # Array(1.3862944), (Array(0.0), Array(10.0))
@@ -54,15 +54,15 @@ jnp.sin(p1) + (2 * p2)
 
 You can also apply arbitrary computations to PyTrees and parameters using unwrapping:
 ```python
-pytree = {'a': 1.0, 'b': {'x': 2.0, 'y': prx.Derived(3.0, jnp.log)}}
-wrapped = prx.Computed(pytree, jnp.exp)
+pytree = {'a': 1.0, 'b': {'x': 2.0, 'y': prx.Derived(jnp.log, 3.0)}}
+wrapped = prx.Computed(jnp.exp, pytree)
 
 prx.unwrap(wrapped)
 # {'a': Array(2.7182817),
 #  'b': {'x': Array(7.389056), 
 #        'y': Array(3.0)}}
 ```
-In the above example, `prx.Computed` operates on the whole PyTree, while `prx.Derived` is an array-like `prx.AbstractVariable`.
+In the above example, `prx.Computed` operates on the whole PyTree's array-like nodes, while `prx.Derived` is an array-like `prx.AbstractVariable`.
 
 ## Next steps
 

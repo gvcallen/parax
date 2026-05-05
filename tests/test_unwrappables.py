@@ -37,7 +37,7 @@ def test_computed_bypasses_non_arrays():
     }
     
     # Apply a square function
-    computed_node = Computed(tree, lambda val: val ** 2 if not isinstance(val, bool) else True)
+    computed_node = Computed(lambda val: val ** 2 if not isinstance(val, bool) else True, tree)
     result = unwrap(computed_node)
     
     assert jnp.allclose(result["x"], 4.0)
@@ -51,7 +51,7 @@ def test_nested_unwrappables():
     inner = Parameterized(lambda: jnp.array(5.0))
     
     # Outer node: computes the square of whatever the inner node produces
-    outer = Computed({"val": inner}, lambda x: x ** 2)
+    outer = Computed(lambda x: x ** 2, {"val": inner})
     
     result = unwrap(outer)
     

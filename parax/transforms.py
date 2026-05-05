@@ -1,13 +1,12 @@
 """
 Common transformations for derived parameters.
 
-This provides stateless and stateful callable transformations
-which can easily be used with `parax.Derived` variables and `parax.Computed`
-PyTrees. These utilities should be preferred over lambdas when
-Model state needs to be interpretable e.g. for serialization.
+This provides stateless callable transformations
+which can easily be used with `parax.Derived` and `parax.Computed`
+variables and PyTrees. They can be used over lambdas if preferred.
 
-Unlike constraints, transformations are not required to be bijective (invertible),
-and do not necessarily define bounds.
+Unlike constraints, transformations are not required
+to be bijective (invertible), and do not define bounds.
 """
 
 from abc import abstractmethod
@@ -27,8 +26,8 @@ class AbstractTransform(eqx.Module):
 
     Transformations are applied to variables, typically within `parax.Derived`. 
     Because they inherit from `equinox.Module`, any JAX arrays stored as 
-    attributes (e.g., learnable shifts or scales) are automatically tracked 
-    by standard JAX optimizers and serialization utilities.
+    attributes (e.g., learnable shifts or scales) can be tracked 
+    by optimizers and serialization utilities.
     """
 
     @abstractmethod
@@ -219,7 +218,7 @@ class Softmax(AbstractTransform):
     Applies the softmax function over a specified axis.
 
     This is a classic non-bijective transformation mapping real numbers 
-    to a probability simplex (values sum to 1.0). Ubiquitous in ML and 
+    to a probability simplex (values sum to 1.0). Usefl in ML and 
     categorical scientific modeling.
 
     Attributes:
@@ -252,7 +251,7 @@ class LogSoftmax(AbstractTransform):
     Applies the log-softmax function over a specified axis.
 
     Mathematically equivalent to `log(softmax(x))`, but implemented in JAX 
-    to be vastly more numerically stable. Ubiquitous when modeling 
+    to be vastly more numerically stable. Useful when modeling 
     log-probabilities or energy states to prevent underflow.
 
     Attributes:
@@ -321,11 +320,9 @@ class Chain(AbstractTransform):
     """
     Composes a sequence of transformations into a single transformation.
 
-    The transformations are applied sequentially in the order they are provided.
-    Mathematically, `Chain([f, g, h])(x)` is equivalent to `h(g(f(x)))`.
-
-    Useful for building complex derivation pipelines (e.g., standardizing an 
-    input, clipping it, and then applying a softmax).
+    The transformations are applied in reverse order to match standard 
+    mathematical function composition.
+    Mathematically, `Chain([f, g, h])(x)` is equivalent to `f(g(h(x)))`.
 
     Attributes:
         transforms: A tuple containing the sequence of transformations.
@@ -336,7 +333,7 @@ class Chain(AbstractTransform):
         """
         Args:
             transforms: A sequence (list or tuple) of `AbstractTransform` instances.
-                They will be applied in the order they appear in the sequence.
+                They will be applied from right-to-left (last element first).
         """
         # Convert to tuple to guarantee immutability as an Equinox PyTree node
         self.transforms = tuple(transforms)
@@ -347,9 +344,9 @@ class Chain(AbstractTransform):
             x: The input array.
 
         Returns:
-            The array mapped sequentially through all transformations in the chain.
+            The array mapped sequentially through all transformations in reverse order.
         """
-        for transform in self.transforms:
+        for transform in reversed(self.transforms):
             x = transform(x)
         return x
 

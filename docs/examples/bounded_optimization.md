@@ -6,11 +6,11 @@ First we initialize a dummy model:
 
 ```python
 import parax as prx
-from parax.constraints import Positive
+from parax.constraints import Positive, Interval
 import equinox as eqx
 
 class DummyModel(eqx.Module):
-    x: prx.Param = prx.constrained(0.0, prx.Interval(-5.0, 5.0))
+    x: prx.Param = prx.constrained(0.0, Interval(-5.0, 5.0))
     y: prx.Param = prx.derived(prx.Constrained(1.0, Positive()), lambda x: x*1e-3)
 
     def __call__(self):

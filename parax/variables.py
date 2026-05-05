@@ -400,8 +400,8 @@ def tagged(
 
 
 def derived(
-    fn: Callable,
     default: Param = dataclasses.MISSING,
+    fn: Callable = lambda x: x,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.

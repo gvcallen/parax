@@ -10,8 +10,8 @@ import parax as prx
 from distreqx.distributions import Normal
 
 class BayesianLinearModel(eqx.Module):
-    weight: prx.ParamLike = prx.random(Normal(0.0, 5.0))
-    bias: prx.ParamLike = prx.random(Normal(0.0, 2.0))
+    weight: prx.Param = prx.random(Normal(0.0, 5.0))
+    bias: prx.Param = prx.random(Normal(0.0, 2.0))
 
     def __call__(self, x):
         return self.weight * x + self.bias

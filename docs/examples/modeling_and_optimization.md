@@ -18,7 +18,7 @@ class DecayCurve(eqx.Module):
 
 model = DecayCurve(
     amplitude=5.0, 
-    rate=prx.Param(0.5, metadata={'desc': 'Decay constant'}), 
+    rate=prx.Tagged(0.5, metadata={'desc': 'Decay constant'}), 
     baseline=1.2
 )
 ```

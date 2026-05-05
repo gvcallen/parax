@@ -14,6 +14,10 @@ from parax.transforms import (
     Shift,
     Scale,
     Clip,
+    LogSoftmax,
+    Round,
+    Reshape,
+    Clip,
     Softmax,
     Normalize,
     Chain,
@@ -89,6 +93,42 @@ def test_softmax(sample_array):
     npt.assert_allclose(sums, expected_sums, rtol=1e-5)
     # Output must be strictly positive
     assert jnp.all(out >= 0.0)
+
+
+def test_reshape():
+    """Tests structural reshaping of arrays."""
+    x = jnp.array([1.0, 2.0, 3.0, 4.0])
+    transform = Reshape(shape=(2, 2))
+    
+    out = transform(x)
+    expected = jnp.array([[1.0, 2.0], [3.0, 4.0]])
+    
+    assert out.shape == (2, 2)
+    npt.assert_allclose(out, expected)
+
+def test_round():
+    """Tests quantization and rounding."""
+    x = jnp.array([1.1, 2.5, 3.8, -1.2])
+    
+    # Test integer rounding
+    transform_int = Round(decimals=0)
+    npt.assert_allclose(transform_int(x), jnp.array([1.0, 2.0, 4.0, -1.0]))
+    
+    # Test decimal rounding
+    x_dec = jnp.array([1.123, 2.567])
+    transform_dec = Round(decimals=1)
+    npt.assert_allclose(transform_dec(x_dec), jnp.array([1.1, 2.6]))
+
+def test_log_softmax(sample_array):
+    """Tests the numerically stable LogSoftmax."""
+    transform_log = LogSoftmax(axis=-1)
+    transform_soft = Softmax(axis=-1)
+    
+    out_log = transform_log(sample_array)
+    out_soft = transform_soft(sample_array)
+    
+    # exp(log_softmax) should equal softmax
+    npt.assert_allclose(jnp.exp(out_log), out_soft, rtol=1e-5)
 
 
 def test_normalize(sample_array):

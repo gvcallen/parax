@@ -144,6 +144,74 @@ class Clip(AbstractTransform):
             The clipped array.
         """
         return jnp.clip(x, min=self.lower, max=self.upper)
+    
+
+class Reshape(AbstractTransform):
+    """
+    Reshapes an array to a specified target shape.
+
+    Essential for bridging flat optimizer spaces with multi-dimensional 
+    scientific or spatial models (e.g., reshaping a 1D parameter array 
+    into a 2D spatial field).
+
+    Attributes:
+        shape: The target shape tuple. Can include `-1` to infer the 
+            size of one dimension automatically.
+    """
+    shape: tuple[int, ...] = eqx.field(static=True)
+
+    def __init__(self, shape: tuple[int, ...]):
+        """
+        Args:
+            shape: The desired target shape.
+        """
+        self.shape = shape
+
+    def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input array.
+
+        Returns:
+            The reshaped array.
+        """
+        return jnp.reshape(x, self.shape)
+
+
+class Round(AbstractTransform):
+    """
+    Rounds array elements to a given number of decimals.
+
+    Useful for quantizing continuous parameters into discrete physical 
+    states (e.g., whole integer quantities). 
+
+    **Corner Case Note:** This is a mathematically destructive, non-bijective 
+    transformation with zero gradients almost everywhere. It will stop 
+    standard autodiff dead in its tracks unless paired with a custom 
+    gradient estimator (like a straight-through estimator).
+
+    Attributes:
+        decimals: The number of decimal places to round to.
+    """
+    decimals: int = eqx.field(static=True)
+
+    def __init__(self, decimals: int = 0):
+        """
+        Args:
+            decimals: Number of decimal places to round to. Defaults to 0 
+                (rounds to nearest integer).
+        """
+        self.decimals = decimals
+
+    def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input array.
+
+        Returns:
+            The rounded array.
+        """
+        return jnp.round(x, decimals=self.decimals)
 
 
 class Softmax(AbstractTransform):
@@ -177,6 +245,38 @@ class Softmax(AbstractTransform):
             probability distribution.
         """
         return jax.nn.softmax(x, axis=self.axis)
+    
+
+class LogSoftmax(AbstractTransform):
+    """
+    Applies the log-softmax function over a specified axis.
+
+    Mathematically equivalent to `log(softmax(x))`, but implemented in JAX 
+    to be vastly more numerically stable. Ubiquitous when modeling 
+    log-probabilities or energy states to prevent underflow.
+
+    Attributes:
+        axis: The axis or axes along which the log-softmax should be computed.
+    """
+    axis: int | tuple[int, ...] | None = eqx.field(static=True)
+
+    def __init__(self, axis: Union[int, tuple[int, ...], None] = -1):
+        """
+        Args:
+            axis: The axis or axes along which to compute the log-softmax. 
+                Defaults to -1 (the last axis).
+        """
+        self.axis = axis
+
+    def __call__(self, x: Array) -> Array:
+        """
+        Args:
+            x: The input array.
+
+        Returns:
+            An array containing the log-probabilities along the specified axis.
+        """
+        return jax.nn.log_softmax(x, axis=self.axis)
 
 
 class Normalize(AbstractTransform):

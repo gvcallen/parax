@@ -8,7 +8,13 @@
 
 ::: parax.transforms.Clip
 
+::: parax.transforms.Reshape
+
+::: parax.transforms.Round
+
 ::: parax.transforms.Softmax
+
+::: parax.transforms.LogSoftmax
 
 ::: parax.transforms.Normalize
 

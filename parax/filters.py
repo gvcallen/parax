@@ -17,7 +17,7 @@ from parax.probabilistic import AbstractProbabilistic
 from parax.variables import AbstractVariable
 from parax.unwrappables import AbstractUnwrappable
 from parax.constraints import AbstractConstraint
-from parax.tagged import AbstractTagged
+from parax.annotated import AbstractAnnotated
 
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector
@@ -32,12 +32,12 @@ def is_constant(x: Any) -> TypeGuard[AbstractConstant]:
     return isinstance(x, AbstractConstant)
 
 
-def is_tagged(x: Any) -> TypeGuard[AbstractTagged]:
+def is_annotated(x: Any) -> TypeGuard[AbstractAnnotated]:
     """
-    Returns True if `x` is an instance of `parax.AbstractTagged`
+    Returns True if `x` is an instance of `parax.AbstractAnnotated`
     (i.e. has metadata).
     """
-    return isinstance(x, AbstractTagged)
+    return isinstance(x, AbstractAnnotated)
 
 
 def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
@@ -47,7 +47,7 @@ def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
     return isinstance(x, AbstractVariable)
 
 
-def is_param_like(x: Any) -> bool:
+def is_param(x: Any) -> bool:
     """
     Returns True if `x` is an instance of `parax.AbstractVariable`
     or returns True for `eqx.is_inexact_array`.

@@ -5,16 +5,15 @@ import equinox as eqx
 
 # Assuming your package is structured so these imports work
 from parax.variables import (
-    Param,
+    AbstractVariable,
+    Tagged,
     Derived,
     Constrained,
-    Physical,
     Fixed,
-    param,
+    tagged,
     derived,
     constrained,
     map_variables,
-    AbstractVariable
 )
 from parax.constraints import Positive
 
@@ -28,7 +27,7 @@ def test_param_and_dunders():
     Test basic parameter instantiation and prove that mathematical 
     dunder methods instantly strip wrappers and return standard arrays.
     """
-    p = Param(raw_value=2.0, metadata={"name": "test_param"})
+    p = Tagged(raw_value=2.0, metadata={"name": "test_param"})
     
     assert p.shape == ()
     assert p.metadata["name"] == "test_param"
@@ -44,7 +43,7 @@ def test_param_and_dunders():
     assert jnp.allclose(result_rmul, 8.0)
     
     # Array indexing/iterating
-    p_arr = Param(jnp.array([1.0, 2.0, 3.0]))
+    p_arr = Tagged(jnp.array([1.0, 2.0, 3.0]))
     assert p_arr[1] == 2.0
     assert len(p_arr) == 3
 
@@ -86,15 +85,6 @@ def test_constrained_initialization_modes():
         Constrained(value=5.0, raw_value=0.0, constraint=Positive())
 
 
-def test_physical_scaling():
-    """Test that Physical applies the scale correctly after the constraint."""
-    # We want a base value of 5.0, scaled by 10.0 -> final value 50.0
-    phys = Physical(Constrained(5.0, constraint=Positive()), scale=10.0)
-    
-    assert jnp.allclose(phys.raw_value.value, 5.0)
-    assert jnp.allclose(phys.value, 50.0)
-
-
 # ==========================================
 # Fixed Wrapper Tests
 # ==========================================
@@ -103,7 +93,7 @@ def test_fixed_stops_gradients():
     """Mathematically prove that Fixed disconnects the gradient graph."""
     def loss_fn(raw_val):
         # Create a variable, then fix it
-        p = Param(raw_value=raw_val)
+        p = Tagged(raw_value=raw_val)
         f = Fixed(p)
         return f.value ** 2
 
@@ -126,11 +116,11 @@ def test_dataclass_helpers():
         # Python dataclass rules: fields without defaults MUST come before fields with defaults!
         c_val: AbstractVariable = constrained(constraint=Positive())
         d_val: AbstractVariable = derived(fn=jnp.exp)
-        p_val: AbstractVariable = param(default=1.0)
+        p_val: AbstractVariable = tagged(default=1.0)
 
     # 1. Provide raw floats (Converters should wrap them)
     model1 = TestModel(c_val=5.0, d_val=2.0)
-    assert isinstance(model1.p_val, Param)
+    assert isinstance(model1.p_val, Tagged)
     assert isinstance(model1.c_val, Constrained)
     assert isinstance(model1.d_val, Derived)
     
@@ -139,7 +129,7 @@ def test_dataclass_helpers():
     assert jnp.allclose(model1.d_val.raw_value, 2.0)
 
     # 2. Provide already instantiated variables (Converters should passthrough)
-    existing_param = Param(10.0)
+    existing_param = Tagged(10.0)
     model2 = TestModel(c_val=1.0, d_val=1.0, p_val=existing_param)
     
     # It should be the exact instance, not Param(Param(10.0))
@@ -149,15 +139,15 @@ def test_dataclass_helpers():
 def test_map_variables():
     """Test mapping safely bypasses non-variables."""
     tree = {
-        "v1": Param(2.0),
-        "v2": Param(3.0),
+        "v1": Tagged(2.0),
+        "v2": Tagged(3.0),
         "static": "ignore_me",
         "arr": jnp.array([1, 2])
     }
     
     # Let's write a map function that squares the raw_value of all variables
     def square_var(v: AbstractVariable):
-        return Param(v.raw_value ** 2)
+        return Tagged(v.raw_value ** 2)
 
     mapped_tree = map_variables(square_var, tree)
     

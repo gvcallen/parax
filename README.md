@@ -42,8 +42,8 @@ Parax provides array-like variables that hold metadata and can be parameterized/
 import parax as prx
 import jax.numpy as jnp
 
-p1 = prx.Param(1.0, metadata={'hello', 'world'})
-p2 = prx.Constrained(8.0, prx.Interval(0.0, 10.0))
+p1 = prx.Tagged(1.0, metadata={'hello', 'world'})
+p2 = prx.Constrained(8.0, prx.constraints.Interval(0.0, 10.0))
 
 p2.raw_value, p2.bounds
 # Array(1.3862944), (Array(0.0), Array(10.0))

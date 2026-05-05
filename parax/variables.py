@@ -19,7 +19,7 @@ from parax.unwrappables import AbstractUnwrappable, Frozen
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
 from parax.constant import AbstractConstant
-from parax.tagged import AbstractTagged
+from parax.annotated import AbstractAnnotated
 
 from distreqx.distributions import AbstractDistribution, ImproperUniform
 
@@ -104,23 +104,23 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     def __round__(self, ndigits: int = 0) -> Array: return jnp.round(self.value, ndigits) 
 
 
-ParamLike = AbstractVariable | Inexact[Array, "..."]
+Param = AbstractVariable | Inexact[Array, "..."]
 """
-A type alias representing any parameter-like object.
+A type alias representing a JAX parameter.
 
-This includes any Parax variables (like `Param`, `Constrained`, `Physical`) 
+This includes any Parax variables (like `Tagged`, `Constrained`, `Derived`) 
 as well as standard JAX inexact arrays.
 """
 
-def _as_param_like(x):
+def _as_param(x):
     if isinstance(x, AbstractVariable):
         return x
     return jnp.asarray(x)
 
 
-class Param(AbstractVariable, AbstractTagged):
+class Tagged(AbstractVariable, AbstractAnnotated[dict]):
     """
-    A canonical parameter with metadata.
+    A variable with dictionary metadata.
 
     Represents a simple, trainable variable
     with a single underlying `raw_value` and metadata.
@@ -129,7 +129,7 @@ class Param(AbstractVariable, AbstractTagged):
         raw_value: The raw value used by optimizers and samplers.
         metadata: Additional arbitrary metadata.
     """
-    raw_value: ParamLike = eqx.field(converter=_as_param_like)
+    raw_value: Param = eqx.field(converter=_as_param)
     metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
 
     @property
@@ -151,7 +151,7 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     Attributes:
         raw_value: The underlying variable that is being fixed.
     """
-    raw_value: ParamLike
+    raw_value: Param
 
     def __post_init__(self):
         if isinstance(self.raw_value, Fixed):
@@ -182,7 +182,7 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    raw_value: ParamLike = eqx.field(converter=_as_param_like)
+    raw_value: Param = eqx.field(converter=_as_param)
     fn: Callable = eqx.field(static=True)
 
     @property
@@ -209,7 +209,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         raw_value: The raw, unconstrained value mapping to the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
     """
-    raw_value: ParamLike = eqx.field(converter=_as_param_like)
+    raw_value: Param = eqx.field(converter=_as_param)
     constraint: AbstractConstraint = eqx.field(converter=Frozen)
 
     def __init__(
@@ -217,7 +217,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         value: Array | None = None,
         constraint: AbstractConstraint | None = None,
         *,
-        raw_value: ParamLike | None = None,
+        raw_value: Param | None = None,
     ):
         """
         Args:
@@ -235,7 +235,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         
         # Array standardization
         if raw_value is not None:
-            raw_value = _as_param_like(raw_value)
+            raw_value = _as_param(raw_value)
             shape = raw_value.shape
         else:
             value = jnp.asarray(value)
@@ -290,13 +290,13 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
                    in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
-    raw_value: ParamLike = eqx.field(converter=_as_param_like)
+    raw_value: Param = eqx.field(converter=_as_param)
     distribution: AbstractDistribution = eqx.field(converter=Frozen)
 
     def __init__(
         self,
         distribution: AbstractDistribution | None = None,
-        raw_value: ParamLike = None,
+        raw_value: Param = None,
     ):
         """
         Args:
@@ -317,7 +317,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
                 raise ValueError("`raw_value` must be provided in `parax.Random` if `distribution` does not support `mean`")
 
         # Array standardization
-        raw_value = _as_param_like(raw_value)
+        raw_value = _as_param(raw_value)
         shape = raw_value.shape
         
         
@@ -334,55 +334,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
 
     def update(self, base: Array) -> "AbstractProbabilistic":
         return eqx.tree_at(lambda x: x.raw_value, self, base)
-
-
-class Physical(AbstractVariable):
-    """
-    A physical variable with a scale or unit.
     
-    Multiplies the underlying `parax.ParamLike` by an `ArrayLike` float or unit.
-
-    Useful for scientific modeling. Applies a linear physical scale 
-    (e.g., units or preconditioning) as the final evaluation step on top of 
-    an underlying variable (such as a `Constrained` or `Param` instance).
-
-    Attributes:
-        variable: The underlying parameter or array being scaled.
-        scale: Linear preconditioning factor or physical unit (e.g., `unxt.Quantity`).
-    """
-    raw_value: ParamLike = eqx.field(converter=_as_param_like)
-    scale: ArrayLike = eqx.field(converter=Fixed)
-
-    def __init__(
-        self,
-        raw_value: ParamLike,
-        scale: Any = 1.0,
-    ):
-        """
-        Args:
-            raw_value: The underlying base variable (e.g., `Constrained`, `Param`, or Array).
-            scale: Linear multiplier or unit string. If a string is provided, 
-                it is converted automatically using `unxt.unit()`.
-        """
-        # Scale standardization
-        if isinstance(scale, (float, int, Array)):
-            scale = jnp.asarray(scale, dtype=float)
-        elif isinstance(scale, str):
-            try:
-                import unxt
-            except ImportError as e:
-                raise Exception("Using units as scales requires the `unxt` package")
-            scale = jnp.array(1.0) * unxt.unit(scale)
-
-        self.raw_value = raw_value
-        self.scale = scale
-
-    @property
-    def value(self) -> Array:
-        """Returns the physically scaled value."""
-        from parax.converters import as_free
-        return as_free(self.scale) * self.raw_value
-
 
 def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
     """
@@ -417,12 +369,12 @@ def map_variables_with_path(f: Callable[[Any, AbstractVariable], Any], pytree: P
     return jax.tree.map_with_path(lambda p, x: f(p, x) if is_variable(x) else x, pytree, is_leaf=is_variable)
 
 
-def param(
-    default: ParamLike = dataclasses.MISSING,
+def tagged(
+    default: Param = dataclasses.MISSING,
     metadata: dict | None = None,
 ) -> Any:
     """
-    Specifies a dataclass field for a standard Parax `Param`.
+    Specifies a dataclass field for a Parax `Tagged` variable.
 
     Args:
         default: The default value. If omitted, this field becomes required 
@@ -438,7 +390,7 @@ def param(
         if isinstance(x, AbstractVariable):
             return x
         
-        return Param(x, metadata=metadata)
+        return Tagged(x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:
@@ -449,7 +401,7 @@ def param(
 
 def derived(
     fn: Callable,
-    default: ParamLike = dataclasses.MISSING,
+    default: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.
@@ -474,7 +426,7 @@ def derived(
 
 
 def constrained(
-    default: ParamLike = dataclasses.MISSING,
+    default: Param = dataclasses.MISSING,
     constraint: AbstractConstraint | None = None,
 ) -> Any:
     """
@@ -501,7 +453,7 @@ def constrained(
 
 def random(
     distribution: AbstractDistribution | None = None,
-    default: ParamLike = dataclasses.MISSING,
+    default: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Random` variable.
@@ -517,34 +469,6 @@ def random(
         if isinstance(x, AbstractVariable):
             return x
         return Random(distribution, raw_value=x)
-
-    field_kwargs = {"converter": converter}
-    if default is not dataclasses.MISSING:
-        field_kwargs["default"] = default
-        
-    return eqx.field(**field_kwargs)
-
-
-def physical(
-    default: ParamLike = dataclasses.MISSING,
-    scale: Any = 1.0,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `Physical` parameter wrapper.
-
-    Args:
-        default: The default underlying variable (e.g. `Constrained`, `Param`, or Array). 
-            If omitted, this field becomes required by the user during instantiation.
-        scale: Linear preconditioning factor or unit string (e.g., "mm").
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        # Avoid double-wrapping if the user passes an already instantiated Physical
-        if isinstance(x, Physical):
-            return x
-        return Physical(x, scale=scale)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:

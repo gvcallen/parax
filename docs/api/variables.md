@@ -1,8 +1,8 @@
 ::: parax.AbstractVariable
 
-::: parax.ParamLike
-
 ::: parax.Param
+
+::: parax.Tagged
 
 ::: parax.Fixed
 
@@ -10,15 +10,11 @@
 
 ::: parax.Constrained
 
-::: parax.Physical
-
-::: parax.param
+::: parax.tagged
 
 ::: parax.derived
 
 ::: parax.constrained
-
-::: parax.physical
 
 ::: parax.map_variables
 

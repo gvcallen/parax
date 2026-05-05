@@ -1,19 +1,19 @@
-::: parax.AbstractConstraint
+::: parax.constraints.AbstractConstraint
 
-::: parax.RealLine
+::: parax.constraints.RealLine
 
-::: parax.GreaterThan
+::: parax.constraints.GreaterThan
 
-::: parax.LessThan
+::: parax.constraints.LessThan
 
-::: parax.Interval
+::: parax.constraints.Interval
 
-::: parax.Positive
+::: parax.constraints.Positive
 
-::: parax.Negative
+::: parax.constraints.Negative
 
-::: parax.TransformedConstraint
+::: parax.constraints.TransformedConstraint
 
-::: parax.TreeConstraint
+::: parax.constraints.TreeConstraint
 
-::: parax.CustomConstraint
+::: parax.constraints.CustomConstraint

@@ -13,44 +13,30 @@ from parax.unwrappables import (
     Parameterized as Parameterized,
     Computed as Computed,
     unwrap as unwrap,
+    frozen as frozen,
 )
 
 from parax.variables import (
     AbstractVariable as AbstractVariable,
-    ParamLike as ParamLike,
     Param as Param,
+    Tagged as Tagged,
     Fixed as Fixed,
     Derived as Derived,
     Constrained as Constrained,
     Random as Random,
-    Physical as Physical,
-    param as param,
+    tagged as tagged,
     derived as derived,
     constrained as constrained,
     random as random,
-    physical as physical,
     map_variables as map_variables,
     map_variables_with_path as map_variables_with_path,
 )
 
-from parax.constraints import (
-    AbstractConstraint as AbstractConstraint,
-    RealLine as RealLine,
-    GreaterThan as GreaterThan,
-    LessThan as LessThan,
-    Interval as Interval,
-    Positive as Positive,
-    Negative as Negative,
-    TransformedConstraint as TransformedConstraint,
-    TreeConstraint as TreeConstraint,
-    CustomConstraint as CustomConstraint,
-)
-
 from parax.filters import (
     is_constant as is_constant,
-    is_tagged as is_tagged,
+    is_annotated as is_annotated,
     is_variable as is_variable,
-    is_param_like as is_param_like,
+    is_param as is_param,
     is_unwrappable as is_unwrappable,
     is_bounded as is_bounded,
     is_probabilistic as is_probabilistic,
@@ -68,9 +54,9 @@ from parax.converters import (
 
 
 from parax import (
+    annotated as annotated,
     constant as constant,
     constraints as constraints,
-    tagged as tagged,
     bounded as bounded,
     probabilistic as probabilistic,
     unwrappables as unwrappables,

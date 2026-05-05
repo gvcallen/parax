@@ -1,10 +1,10 @@
 ::: parax.is_constant
 
-::: parax.is_tagged
+::: parax.is_annotated
 
 ::: parax.is_variable
 
-::: parax.is_param_like
+::: parax.is_param
 
 ::: parax.is_unwrappable
 

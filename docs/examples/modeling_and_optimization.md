@@ -6,11 +6,12 @@ Lets define a simple exponential decay model: $y = A e^{-kt} + C$ using `equinox
 import jax.numpy as jnp
 import equinox as eqx
 import parax as prx
+from parax.constraints import Positive
 
 class DecayCurve(eqx.Module):
-    rate: prx.ParamLike
-    baseline: prx.ParamLike
-    amplitude: prx.ParamLike = prx.constrained(prx.Positive())
+    rate: prx.Param
+    baseline: prx.Param
+    amplitude: prx.Param = prx.constrained(Positive())
 
     def __call__(self, t):
         return self.amplitude * jnp.exp(-self.rate * t) + self.baseline

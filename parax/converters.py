@@ -1,8 +1,11 @@
 from typing import TypeVar, Union, Any
 
+import jax.numpy as jnp
+
 from parax.constant import AbstractConstant
-from parax.variables import Param, ParamLike, Fixed
+from parax.variables import Param, Fixed
 from parax.unwrappables import Frozen
+from parax.filters import is_param
 
 T = TypeVar('T')
 
@@ -40,7 +43,7 @@ def as_frozen(pytree: Union[T | Frozen[T]]) -> T:
     return Frozen(pytree)
 
 
-def as_param(value: Any) -> Param:
+def as_param(value: Any) -> Any:
     """
     Returns `value` as a `parax.Param`, wrapping it if necessary.
 
@@ -50,13 +53,13 @@ def as_param(value: Any) -> Param:
     Returns:
         The instantiated parameter.
     """    
-    if isinstance(value, Param):
+    if is_param(value):
         return value
-    return Param(raw_value=value)
+    return jnp.asarray(value)
 
 
 
-def as_fixed(value: ParamLike) -> Fixed:
+def as_fixed(value: Param) -> Fixed:
     """
     Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
 

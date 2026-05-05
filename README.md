@@ -4,7 +4,7 @@
 
 - Parameters with metadata
 - Computed PyTrees and callable parameterizations
-- Derived, constrained, physical and random variables
+- Derived, constrained, fixed, physical and random variables
 - Arbitrary nesting of the above
 - Abstract interfaces and associated tree manipulation tools
 

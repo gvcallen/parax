@@ -7,7 +7,15 @@
 - Abstract interfaces for fixed, bounded, and probabilistic PyTrees
 - Associated filtering and tree manipulation tools
 
-Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (such as [Equinox](https://github.com/patrick-kidger/equinox)).
+The above makes Parax great for:
+
+- Parameterizations in machine learning
+- Bounded optimization in scientific modeling
+- Bayesian inference in probabilistic modeling
+
+Examples for each of these are available in the documentation.
+
+Note that Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
 
 ## Installation
 Parax can be installed using pip:
@@ -24,7 +32,7 @@ pip install git+https://github.com/gvcallen/distreqx.git
 
 ## Documentation
 
-Documentation is available [here](https://gvcallen.github.io/parax/), with examples on unconstrained/bounded optimization and more.
+Documentation is available [here](https://gvcallen.github.io/parax/).
 
 ## Quick example
 

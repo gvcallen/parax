@@ -285,29 +285,41 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
     to integrate with stochastic samplers and other algorithms.
 
     Attributes:
-        raw_value: The raw un-probabilistic value.
         distribution: The probability distribution of `raw_value`.
+        raw_value: The raw un-probabilistic value. Can be None,
+                   in which case the mean of the distribution is used.
+                   If the mean is not supported, an exception is thrown.
     """
     raw_value: ParamLike = eqx.field(converter=_as_param_like)
     distribution: AbstractDistribution = eqx.field(converter=Frozen)
 
     def __init__(
         self,
-        raw_value: ParamLike = None,
         distribution: AbstractDistribution | None = None,
+        raw_value: ParamLike = None,
     ):
         """
         Args:
             raw_value: The un-probabilistic raw value.
             distribution: The probability distribution. If None, defaults to `distreqx.distributions.ImproperUniform.
         """
+        # Distribution standardization
+        if distribution is None:
+            distribution = ImproperUniform(shape=shape)
+            if raw_value is None:
+                raw_value = 0.0
+
+        # Try to extract raw_value from mean:
+        if raw_value is None:
+            try:
+                raw_value = distribution.mean()
+            except:
+                raise ValueError("`raw_value` must be provided in `parax.Random` if `distribution` does not support `mean`")
+
         # Array standardization
         raw_value = _as_param_like(raw_value)
         shape = raw_value.shape
         
-        # Distribution standardization
-        if distribution is None:
-            distribution = ImproperUniform(shape=shape)
         
         self.distribution = distribution
         self.raw_value = raw_value
@@ -315,6 +327,13 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
     @property
     def value(self) -> Array:
         return self.raw_value
+    
+    @property
+    def base(self) -> Array:
+        return jnp.asarray(self.value)
+
+    def update(self, base: Array) -> "AbstractProbabilistic":
+        return eqx.tree_at(lambda x: x.raw_value, self, base)
 
 
 class Physical(AbstractVariable):
@@ -481,8 +500,8 @@ def constrained(
 
 
 def random(
-    default: ParamLike = dataclasses.MISSING,
     distribution: AbstractDistribution | None = None,
+    default: ParamLike = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Random` variable.
@@ -497,7 +516,7 @@ def random(
     def converter(x: Any) -> AbstractVariable:
         if isinstance(x, AbstractVariable):
             return x
-        return Random(x, distribution=distribution)
+        return Random(distribution, raw_value=x)
 
     field_kwargs = {"converter": converter}
     if default is not dataclasses.MISSING:

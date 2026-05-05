@@ -55,6 +55,7 @@ def as_param(value: Any) -> Param:
     return Param(raw_value=value)
 
 
+
 def as_fixed(value: ParamLike) -> Fixed:
     """
     Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.

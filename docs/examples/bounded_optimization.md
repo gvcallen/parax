@@ -30,16 +30,16 @@ params, static = eqx.partition(initial_base, filter_spec, is_leaf=prx.is_constan
 lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 
-def objective(p, static_structure):
-    model = prx.unwrap(eqx.combine(p, static_structure))
-    return model()
+def objective(p, static):
+    unwrapped_model = prx.unwrap(eqx.combine(p, static))
+    return unwrapped_model()
 
 # Run the optimization
 solver = jaxopt.ScipyBoundedMinimize(fun=objective)
 results = solver.run(
     init_params=params, 
     bounds=(lower, upper), 
-    static_structure=static
+    static=static
 )
 
 # Reconstruct the optimized model

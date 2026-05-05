@@ -51,8 +51,9 @@ nav:
   - Getting started: index.md
   - Overview: overview.md
   - Examples:
-    - Modeling and optimization (Equinox/Optimistix): examples/modeling_and_optimization.md
+    - Regular optimization (Optimistix): examples/modeling_and_optimization.md
     - Bounded optimization (JAXopt): examples/bounded_optimization.md
+    - Bayesian inference (BlackJAX): examples/bayesian_inference.md
   - API:
     - Base Interfaces:
       - Constant: api/constant.md

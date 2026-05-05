@@ -1,6 +1,7 @@
 """
 An abstract interface for PyTrees that have an associated probability distribution.
 """
+from abc import abstractmethod
 from typing import Generic, TypeVar
 
 from jaxtyping import PyTree
@@ -9,10 +10,12 @@ import jax.numpy as jnp
 import equinox as eqx
 
 from distreqx.distributions import AbstractDistribution, Joint
+from parax.unwrappables import unwrap
 
-T = TypeVar("T")
+Base = TypeVar("Base")
 
-class AbstractProbabilistic(eqx.Module, Generic[T]):
+
+class AbstractProbabilistic(eqx.Module, Generic[Base]):
     """
     The abstract interface for a probabilistic PyTree.
 
@@ -20,8 +23,8 @@ class AbstractProbabilistic(eqx.Module, Generic[T]):
     associated with them. That is, samples from the resultant
     distribution should match the PyTree structure of `self`.
 
-    Currently Parax depends on `distreqx` for probability distributions,
-    however this may be generalized in the future.
+    Makes use of the concept of a "base" space
+    where inference algorithms operate.
     
     Used as a type check for `parax.is_probabilistic`. 
 
@@ -29,6 +32,47 @@ class AbstractProbabilistic(eqx.Module, Generic[T]):
         distribution: The probability distribution associated with this PyTree node.
     """
     distribution: eqx.AbstractVar[AbstractDistribution]
+
+    @property
+    @abstractmethod
+    def base(self) -> Base:
+        """Returns the current PyTree in the probability base space."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, base: Base) -> "AbstractProbabilistic":
+        """
+        Returns a new instance of this object updated with a new base PyTree.
+
+        Args:
+            base: The new base-space PyTree representing the sampled state.
+
+        Returns:
+            A new instance of the probabilistic object, updated to reflect the new base.
+        """
+        pass
+
+
+def tree_base(model: PyTree) -> PyTree:
+    """
+    Extracts a PyTree of base values from a probabilistic model. 
+    
+    Standard inexact arrays are left intact.
+
+    Args:
+        model: The original PyTree model potentially containing probabilistic nodes.
+
+    Returns:
+        A PyTree containing the extracted base values.
+    """
+    from parax.filters import is_probabilistic
+
+    def _extract(x):
+        if not is_probabilistic(x):
+            return x
+        return unwrap(x.base)
+
+    return jax.tree_util.tree_map(_extract, model, is_leaf=is_probabilistic)
 
 
 def tree_distribution(tree: PyTree) -> PyTree:
@@ -48,7 +92,7 @@ def tree_distribution(tree: PyTree) -> PyTree:
 
     def _get_distribution(x):
         if is_probabilistic(x):
-            return x.distribution
+            return unwrap(x.distribution)
         if eqx.is_inexact_array(x):
             from distreqx.distributions import ImproperUniform
             return ImproperUniform(shape=jnp.shape(x))
@@ -73,3 +117,26 @@ def tree_joint(tree: PyTree) -> Joint:
         A single joint distribution whose samples match the structure of `tree`.
     """
     return Joint(tree_distribution(tree))
+
+
+def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
+    """
+    Takes an updated base-space PyTree and injects it back into the 
+    original probabilistic model structure using `update`.
+
+    Args:
+        model: The original PyTree model containing the probabilistic nodes.
+        base_model: The updated PyTree containing the new base values.
+
+    Returns:
+        A new PyTree model with its internal states reconstructed to reflect 
+        the updated base values.
+    """
+    from parax.filters import is_probabilistic
+
+    def _rebuild(orig, base):
+        if is_probabilistic(orig):
+            return orig.update(base)
+        return base
+        
+    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_probabilistic)

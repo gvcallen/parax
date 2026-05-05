@@ -2,7 +2,7 @@
 
 Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of regular parameters, we will assign probability distributions to our variables using `prx.Random` variables to establish our priors.
 
-We'll define the model class, assign normal priors to our weight and bias, and initialize the model with our initial guesses. Note that math operations inside the `__call__` method instantly unwrap variables to standard JAX arrays.
+We'll define the model class, assign normal priors to our weight and bias, and initialize the model with our initial guesses.
 
 ```python
 import equinox as eqx
@@ -53,7 +53,7 @@ def log_posterior_fn(p, static, x_data, y_true):
 
 # 3. Running the sampler
 
-Mext we generate some noisy dummy data (with a true weight of `2.5` and a true bias of `1.0`) and set up our MCMC sampler. We'll use the No-U-Turn Sampler (NUTS) without window adaptation, initialize the state, define the sampling loop using `jax.lax.scan`, and finally run the sampler.
+Now we generate some noisy dummy data (with a true weight of `2.5` and a true bias of `1.0`) and set up our MCMC sampler. We'll use the No-U-Turn Sampler (NUTS) without window adaptation, initialize the state, define the sampling loop using `jax.lax.scan`, and finally run the sampler.
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -86,9 +86,11 @@ base_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 ```
 
 # 4. Evaluating the results
-Because `blackjax` preserves the PyTree structure of our inputs, `base_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.probabilistic.tree_update` to reconstruct the model and plot parameters and functional posteriors!
+Because `blackjax` preserves the PyTree structure of our inputs, `base_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.probabilistic.tree_update` to reconstruct the model and easily plot parameters and functional posteriors!
 
-We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our base space, it is always best practice to unwrap before evaluation. Finally, we generate predictions across the input space and plot the results.
+We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our base space, it is always best practice to unwrap before evaluation.
+
+Finally, we generate predictions across the input space and plot the results.
 
 <!-- pytest-codeblocks:cont -->
 ```python

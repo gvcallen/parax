@@ -182,7 +182,7 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    fn: Callable
+    fn: Callable = eqx.field(converter=Frozen)
     raw_value: Param = eqx.field(converter=_as_param)
 
     @property
@@ -290,8 +290,8 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
                    in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
-    raw_value: Param = eqx.field(converter=_as_param)
     distribution: AbstractDistribution = eqx.field(converter=Frozen)
+    raw_value: Param = eqx.field(converter=_as_param)
 
     def __init__(
         self,

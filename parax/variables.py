@@ -336,39 +336,6 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
         return eqx.tree_at(lambda x: x.raw_value, self, base)
     
 
-def map_variables(f: Callable[[AbstractVariable], Any], pytree: PyTree) -> PyTree:
-    """
-    Maps a callable over all `parax.AbstractVariable` nodes in a PyTree.
-
-    Safely bypasses standard arrays or PyTree structural nodes.
-
-    Args:
-        f: The callable mapping function.
-        pytree: Any JAX PyTree containing `parax.AbstractVariable` leaves.
-
-    Returns:
-        A new PyTree with the variables mapped. 
-    """
-    from parax.filters import is_variable
-    return jax.tree.map(lambda x: f(x) if is_variable(x) else x, pytree, is_leaf=is_variable)
-
-
-def map_variables_with_path(f: Callable[[Any, AbstractVariable], Any], pytree: PyTree) -> PyTree:
-    """
-    Maps a callable (which takes a key path) over all `parax.AbstractVariable` 
-    nodes in a PyTree.
-
-    Args:
-        f: The callable mapping function taking `(path, variable)`.
-        pytree: Any JAX PyTree containing `parax.AbstractVariable` leaves.
-
-    Returns:
-        A new PyTree with the variables mapped.
-    """
-    from parax.filters import is_variable
-    return jax.tree.map_with_path(lambda p, x: f(p, x) if is_variable(x) else x, pytree, is_leaf=is_variable)
-
-
 def tagged(
     default: Param = dataclasses.MISSING,
     metadata: dict | None = None,

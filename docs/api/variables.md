@@ -15,7 +15,3 @@
 ::: parax.derived
 
 ::: parax.constrained
-
-::: parax.map_variables
-
-::: parax.map_variables_with_path

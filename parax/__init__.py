@@ -28,8 +28,6 @@ from parax.variables import (
     derived as derived,
     constrained as constrained,
     random as random,
-    map_variables as map_variables,
-    map_variables_with_path as map_variables_with_path,
 )
 
 from parax.filters import (

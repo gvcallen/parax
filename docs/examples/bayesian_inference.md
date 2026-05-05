@@ -4,7 +4,6 @@ Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of r
 
 We'll define the model class, assign normal priors to our weight and bias, and initialize the model with our initial guesses. Note that math operations inside the `__call__` method instantly unwrap variables to standard JAX arrays.
 
-<!-- pytest-codeblocks:cont -->
 ```python
 import equinox as eqx
 import parax as prx

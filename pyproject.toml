@@ -24,6 +24,7 @@ docs = [
 test = [
     "pytest",
     "optimistix",
+    "blackjax",
     "jaxopt",
     "pytest-codeblocks",
 ]

@@ -27,6 +27,7 @@ In this tutorial, we will use `blackjax` for Bayesian sampling. We need to provi
 
 First, we use `parax.probabilistic` to extract the initial model values in the "base" probability space (where the distributions are defined) as well as our joint prior. Then, we partition the model into parameters and static metadata. Finally, in the log posterior function, we combine + unwrap and evaluate our data.
 
+<!-- pytest-codeblocks:cont -->
 ```python
 import jax
 import jax.numpy as jnp
@@ -57,6 +58,7 @@ def log_posterior_fn(p, static, x_data, y_true):
 
 Now we generate some noisy dummy data and set up our MCMC sampler. We'll use the No-U-Turn Sampler (NUTS) without window adaptation.
 
+<!-- pytest-codeblocks:cont -->
 ```python
 import blackjax
 import jax.random as jr
@@ -95,6 +97,7 @@ base_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 
 Because `blackjax` preserves the PyTree structure of our inputs, `base_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.probabilistic.tree_update` to reconstruct the model and plot parameters and functional posteriors!
 
+<!-- pytest-codeblocks:cont -->
 ```python
 import matplotlib.pyplot as plt
 

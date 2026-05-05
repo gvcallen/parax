@@ -4,7 +4,7 @@
 
 - Parameters with metadata
 - Computed PyTrees and callable parameterizations
-- Derived, constrained, fixed, physical and random variables
+- Derived, constrained, fixed, and random variables
 - Arbitrary nesting of the above
 - Abstract interfaces and associated tree manipulation tools
 
@@ -15,7 +15,7 @@ This makes Parax great for:
 - Bayesian inference for probabilistic modeling
 - Combinations of these
 
-Note that Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
+Note that Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)) and raw JAX arrays.
 
 ## Installation
 Parax can be installed using pip:

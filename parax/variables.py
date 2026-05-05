@@ -183,7 +183,7 @@ class Derived(AbstractVariable):
         fn: The callable used to transform the raw value.
     """
     raw_value: Param = eqx.field(converter=_as_param)
-    fn: Callable = eqx.field(static=True)
+    fn: Callable
 
     @property
     def value(self) -> Array:

@@ -15,7 +15,7 @@ This makes Parax great for:
 - Bayesian inference for probabilistic modeling
 - Any combinations of these
 
-Examples for each of these are available in the documentation.
+Examples of the above applications are available in the documentation.
 
 Note that Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
 

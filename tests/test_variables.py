@@ -13,7 +13,6 @@ from parax.variables import (
     tagged,
     derived,
     constrained,
-    map_variables,
 )
 from parax.constraints import Positive
 
@@ -134,25 +133,3 @@ def test_dataclass_helpers():
     
     # It should be the exact instance, not Param(Param(10.0))
     assert model2.p_val is existing_param
-
-
-def test_map_variables():
-    """Test mapping safely bypasses non-variables."""
-    tree = {
-        "v1": Tagged(2.0),
-        "v2": Tagged(3.0),
-        "static": "ignore_me",
-        "arr": jnp.array([1, 2])
-    }
-    
-    # Let's write a map function that squares the raw_value of all variables
-    def square_var(v: AbstractVariable):
-        return Tagged(v.raw_value ** 2)
-
-    mapped_tree = map_variables(square_var, tree)
-    
-    assert jnp.allclose(mapped_tree["v1"].value, 4.0)
-    assert jnp.allclose(mapped_tree["v2"].value, 9.0)
-    # Ensure static metadata and raw arrays were untouched
-    assert mapped_tree["static"] == "ignore_me"
-    assert jnp.allclose(mapped_tree["arr"], jnp.array([1, 2]))

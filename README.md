@@ -15,7 +15,7 @@ This makes Parax great for:
 - Bayesian inference for probabilistic modeling
 - Combinations of these
 
-Note that Parax is *not a framework*, and is designed to be both extendable and interoperable with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)) and raw JAX arrays.
+Note that Parax is *not a framework*, though it can be used to make one. Rather, it is focus on being both extendable and interoperable with other JAX libraries (such as [Equinox](https://github.com/patrick-kidger/equinox)).
 
 ## Installation
 Parax can be installed using pip:

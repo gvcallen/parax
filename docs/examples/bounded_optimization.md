@@ -57,6 +57,7 @@ final_model = prxb.tree_update(initial_model, opt_base)
 ```
 
 Our parameters match the minimum of the dummy model:
+<!-- pytest-codeblocks:cont -->
 ```python
 final_model.x.value
 # ~3.0

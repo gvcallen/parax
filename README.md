@@ -7,7 +7,7 @@
 - Abstract interfaces for fixed, bounded, and probabilistic PyTrees
 - Associated filtering and tree manipulation tools
 
-The above makes Parax great for:
+This makes Parax great for:
 
 - Parameterizations in machine learning
 - Bounded optimization in scientific modeling

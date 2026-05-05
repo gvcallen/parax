@@ -192,7 +192,8 @@ class Derived(AbstractVariable):
         
         Returns the raw state transformed by the derivation function.
         """
-        return self.fn(jnp.asarray(self.raw_value))
+        from parax.converters import as_free
+        return as_free(self.fn)(jnp.asarray(self.raw_value))
 
 
 class Constrained(AbstractVariable, AbstractBounded[Array]):

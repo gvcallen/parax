@@ -30,7 +30,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install git+https://github.com/gvcallen/distreqx.git
         # Install your package with test extras, plus the codeblocks plugin
-        pip install -e .[test] pytest-codeblocks
+        pip install -e .[test] pytest-codeblocks matplotlib
 
     - name: Run standard test suite
       run: |

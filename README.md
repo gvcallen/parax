@@ -2,17 +2,18 @@
 
 **Parax** is a library for parametric modeling in [JAX](https://github.com/jax-ml/jax). Features include:
 
-- Derived/constrained parameters with metadata
+- Parameters with metadata
 - Computed PyTrees and callable parameterizations
-- Abstract interfaces for fixed, bounded, and probabilistic PyTrees
-- Associated filtering and tree manipulation tools
+- Derived, constrained, physical and random variables
+- Arbitrary nesting of the above
+- Abstract interfaces and associated tree manipulation tools
 
 This makes Parax great for:
 
 - Parameterizations for machine learning
 - Bounded optimization for scientific modeling
 - Bayesian inference for probabilistic modeling
-- Combinations of these
+- Any combinations of these
 
 Examples for each of these are available in the documentation.
 

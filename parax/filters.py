@@ -12,6 +12,7 @@ from typing import Any, TypeGuard
 import equinox as eqx
 
 from parax.constant import AbstractConstant
+from parax.transforms import AbstractTransform
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
 from parax.variables import AbstractVariable
@@ -81,6 +82,13 @@ def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
     Returns True if `x` is an instance of `parax.AbstractConstraint`.
     """
     return isinstance(x, AbstractConstraint)
+
+
+def is_transform(x: Any) -> TypeGuard[AbstractTransform]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractTransform`.
+    """
+    return isinstance(x, AbstractTransform)
 
 
 def is_distribution(x: Any) -> TypeGuard[AbstractDistribution]:

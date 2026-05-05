@@ -55,15 +55,16 @@ nav:
     - Bounded optimization (JAXopt): examples/bounded_optimization.md
     - Bayesian inference (BlackJAX): examples/bayesian_inference.md
   - API:
-    - Base Interfaces:
+    - Interfaces:
       - Constant: api/constant.md
-      - Tagged: api/tagged.md
+      - Annotated: api/annotated.md
       - Bounded: api/bounded.md
       - Probabilistic: api/probabilistic.md
     - Parameters:
       - Unwrappables: api/unwrappables.md
       - Variables: api/variables.md
       - Constraints: api/constraints.md
+      - Transforms: api/transforms.md
     - Misc:
       - Filters: api/filters.md
       - Converters: api/converters.md

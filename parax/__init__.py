@@ -58,6 +58,7 @@ from parax import (
     constant as constant,
     constraints as constraints,
     bounded as bounded,
+    experimental as experimental,
     probabilistic as probabilistic,
     unwrappables as unwrappables,
     variables as variables,

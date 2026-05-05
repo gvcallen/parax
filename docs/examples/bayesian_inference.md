@@ -147,3 +147,11 @@ axes[2].legend()
 plt.tight_layout()
 plt.show()
 ```
+
+# 5. Advantages of Parax
+
+You may have noticed that we could have accomplish the above without the added abstraction of `parax.Random` variable wrappers (i.e. by defining our models using `distreqx` distributions directly). However, building models using Parax variables (`parax.AbstractVariables`) has a number of quality-of-live benefits:
+
+- **Easy fixing of variables**. You can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.
+- **Compatibility with optimization**. It is common to want to swap between optimization and Bayesian sampling. For example, we could easily define a factory that wraps a `parax.Random` in a `parax.Constrained`, allowing us to toggle between bounded optimation and inference.
+- **Parameters as first-class citizens**. Models contain parameters - not distributions. By prioritizing a parameter-centred approach, and simply attaching priors as metadata and using tree tools at model setup, we maintain a clear separation of concerns. This naturally has downstream benefits.

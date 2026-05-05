@@ -70,9 +70,9 @@ In the above example, `prx.Computed` operates on the whole PyTree, while `prx.De
 
 Several tutorials are available in the documentation, for example:
 
-- [Regular optimization (Optimistix)](https://gvcallen.github.io/parax/examples/modeling_and_optimization/)
-- [Bounded optimization (JAXopt)](https://gvcallen.github.io/parax/examples/bounded_optimization/)
-- [Bayesian inference (BlackJAX)](https://gvcallen.github.io/parax/examples/bayesian_inference/)
+- [Regular optimization](https://gvcallen.github.io/parax/examples/modeling_and_optimization/) (Optimistix)
+- [Bounded optimization](https://gvcallen.github.io/parax/examples/bounded_optimization/) (JAXopt)
+- [Bayesian inference](https://gvcallen.github.io/parax/examples/bayesian_inference/) (BlackJAX)
 
 ## Related
 

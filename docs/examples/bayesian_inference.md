@@ -40,7 +40,7 @@ prior, _ = eqx.partition(prior_dist, filter_spec, is_leaf=prx.is_constant)
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
 
-Note how we do all probabilistic calculations in the base space, and only unwrap the model for the forward pass
+Note how we do all probabilistic calculations in the base space, and only unwrap the model for the forward pass.
 <!-- pytest-codeblocks:cont -->
 ```python
 def log_posterior_fn(p, static, x_data, y_true):

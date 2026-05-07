@@ -2,6 +2,8 @@
 
 This example demonstrates Bayesian sampling of a linear regression model with independent priors using `blackjax`.
 
+**NB**: This example unwraps random variables onto the real line before sampling. Random varies with finite support are not yet fully catered for.
+
 ## 1. Defining the model
 
 Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of regular parameters, we will assign probability distributions to our variables using `prx.Random` variables to establish our priors.
@@ -33,13 +35,12 @@ First, we use `parax.probabilistic` to extract the initial model values in the "
 ```python
 import jax
 import jax.numpy as jnp
-import parax.probabilistic as prxp
 
-base_prior = prxp.tree_joint(initial_model)
-initial_base = prxp.tree_base(initial_model)
+prior = prx.probabilistic.tree_joint(initial_model)
+initial_values = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
 
 filter_spec = eqx.is_inexact_array
-params, static = eqx.partition(initial_base, filter_spec, is_leaf=prx.is_constant)
+params, static = eqx.partition(initial_values, filter_spec, is_leaf=prx.is_constant)
 ```
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
@@ -48,10 +49,10 @@ Note how we do all probabilistic calculations in the base space, and only unwrap
 <!-- pytest-codeblocks:cont -->
 ```python
 def log_posterior_fn(params, static, x_data, y_true):
-    base = eqx.combine(params, static)
-    log_prior = base_prior.log_prob(base)
+    values = eqx.combine(params, static)
+    log_prior = prior.log_prob(values)
     
-    unwrapped = prx.unwrap(base)
+    unwrapped = prx.unwrap(values)
     y_pred = jax.vmap(unwrapped)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
     
@@ -106,8 +107,8 @@ import matplotlib.pyplot as plt
 
 clean_samples = jax.tree.map(lambda x: x[500:], base_samples)
 
-base_models = eqx.combine(clean_samples, static)
-sampled_models = prxp.tree_update(initial_model, base_models)
+value_models = eqx.combine(clean_samples, static)
+sampled_models = prx.wrap(initial_model, value_models, only_if=prx.is_probabilistic)
 
 unwrapped_models = prx.unwrap(sampled_models)
 

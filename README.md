@@ -12,8 +12,9 @@ This makes Parax great for:
 
 - Parameterizations for machine learning
 - Bounded optimization for scientific modeling
-- Bayesian inference for probabilistic modeling
-- Combinations of these
+- Probabilistic modeling and Bayesian inference
+- Deep, nested PyTrees
+- Combinations of the above
 
 Note that Parax is *not a framework*, though it can be used to make one. Rather, it is focused on extendability and interoperability with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
 

@@ -30,12 +30,11 @@ import jax
 import jax.numpy as jnp
 import parax.probabilistic as prxp
 
+base_prior = prxp.tree_joint(initial_model)
 initial_base = prxp.tree_base(initial_model)
-prior_dist = prxp.tree_joint(initial_model)
 
 filter_spec = eqx.is_inexact_array
 params, static = eqx.partition(initial_base, filter_spec, is_leaf=prx.is_constant)
-prior, _ = eqx.partition(prior_dist, filter_spec, is_leaf=prx.is_constant)
 ```
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
@@ -45,7 +44,7 @@ Note how we do all probabilistic calculations in the base space, and only unwrap
 ```python
 def log_posterior_fn(p, static, x_data, y_true):
     base = eqx.combine(p, static)
-    log_prior = prior_dist.log_prob(base)
+    log_prior = base_prior.log_prob(base)
     
     unwrapped = prx.unwrap(base)
     y_pred = jax.vmap(unwrapped)(x_data)

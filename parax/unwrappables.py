@@ -151,3 +151,22 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
     def unwrap(self) -> T:
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
+    
+
+class Static(AbstractUnwrappable[T]):
+    """
+    Wraps a tree and marks it as static.
+    """
+    tree: T = eqx.field(static=True)
+
+    def __init__(self, tree: T):
+        """
+        Args:
+            tree: The PyTree to freeze.
+        """
+        if isinstance(tree, Static):
+            tree = tree.tree
+        self.tree = tree
+
+    def unwrap(self) -> T:
+        return self.tree

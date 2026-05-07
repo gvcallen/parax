@@ -7,3 +7,5 @@
 ::: parax.Parameterized
 
 ::: parax.Computed
+
+::: parax.Static

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from parax.constant import AbstractConstant
 from parax.variables import Param, Fixed
-from parax.unwrappables import Frozen
+from parax.unwrappables import Frozen, Static
 from parax.filters import is_param
 
 T = TypeVar('T')
@@ -28,21 +28,6 @@ def as_free(value: Union[AbstractConstant[T], T]) -> T:
     return value
 
 
-def as_frozen(pytree: Union[T | Frozen[T]]) -> T:
-    """
-    Returns `pytree` wrapped in a `parax.Frozen` module, creating one if needed.
-
-    Args:
-        pytree: An arbitrary PyTree.
-
-    Returns:
-        A frozen version of the PyTree. If it is already frozen, returns it directly.
-    """    
-    if isinstance(pytree, Frozen):
-        return pytree
-    return Frozen(pytree)
-
-
 def as_param(value: Any) -> Any:
     """
     Returns `value` as a `parax.Param`, wrapping it if necessary.
@@ -58,7 +43,6 @@ def as_param(value: Any) -> Any:
     return jnp.asarray(value)
 
 
-
 def as_fixed(value: Param) -> Fixed:
     """
     Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
@@ -72,3 +56,33 @@ def as_fixed(value: Param) -> Fixed:
     if isinstance(value, Fixed):
         return value
     return Fixed(value)
+
+
+def as_frozen(pytree: Union[T | Frozen[T]]) -> T:
+    """
+    Returns `pytree` wrapped in a `parax.Frozen` module, creating one if needed.
+
+    Args:
+        pytree: An arbitrary PyTree.
+
+    Returns:
+        A frozen version of the PyTree. If it is already frozen, returns it directly.
+    """    
+    if isinstance(pytree, Frozen):
+        return pytree
+    return Frozen(pytree)
+
+
+def as_static(pytree: Union[T | Static[T]]) -> T:
+    """
+    Returns `pytree` wrapped in a `parax.Static` module, creating one if needed.
+
+    Args:
+        pytree: An arbitrary PyTree.
+
+    Returns:
+        A static frozen version of the PyTree. If it is already static, returns it directly.
+    """    
+    if isinstance(pytree, Static):
+        return pytree
+    return Static(pytree)

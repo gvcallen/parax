@@ -12,6 +12,7 @@ from parax.unwrappables import (
     Frozen as Frozen,
     Parameterized as Parameterized,
     Computed as Computed,
+    Static as Static,
     unwrap as unwrap,
 )
 

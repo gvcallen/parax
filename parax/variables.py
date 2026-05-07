@@ -11,11 +11,11 @@ import dataclasses
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree, Inexact, ArrayLike
+from jaxtyping import Array, Inexact
 import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
-from parax.unwrappables import AbstractUnwrappable, Frozen
+from parax.unwrappables import AbstractUnwrappable, Frozen, unwrap
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
 from parax.constant import AbstractConstant
@@ -130,32 +130,32 @@ class Tagged(AbstractVariable, AbstractAnnotated[dict]):
         metadata: Additional arbitrary metadata.
     """
     raw_value: Param = eqx.field(converter=_as_param)
-    metadata: dict = eqx.field(default_factory=dict, static=True, kw_only=True)
+    metadata: dict = eqx.field(default_factory=dict, static=True)
 
     @property
     def value(self) -> Array:
-        return self.raw_value
-    
+        return jnp.asarray(self.raw_value)
 
 class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     """
     A fixed variable.
     
-    Implements `AbstractConstant` for structural filtering during partitioning.
+    Implements `AbstractConstant` for filtering during partitioning.
      
-    **Corner Case Note:** This class implements `__getattr__` to forward all 
-    unrecognized attribute lookups to the underlying wrapped variable. This means 
-    a `Fixed(Constrained(...))` object will still safely expose `.constraint`, 
-    `.bounds`, and `.metadata` to the user as if it weren't wrapped at all.
-
     Attributes:
         raw_value: The underlying variable that is being fixed.
     """
     raw_value: Param
 
-    def __post_init__(self):
-        if isinstance(self.raw_value, Fixed):
-            self.raw_value = self.raw_value.raw_value
+    def __init__(self, raw_value: Param | None = None):
+        """
+        Args:
+            raw_value: The underlying value to be fixed.
+        """
+        # Error checking
+        if isinstance(raw_value, Fixed):
+            raw_value = raw_value.raw_value
+        self.raw_value = raw_value    
 
     def as_free(self) -> AbstractVariable:
         return self.raw_value
@@ -226,7 +226,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
             value: The desired output (constrained) value. If provided, the internal 
                 `raw_value` is computed dynamically via the constraint's inverse bijector. 
                 Mutually exclusive with `raw_value`.
-            raw_value: The unconstrained optimizer-space value. Mutually exclusive with `value`.
+            raw_value: The unconstrained underlying value. Mutually exclusive with `value`.
         """
         # Error checking
         if value is None and raw_value is None:
@@ -321,7 +321,6 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
         raw_value = _as_param(raw_value)
         shape = raw_value.shape
         
-        
         self.distribution = distribution
         self.raw_value = raw_value
 
@@ -335,17 +334,17 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
 
     def update(self, base: Array) -> "AbstractProbabilistic":
         return eqx.tree_at(lambda x: x.raw_value, self, base)
-    
 
 def tagged(
-    default: Param = dataclasses.MISSING,
+    raw_value: Param = dataclasses.MISSING,
+    *,
     metadata: dict | None = None,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Tagged` variable.
 
     Args:
-        default: The default value. If omitted, this field becomes required 
+        raw_value: The default raw value. If omitted, this field becomes required 
             by the user during instantiation.
         metadata: Additional static metadata to store.
         
@@ -361,22 +360,22 @@ def tagged(
         return Tagged(raw_value=x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
-    if default is not dataclasses.MISSING:
-        field_kwargs["default"] = default
+    if raw_value is not dataclasses.MISSING:
+        field_kwargs["default"] = raw_value
 
     return eqx.field(**field_kwargs)
 
 
 def derived(
     fn: Callable = lambda x: x,
-    default: Param = dataclasses.MISSING,
+    raw_value: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `Derived` variable.
 
     Args:
         fn: The callable used to transform the raw value.
-        default: The default raw value. If omitted, this field becomes required.
+        value: The default raw value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -387,22 +386,22 @@ def derived(
         return Derived(fn=fn, raw_value=x)
 
     field_kwargs = {"converter": converter}
-    if default is not dataclasses.MISSING:
-        field_kwargs["default"] = default
+    if raw_value is not dataclasses.MISSING:
+        field_kwargs["default"] = raw_value
         
     return eqx.field(**field_kwargs)
 
 
 def constrained(
     constraint: AbstractConstraint | None = None,
-    default: Param = dataclasses.MISSING,
+    value: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Constrained` variable.
 
     Args:
         constraint: The abstract constraint defining base bounds and mappings.
-        default: The default constrained value. If omitted, this field becomes required.
+        value: The default constrained value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -413,22 +412,22 @@ def constrained(
         return Constrained(constraint=constraint, value=x)
 
     field_kwargs = {"converter": converter}
-    if default is not dataclasses.MISSING:
-        field_kwargs["default"] = default
+    if value is not dataclasses.MISSING:
+        field_kwargs["default"] = value
         
     return eqx.field(**field_kwargs)
 
 
 def random(
     distribution: AbstractDistribution | None = None,
-    default: Param = dataclasses.MISSING,
+    value: Param = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Random` variable.
 
     Args:
-        default: The default value. If omitted, this field becomes required.
-        constraint: The abstract constraint defining base bounds and mappings.
+        distribution: The distribution defining base bounds and mappings.
+        value: The default value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.
@@ -439,7 +438,7 @@ def random(
         return Random(distribution=distribution, raw_value=x)
 
     field_kwargs = {"converter": converter}
-    if default is not dataclasses.MISSING:
-        field_kwargs["default"] = default
+    if value is not dataclasses.MISSING:
+        field_kwargs["default"] = value
         
     return eqx.field(**field_kwargs)

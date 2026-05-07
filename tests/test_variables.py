@@ -26,7 +26,7 @@ def test_param_and_dunders():
     Test basic parameter instantiation and prove that mathematical 
     dunder methods instantly strip wrappers and return standard arrays.
     """
-    p = Tagged(raw_value=2.0, metadata={"name": "test_param"})
+    p = Tagged(2.0, metadata={"name": "test_param"})
     
     assert p.shape == ()
     assert p.metadata["name"] == "test_param"
@@ -90,9 +90,9 @@ def test_constrained_initialization_modes():
 
 def test_fixed_stops_gradients():
     """Mathematically prove that Fixed disconnects the gradient graph."""
-    def loss_fn(raw_val):
+    def loss_fn(val):
         # Create a variable, then fix it
-        p = Tagged(raw_value=raw_val)
+        p = Tagged(raw_value=val)
         f = Fixed(p)
         return f.value ** 2
 
@@ -115,7 +115,7 @@ def test_dataclass_helpers():
         # Python dataclass rules: fields without defaults MUST come before fields with defaults!
         c_val: AbstractVariable = constrained(constraint=Positive())
         d_val: AbstractVariable = derived(fn=jnp.exp)
-        p_val: AbstractVariable = tagged(default=1.0)
+        p_val: AbstractVariable = tagged(raw_value=1.0)
 
     # 1. Provide raw floats (Converters should wrap them)
     model1 = TestModel(c_val=5.0, d_val=2.0)

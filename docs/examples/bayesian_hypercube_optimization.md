@@ -11,7 +11,6 @@ This is an advanced example building on previous examples. It demonstrates sever
 ## 1. Defining the model
 Similar to the Bayesian sampling example, we define a linear regression model $y = w \cdot x + b$. However, instead of defining the weight and bias with individual priors, we model them using a joint covariance matrix. We use a derived variable via a Cholesky decomposition (as opposed to using a multivariate normal from `distreqx.distributions`) so that we can map independent standard `Normal` distribution to the unit hypercube using their native `cdf` and `icdf` functions.
 
-<!-- pytest-codeblocks:cont -->
 ```python
 import parax as prx
 import equinox as eqx

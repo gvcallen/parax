@@ -51,14 +51,14 @@ class AbstractBounded(eqx.Module, Generic[Base]):
         pass
     
 
-def tree_base(model: PyTree) -> PyTree:
+def tree_base(tree: PyTree) -> PyTree:
     """
-    Extracts a PyTree of base values from a model. 
+    Extracts a PyTree of base values from a tree. 
     
     Standard inexact arrays are left intact.
 
     Args:
-        model: The original PyTree model potentially containing bounded nodes.
+        tree: The original PyTree tree potentially containing bounded nodes.
 
     Returns:
         A PyTree containing the extracted base values.
@@ -69,7 +69,7 @@ def tree_base(model: PyTree) -> PyTree:
             return x
         return x.base
 
-    return jax.tree_util.tree_map(_extract, model, is_leaf=is_bounded)
+    return jax.tree_util.tree_map(_extract, tree, is_leaf=is_bounded)
 
 
 def tree_lower(tree: PyTree) -> PyTree:
@@ -138,17 +138,17 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
     return tree_lower(tree), tree_upper(tree)
 
 
-def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
+def tree_update(tree: PyTree, base_tree: PyTree) -> PyTree:
     """
     Takes an updated base-space PyTree and injects it back into the 
-    original bounded model structure using `update_from_base`.
+    original bounded tree structure using `parax.AbstractBounded.update`.
 
     Args:
-        model: The original PyTree model containing the bounded nodes.
-        base_model: The updated PyTree containing the new base values.
+        tree: The original PyTree tree containing the bounded nodes.
+        base_tree: The updated PyTree containing the new base values.
 
     Returns:
-        A new PyTree model with its internal states reconstructed to reflect 
+        A new PyTree tree with its internal states reconstructed to reflect 
         the updated base values.
     """
     from parax.filters import is_bounded
@@ -158,4 +158,4 @@ def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
             return orig.update(base)
         return base
         
-    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_bounded)
+    return jax.tree_util.tree_map(_rebuild, tree, base_tree, is_leaf=is_bounded)

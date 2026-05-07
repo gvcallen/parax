@@ -39,13 +39,16 @@ prior, _ = eqx.partition(prior_dist, filter_spec, is_leaf=prx.is_constant)
 ```
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
+
+Note how we do all probabilistic calculations in the base space, and only unwrap the model for the forward pass
 <!-- pytest-codeblocks:cont -->
 ```python
 def log_posterior_fn(p, static, x_data, y_true):
-    unwrapped_model = prx.unwrap(eqx.combine(p, static))
-    log_prior = prior_dist.log_prob(unwrapped_model)
+    base = eqx.combine(p, static)
+    log_prior = prior_dist.log_prob(base)
     
-    y_pred = jax.vmap(unwrapped_model)(x_data)
+    unwrapped = prx.unwrap(base)
+    y_pred = jax.vmap(unwrapped)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
     
     return log_prior + log_likelihood

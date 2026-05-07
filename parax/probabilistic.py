@@ -53,14 +53,14 @@ class AbstractProbabilistic(eqx.Module, Generic[Base]):
         pass
 
 
-def tree_base(model: PyTree) -> PyTree:
+def tree_base(tree: PyTree) -> PyTree:
     """
-    Extracts a PyTree of base values from a probabilistic model. 
+    Extracts a PyTree of base values from a probabilistic tree. 
     
     Standard inexact arrays are left intact.
 
     Args:
-        model: The original PyTree model potentially containing probabilistic nodes.
+        tree: The original PyTree tree potentially containing probabilistic nodes.
 
     Returns:
         A PyTree containing the extracted base values.
@@ -72,7 +72,7 @@ def tree_base(model: PyTree) -> PyTree:
             return x
         return unwrap(x.base)
 
-    return jax.tree_util.tree_map(_extract, model, is_leaf=is_probabilistic)
+    return jax.tree_util.tree_map(_extract, tree, is_leaf=is_probabilistic)
 
 
 def tree_distribution(tree: PyTree) -> PyTree:
@@ -82,19 +82,19 @@ def tree_distribution(tree: PyTree) -> PyTree:
     Standard arrays default to `distreqx.ImproperUniform`.
 
     Args:
-        tree: The PyTree model containing probabilistic nodes or standard arrays.
+        tree: The PyTree containing probabilistic nodes or standard arrays.
 
     Returns:
         A PyTree of the exact same structure containing the extracted 
         probability distributions.
     """
     from parax.filters import is_probabilistic
+    from distreqx.distributions import ImproperUniform
 
     def _get_distribution(x):
         if is_probabilistic(x):
             return unwrap(x.distribution)
         if eqx.is_inexact_array(x):
-            from distreqx.distributions import ImproperUniform
             return ImproperUniform(shape=jnp.shape(x))
         return x
 
@@ -114,22 +114,22 @@ def tree_joint(tree: PyTree) -> Joint:
         tree: The PyTree model containing probabilistic nodes or standard arrays.
 
     Returns:
-        A single joint distribution whose samples match the structure of `tree`.
+        A single joint distribution whose event shape matches the structure of `tree`.
     """
     return Joint(tree_distribution(tree))
 
 
-def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
+def tree_update(tree: PyTree, base_tree: PyTree) -> PyTree:
     """
     Takes an updated base-space PyTree and injects it back into the 
-    original probabilistic model structure using `update`.
+    original probabilistic tree structure using `update`.
 
     Args:
-        model: The original PyTree model containing the probabilistic nodes.
-        base_model: The updated PyTree containing the new base values.
+        tree: The original PyTree tree containing the probabilistic nodes.
+        base_tree: The updated PyTree containing the new base values.
 
     Returns:
-        A new PyTree model with its internal states reconstructed to reflect 
+        A new PyTree tree with its internal states reconstructed to reflect 
         the updated base values.
     """
     from parax.filters import is_probabilistic
@@ -139,4 +139,4 @@ def tree_update(model: PyTree, base_model: PyTree) -> PyTree:
             return orig.update(base)
         return base
         
-    return jax.tree_util.tree_map(_rebuild, model, base_model, is_leaf=is_probabilistic)
+    return jax.tree_util.tree_map(_rebuild, tree, base_tree, is_leaf=is_probabilistic)

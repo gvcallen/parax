@@ -69,9 +69,9 @@ In the above example, `prx.Computed` operates on the whole PyTree's array-like n
 
 Several tutorials are available in the documentation, for example:
 
-- [Regular optimization](https://gvcallen.github.io/parax/examples/modeling_and_optimization/) (Optimistix)
-- [Bounded optimization](https://gvcallen.github.io/parax/examples/bounded_optimization/) (JAXopt)
-- [Bayesian inference](https://gvcallen.github.io/parax/examples/bayesian_inference/) (BlackJAX)
+- [Regular optimization](https://gvcallen.github.io/parax/examples/regular_optimization_optimistix/) (Optimistix)
+- [Bounded optimization](https://gvcallen.github.io/parax/examples/bounded_optimization_jaxopt/) (JAXopt)
+- [Bayesian sampling](https://gvcallen.github.io/parax/examples/bayesian_sampling_blackjax/) (BlackJAX)
 
 ## Related
 

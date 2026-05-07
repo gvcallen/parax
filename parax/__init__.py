@@ -16,15 +16,24 @@ from parax.bounded import is_bounded as is_bounded
 from parax.probabilistic import is_probabilistic as is_probabilistic
 from parax.constraints import is_constraint as is_constraint
 
-from parax.unwrappables import (
+from parax.unwrappable import (
     AbstractUnwrappable as AbstractUnwrappable,
+    unwrap as unwrap,
+    is_unwrappable as is_unwrappable,
+    as_unwrapped as as_unwrapped,
+)
+
+from parax.wrappable import (
+    AbstractWrappable as AbstractWrappable,
+    wrap as wrap,
+    is_wrappable as is_wrappable,
+)
+
+from parax.wrappers import (
     Frozen as Frozen,
     Parameterized as Parameterized,
     Computed as Computed,
     Static as Static,
-    unwrap as unwrap,
-    is_unwrappable as is_unwrappable,
-    as_unwrapped as as_unwrapped,
     as_frozen as as_frozen,
     as_static as as_static,
     as_frozen_or_static as as_frozen_or_static,
@@ -64,7 +73,7 @@ from parax import (
     bounded as bounded,
     experimental as experimental,
     probabilistic as probabilistic,
-    unwrappables as unwrappables,
     variables as variables,
     constraints as constraints,
+    wrappers as wrappers,
 )

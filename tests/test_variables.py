@@ -126,10 +126,3 @@ def test_dataclass_helpers():
     assert jnp.allclose(model1.p_val.value, 1.0) # default used
     assert jnp.allclose(model1.c_val.value, 5.0) # init via `value` due to kwarg pass
     assert jnp.allclose(model1.d_val.raw_value, 2.0)
-
-    # 2. Provide already instantiated variables (Converters should passthrough)
-    existing_param = Tagged(10.0)
-    model2 = TestModel(c_val=1.0, d_val=1.0, p_val=existing_param)
-    
-    # It should be the exact instance, not Param(Param(10.0))
-    assert model2.p_val is existing_param

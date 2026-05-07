@@ -6,78 +6,17 @@ and gradient stopping within JAX PyTrees.
 """
 
 from abc import abstractmethod
-from typing import Generic, TypeVar, Callable, Any, Union, TypeGuard
+from typing import Generic, TypeVar, Callable, Any, Union, TypeGuard, Self
 
 import equinox as eqx
 import jax
 from jaxtyping import PyTree
 
 from parax.constant import AbstractConstant
+from parax.unwrappable import AbstractUnwrappable
+from parax.wrappable import AbstractWrappable
 
 T = TypeVar("T")
-
-
-class AbstractUnwrappable(eqx.Module, Generic[T]):
-    """An abstract class representing a deferred or wrapped PyTree node.
-
-    Unwrappables act as placeholders within a PyTree. When `parax.unwrap` 
-    is called on the tree, these nodes execute custom logic (like computation 
-    or gradient stopping) and replace themselves with their output.
-    """
-
-    @abstractmethod
-    def unwrap(self) -> T:
-        """Returns the unwrapped pytree, assuming no wrapped subnodes exist."""
-        pass
-
-
-def unwrap(tree: PyTree):
-    """
-    Map across a PyTree and recursively resolve all `AbstractUnwrappable` nodes.
-
-    **Corner Case Note:** This function handles nested unwrappables from the 
-    inside out. If an `AbstractUnwrappable` contains other unwrappables, the 
-    inner nodes are recursively unwrapped *before* the outer node's `.unwrap()` 
-    method is called.
-    """
-
-    def _unwrap(tree, *, include_self: bool):
-        def _map_fn(leaf):
-            if isinstance(leaf, AbstractUnwrappable):
-                # Unwrap subnodes, then itself
-                return _unwrap(leaf, include_self=False).unwrap()
-            return leaf
-
-        def is_leaf(x):
-            is_unwrappable = isinstance(x, AbstractUnwrappable)
-            included = include_self or x is not tree
-            return is_unwrappable and included
-
-        return jax.tree_util.tree_map(f=_map_fn, tree=tree, is_leaf=is_leaf)
-
-    return _unwrap(tree, include_self=True)
-
-
-def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
-    """
-    Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
-    """
-    return isinstance(x, AbstractUnwrappable)
-
-
-def as_unwrapped(tree: Union[T | PyTree[T]]) -> T:
-    """
-    Calls `tree.unwrap` only if it is an `AbstractUnwrappable`, otherwise returns it.
-
-    Args:
-        tree: The tree to (potentially) unwrap.
-
-    Returns:
-        The unwrapped tree.
-    """
-    if isinstance(tree, AbstractUnwrappable):
-        return tree.unwrap()
-    return tree
 
 
 class Parameterized(AbstractUnwrappable[T]):
@@ -145,7 +84,7 @@ class Computed(AbstractUnwrappable[T]):
         return jax.tree.map(_map_fn, self.tree, is_leaf=eqx.is_array_like)
 
 
-class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
+class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
     """
     Applies `jax.lax.stop_gradient` to all array-like leaves before unwrapping.
 
@@ -174,6 +113,9 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
         differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
     
+    def wrap(self, tree: T) -> Self:
+        return Frozen(tree)
+    
 
 def as_frozen(tree: Union[T | Frozen[T]]) -> T:
     """
@@ -190,7 +132,7 @@ def as_frozen(tree: Union[T | Frozen[T]]) -> T:
     return Frozen(tree)
     
 
-class Static(AbstractUnwrappable[T]):
+class Static(AbstractUnwrappable[T], AbstractWrappable[T]):
     """
     Wraps a tree and marks it as static.
     """
@@ -207,6 +149,9 @@ class Static(AbstractUnwrappable[T]):
 
     def unwrap(self) -> T:
         return self.tree
+    
+    def wrap(self, tree: T) -> Self:
+        return Static(tree)
     
 
 def as_static(tree: Union[T | Static[T]]) -> T:

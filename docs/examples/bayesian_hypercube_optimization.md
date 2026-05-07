@@ -27,35 +27,35 @@ class CorrelatedBayesianModel(eqx.Module):
         cov = jnp.array([[5.0, 4.0], 
                          [4.0, 5.0]])
         chol_L = jax.scipy.linalg.cholesky(cov, lower=True)
-        
+
         def to_correlated(z):
             return loc + chol_L @ z
-            
+
         self.theta = prx.Derived(
             fn=to_correlated,
             raw_value=prx.Random(Normal(jnp.zeros(2), jnp.ones(2)))
         )
-        
+
         self.sigma = prx.Random(LogNormal(0.0, 1.0))
 
     def __call__(self, x):
         weight, bias = self.theta
         return weight * x + bias
-    
+
 initial_model = CorrelatedBayesianModel()
 ```
 
 ## 2. Setting up the negative log posterior
 
-To setup the log posterior, we first have to project the model to base space and then extract the distributions and initial hypercube values:
+To setup the log posterior, we unwrap the model into the bounded space, and then extract the distributions and initial hypercube values:
 
 <!-- pytest-codeblocks:cont -->
 ```python
 import parax.probabilistic as prxp
 
-initial_base = prxp.tree_base(initial_model)
+initial_bounded = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
 base_distributions = prxp.tree_distribution(initial_model)
-initial_cube = jax.tree.map(lambda d, b: d.cdf(b), base_distributions, initial_base, is_leaf=prx.is_distribution)
+initial_cube = jax.tree.map(lambda d, b: d.cdf(b), base_distributions, initial_bounded, is_leaf=prx.is_distribution)
 
 def hypercube_transform(cube):
     eps = jnp.finfo(jnp.float32).eps
@@ -84,7 +84,7 @@ def negative_log_posterior(params, static, x_data, y_data):
     cube_model = eqx.combine(params, static)
     base_model = hypercube_transform(cube_model)
     log_prior = base_joint.log_prob(base_model)
-    
+
     unwrapped_model = prx.unwrap(base_model)
     y_pred = jax.vmap(unwrapped_model)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, unwrapped_model.sigma).log_prob(y_data))
@@ -122,8 +122,8 @@ results = solver.run(
 )
 
 cube_model = eqx.combine(results.params, static)
-base_model = hypercube_transform(cube_model)
-map_model = prxp.tree_update(initial_model, base_model)
+bounded_model = hypercube_transform(cube_model)
+map_model = prx.wrap(initial_model, bounded_model, only_if=prx.is_probabilistic)
 ```
 
 If we print out the results, we see our maximum a posteriori estimate aligns with our simulated data:

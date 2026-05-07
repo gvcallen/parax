@@ -10,12 +10,12 @@ import jax.numpy as jnp
 import equinox as eqx
 
 from distreqx.distributions import AbstractDistribution, Joint
-from parax.unwrappables import unwrap
+from parax.unwrappable import unwrap
 
-Base = TypeVar("Base")
+T = TypeVar("T")
 
 
-class AbstractProbabilistic(eqx.Module, Generic[Base]):
+class AbstractProbabilistic(eqx.Module, Generic[T]):
     """
     The abstract interface for a probabilistic PyTree.
 
@@ -32,26 +32,6 @@ class AbstractProbabilistic(eqx.Module, Generic[Base]):
         distribution: The probability distribution associated with this PyTree node.
     """
     distribution: eqx.AbstractVar[AbstractDistribution]
-
-    @property
-    @abstractmethod
-    def base(self) -> Base:
-        """Returns the current PyTree in the probability base space."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, base: Base) -> "AbstractProbabilistic":
-        """
-        Returns a new instance of this object updated with a new base PyTree.
-
-        Args:
-            base: The new base-space PyTree representing the sampled state.
-
-        Returns:
-            A new instance of the probabilistic object, updated to reflect the new base.
-        """
-        pass
-
 
 def is_probabilistic(x: Any) -> TypeGuard[AbstractProbabilistic]:
     """

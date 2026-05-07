@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from parax.unwrappables import (
+from parax import (
     unwrap,
     Parameterized,
     Computed,

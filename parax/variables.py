@@ -6,7 +6,7 @@ array-like objects that can be directly injected into JAX computations
 or unwrapped prior to execution.
 """
 from abc import abstractmethod
-from typing import Any, Iterator, Callable, TypeGuard
+from typing import Any, Iterator, Callable, TypeGuard, Self
 import dataclasses
 
 import jax
@@ -16,7 +16,9 @@ import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
 from parax.constant import AbstractConstant
-from parax.unwrappables import AbstractUnwrappable, as_frozen, as_frozen_or_static, as_unwrapped
+from parax.unwrappable import AbstractUnwrappable, as_unwrapped
+from parax.wrappable import AbstractWrappable
+from parax.wrappers import as_frozen, as_frozen_or_static
 from parax.annotated import AbstractAnnotated
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
@@ -143,7 +145,7 @@ def as_param(value: Any) -> Any:
     return jnp.asarray(value)
 
 
-class Tagged(AbstractVariable, AbstractAnnotated[dict]):
+class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]):
     """
     A variable with dictionary metadata.
 
@@ -160,9 +162,12 @@ class Tagged(AbstractVariable, AbstractAnnotated[dict]):
     @property
     def value(self) -> Array:
         return jnp.asarray(self.raw_value)
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda m: m.raw_value, self, value)
 
 
-class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
+class Fixed(AbstractVariable, AbstractConstant[Param]):
     """
     A fixed variable.
     
@@ -234,9 +239,12 @@ class Derived(AbstractVariable):
         Returns the raw state transformed by the derivation function.
         """
         return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda m: m.raw_value, self, value)    
 
 
-class Constrained(AbstractVariable, AbstractBounded[Array]):
+class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Array]):
     """
     A constrained variable.
     
@@ -293,9 +301,6 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         self.constraint = constraint
         self.raw_value = raw_value
        
-    @property
-    def base(self) -> Array:
-        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
     
     @property
     def bounds(self) -> tuple[Array, Array]:
@@ -304,16 +309,16 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    def update(self, base: Array) -> Array:
-        new_raw = as_unwrapped(self.constraint).bijector.inverse(base)
-        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
-    
     @property
     def value(self) -> Array:
-        return self.base
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+    
+    def wrap(self, value: Array) -> Self:
+        new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
 
-class Random(AbstractVariable, AbstractProbabilistic[Array]):
+class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractWrappable[Array]):
     """
     A random variable.
     
@@ -365,12 +370,8 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
     def value(self) -> Array:
         return self.raw_value
     
-    @property
-    def base(self) -> Array:
-        return jnp.asarray(self.value)
-
-    def update(self, base: Array) -> "AbstractProbabilistic":
-        return eqx.tree_at(lambda x: x.raw_value, self, base)
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda x: x.raw_value, self, value)
 
 def tagged(
     raw_value: Param = dataclasses.MISSING,
@@ -391,9 +392,6 @@ def tagged(
     if metadata is None: metadata = {}
 
     def converter(x: Any) -> AbstractVariable:
-        if isinstance(x, AbstractVariable):
-            return x
-        
         return Tagged(raw_value=x, metadata=metadata)
 
     field_kwargs = {"converter": converter}
@@ -418,8 +416,6 @@ def derived(
         An `equinox.field` properly configured for the field type.
     """
     def converter(x: Any) -> AbstractVariable:
-        if isinstance(x, AbstractVariable):
-            return x
         return Derived(fn=fn, raw_value=x)
 
     field_kwargs = {"converter": converter}
@@ -444,8 +440,6 @@ def constrained(
         An `equinox.field` properly configured for the field type.
     """
     def converter(x: Any) -> AbstractVariable:
-        if isinstance(x, AbstractVariable):
-            return x
         return Constrained(constraint=constraint, value=x)
 
     field_kwargs = {"converter": converter}
@@ -470,8 +464,6 @@ def random(
         An `equinox.field` properly configured for the field type.
     """
     def converter(x: Any) -> AbstractVariable:
-        if isinstance(x, AbstractVariable):
-            return x
         return Random(distribution=distribution, raw_value=x)
 
     field_kwargs = {"converter": converter}

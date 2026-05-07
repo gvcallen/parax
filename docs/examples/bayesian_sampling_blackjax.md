@@ -2,7 +2,7 @@
 
 This example demonstrates Bayesian sampling of a linear regression model with independent priors using `blackjax`.
 
-**NB**: This example unwraps random variables onto the real line before sampling. Random varies with finite support are not yet fully catered for.
+**NB**: This example unwraps random variables onto the real line before sampling. Random variables with finite support are not yet fully catered for.
 
 ## 1. Defining the model
 

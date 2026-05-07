@@ -1,4 +1,8 @@
-# Bounded Optimization (JAXopt)
+# Overview
+
+In this example, we optimize a bounded dummy model using `jaxopt`.
+
+## 1. Defining the model
 
 `parax.bounded` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to project our model to the `base` constrained space before feeding it to the optimizer, and then update it afterwards using `parax.bounded.tree_update`.
 
@@ -22,10 +26,11 @@ initial_model = DummyModel()
 
 Note that we can nest parameters (like `y` above) and the constraints apply on the level we define them.
 
+## 2. Setting up the loss
+
 Next, we extract the base values and bounds, and partition the model and bounds into parameters and static metadata.
 
 <!-- pytest-codeblocks:cont -->
-
 ```python
 import parax.bounded as prxb
 
@@ -38,15 +43,21 @@ lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 ```
 
-Finally, we define our objective and run the optimizer:
+Now we can define our objective:
+<!-- pytest-codeblocks:cont -->
+```python
+def objective(p):
+    unwrapped_model = prx.unwrap(eqx.combine(p, static))
+    return unwrapped_model()
+```
+
+## 3. Running the optimizer
+
+Finally, we can run the optimizer:
 
 <!-- pytest-codeblocks:cont -->
 ```python
 import jaxopt
-
-def objective(p):
-    unwrapped_model = prx.unwrap(eqx.combine(p, static))
-    return unwrapped_model()
 
 solver = jaxopt.ScipyBoundedMinimize(fun=objective)
 results = solver.run(

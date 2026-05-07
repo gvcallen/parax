@@ -85,6 +85,11 @@ def tree_lower(tree: PyTree) -> PyTree:
     
     Standard arrays default to (-inf, inf).
 
+    Note that this function does not allow non-array/bounded leaf nodes.
+    If you have leaves in your tree that are neither arrays nor derive
+    from `parax.bounded.AbstractBounded`, be sure to mark
+    them as static or filter them out using e.g. `eqx.filter` first.    
+
     Args:
         tree: The PyTree model to extract lower bounds from.
 
@@ -96,7 +101,7 @@ def tree_lower(tree: PyTree) -> PyTree:
             return x.bounds[0]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, -jnp.inf)
-        return x
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_lower`. Value: {x}")
 
     lower = jax.tree_util.tree_map(_get_lower, tree, is_leaf=is_bounded)
     return lower
@@ -107,6 +112,11 @@ def tree_upper(tree: PyTree) -> PyTree:
     Extracts the upper bounds of a potentially bounded PyTree in base space. 
     
     Standard arrays default to (-inf, inf).
+
+    Note that this function does not allow non-array/bounded leaf nodes.
+    If you have leaves in your tree that are neither arrays nor derive
+    from `parax.bounded.AbstractBounded`, be sure to mark
+    them as static or filter them out using e.g. `eqx.filter` first.    
 
     Args:
         tree: The PyTree model to extract upper bounds from.
@@ -119,7 +129,7 @@ def tree_upper(tree: PyTree) -> PyTree:
             return x.bounds[1]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, jnp.inf)
-        return x
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_upper`. Value: {x}")
 
     upper = jax.tree_util.tree_map(_get_upper, tree, is_leaf=is_bounded)
     return upper
@@ -131,6 +141,11 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
     the base space. 
     
     Standard arrays default to (-inf, inf).
+
+    Note that this function does not allow non-array/bounded leaf nodes.
+    If you have leaves in your tree that are neither arrays nor derive
+    from `parax.bounded.AbstractBounded`, be sure to mark
+    them as static or filter them out using e.g. `eqx.filter` first.    
 
     Args:
         tree: The PyTree model to extract bounds from.

@@ -54,7 +54,7 @@ nav:
     - Regular optimization (Optimistix): examples/regular_optimization_optimistix.md
     - Bounded optimization (JAXopt): examples/bounded_optimization_jaxopt.md
     - Bayesian sampling (BlackJAX): examples/bayesian_sampling_blackjax.md
-    - Correlated Bayesian hypercube optimization (Advanced): examples/correlated_bayesian_hypercube_optimization.md
+    - Bayesian hypercube optimization (with correlated variables): examples/bayesian_hypercube_optimization.md
   - API:
     - Interfaces:
       - Constant: api/constant.md

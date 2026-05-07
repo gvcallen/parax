@@ -1,4 +1,8 @@
-# 1. Defining the model
+# Overview
+
+This example demonstrates Bayesian sampling of a linear regression model with independent priors using `blackjax`.
+
+## 1. Defining the model
 
 Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of regular parameters, we will assign probability distributions to our variables using `prx.Random` variables to establish our priors.
 
@@ -19,7 +23,8 @@ class BayesianLinearModel(eqx.Module):
 initial_model = BayesianLinearModel(weight=1.0, bias=0.0)
 ```
 
-# 2. Setting up the log posterior
+## 2. Setting up the log posterior
+
 In this tutorial, we will use `blackjax` for Bayesian sampling. We need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior.
 
 First, we use `parax.probabilistic` to extract the initial model values in the "base" probability space (where the distributions are defined), as well as our joint prior.  We then partition the base model and prior values into parameters and static metadata.
@@ -42,8 +47,8 @@ Next, we define the log posterior. We assume Gaussian noise with a standard devi
 Note how we do all probabilistic calculations in the base space, and only unwrap the model for the forward pass.
 <!-- pytest-codeblocks:cont -->
 ```python
-def log_posterior_fn(p, static, x_data, y_true):
-    base = eqx.combine(p, static)
+def log_posterior_fn(params, static, x_data, y_true):
+    base = eqx.combine(params, static)
     log_prior = base_prior.log_prob(base)
     
     unwrapped = prx.unwrap(base)
@@ -53,7 +58,7 @@ def log_posterior_fn(p, static, x_data, y_true):
     return log_prior + log_likelihood
 ```
 
-# 3. Running the sampler
+## 3. Running the sampler
 
 Now we generate some noisy dummy data (with a true weight of `2.5` and a true bias of `1.0`) and set up our MCMC sampler. We'll use the No-U-Turn Sampler (NUTS) without window adaptation, initialize the state, define the sampling loop using `jax.lax.scan`, and finally run the sampler.
 
@@ -87,7 +92,8 @@ sample_key = jr.key(0)
 base_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 ```
 
-# 4. Evaluating the results
+## 4. Evaluating the results
+
 Because `blackjax` preserves the PyTree structure of our inputs, `base_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.probabilistic.tree_update` to reconstruct the model and easily plot parameters and functional posteriors!
 
 We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our base space, it is always best practice to unwrap before evaluation.
@@ -133,7 +139,8 @@ plt.tight_layout()
 plt.show()
 ```
 
-# 5. Advantages of Parax
+## 5. Advantages of Parax
+
 You may have noticed that we could have accomplished the above without the added abstraction of `parax.Random` variable wrappers (i.e. by defining our models using `distreqx` distributions directly). However, building models using Parax variables (`parax.AbstractVariables`) has a number of quality-of-life benefits:
 
 - *Easy fixing of variables*. You can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.

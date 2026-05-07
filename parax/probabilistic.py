@@ -86,6 +86,11 @@ def tree_distribution(tree: PyTree) -> PyTree:
     
     Standard arrays default to `distreqx.ImproperUniform`.
 
+    Note that this function does not allow non-array/probabilistic leaf nodes.
+    If you have leaves in your tree that are neither arrays nor derive
+    from `parax.probabilistic.AbstractProbabilistic`, be sure to mark
+    them as static or filter them out using e.g. `eqx.filter` first.
+
     Args:
         tree: The PyTree containing probabilistic nodes or standard arrays.
 
@@ -100,7 +105,7 @@ def tree_distribution(tree: PyTree) -> PyTree:
             return unwrap(x.distribution)
         if eqx.is_inexact_array(x):
             return ImproperUniform(shape=jnp.shape(x))
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither static, probabilistic nor an array in `parax.probabilistic.tree_distribution`. Value: {x}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither probabilistic nor an array in `parax.probabilistic.tree_distribution`. Value: {x}")
 
     distributions = jax.tree_util.tree_map(_get_distribution, tree, is_leaf=is_probabilistic)
     return distributions

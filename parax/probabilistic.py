@@ -40,26 +40,6 @@ def is_probabilistic(x: Any) -> TypeGuard[AbstractProbabilistic]:
     return isinstance(x, AbstractProbabilistic)
 
 
-def tree_base(tree: PyTree) -> PyTree:
-    """
-    Extracts a PyTree of base values from a probabilistic tree. 
-    
-    Standard inexact arrays are left intact.
-
-    Args:
-        tree: The original PyTree tree potentially containing probabilistic nodes.
-
-    Returns:
-        A PyTree containing the extracted base values.
-    """
-    def _extract(x):
-        if not is_probabilistic(x):
-            return x
-        return unwrap(x.base)
-
-    return jax.tree_util.tree_map(_extract, tree, is_leaf=is_probabilistic)
-
-
 def tree_distribution(tree: PyTree) -> PyTree:
     """
     Extracts the probability distributions of a PyTree.
@@ -106,24 +86,3 @@ def tree_joint(tree: PyTree) -> Joint:
         A single joint distribution whose event shape matches the structure of `tree`.
     """
     return Joint(tree_distribution(tree))
-
-
-def tree_update(tree: PyTree, base_tree: PyTree) -> PyTree:
-    """
-    Takes an updated base-space PyTree and injects it back into the 
-    original probabilistic tree structure using `update`.
-
-    Args:
-        tree: The original PyTree tree containing the probabilistic nodes.
-        base_tree: The updated PyTree containing the new base values.
-
-    Returns:
-        A new PyTree tree with its internal states reconstructed to reflect 
-        the updated base values.
-    """
-    def _rebuild(orig, base):
-        if is_probabilistic(orig):
-            return orig.update(base)
-        return base
-        
-    return jax.tree_util.tree_map(_rebuild, tree, base_tree, is_leaf=is_probabilistic)

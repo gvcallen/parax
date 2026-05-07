@@ -65,6 +65,21 @@ def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
     return isinstance(x, AbstractUnwrappable)
 
 
+def as_unwrapped(tree: Union[T | PyTree[T]]) -> T:
+    """
+    Calls `tree.unwrap` only if it is an `AbstractUnwrappable`, otherwise returns it.
+
+    Args:
+        tree: The tree to (potentially) unwrap.
+
+    Returns:
+        The unwrapped tree.
+    """
+    if isinstance(tree, AbstractUnwrappable):
+        return tree.unwrap()
+    return tree
+
+
 class Parameterized(AbstractUnwrappable[T]):
     """
     Unwrap into an arbitrary object by calling a function with arguments.

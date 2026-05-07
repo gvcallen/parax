@@ -4,6 +4,8 @@
 
 ::: parax.as_fixed
 
+::: parax.as_unwrapped
+
 ::: parax.as_frozen
 
 ::: parax.as_static

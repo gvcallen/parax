@@ -15,8 +15,8 @@ from jaxtyping import Array, Inexact
 import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
-from parax.constant import AbstractConstant, as_free
-from parax.unwrappables import AbstractUnwrappable, as_frozen
+from parax.constant import AbstractConstant
+from parax.unwrappables import AbstractUnwrappable, as_frozen, as_frozen_or_static, as_unwrapped
 from parax.annotated import AbstractAnnotated
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
@@ -223,7 +223,7 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    fn: Callable = eqx.field(converter=as_frozen)
+    fn: Callable = eqx.field(converter=as_frozen_or_static)
     raw_value: Param = eqx.field(converter=as_param)
 
     @property
@@ -233,7 +233,7 @@ class Derived(AbstractVariable):
         
         Returns the raw state transformed by the derivation function.
         """
-        return as_free(self.fn)(jnp.asarray(self.raw_value))
+        return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
 
 
 class Constrained(AbstractVariable, AbstractBounded[Array]):
@@ -295,17 +295,17 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
        
     @property
     def base(self) -> Array:
-        return as_free(self.constraint).bijector.forward(self.raw_value)
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
     
     @property
     def bounds(self) -> tuple[Array, Array]:
-        constraint_bounds = as_free(self.constraint).bounds
+        constraint_bounds = as_unwrapped(self.constraint).bounds
         lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
     def update(self, base: Array) -> Array:
-        new_raw = as_free(self.constraint).bijector.inverse(base)
+        new_raw = as_unwrapped(self.constraint).bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     @property

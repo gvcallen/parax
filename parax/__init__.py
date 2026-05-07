@@ -24,6 +24,7 @@ from parax.unwrappables import (
     Static as Static,
     unwrap as unwrap,
     is_unwrappable as is_unwrappable,
+    as_unwrapped as as_unwrapped,
     as_frozen as as_frozen,
     as_static as as_static,
     as_frozen_or_static as as_frozen_or_static,

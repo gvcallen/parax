@@ -72,8 +72,6 @@ def tree_base(tree: PyTree) -> PyTree:
     Returns:
         A PyTree containing the extracted base values.
     """
-    from parax.filters import is_probabilistic
-
     def _extract(x):
         if not is_probabilistic(x):
             return x
@@ -95,7 +93,6 @@ def tree_distribution(tree: PyTree) -> PyTree:
         A PyTree of the exact same structure containing the extracted 
         probability distributions.
     """
-    from parax.filters import is_probabilistic
     from distreqx.distributions import ImproperUniform
 
     def _get_distribution(x):
@@ -139,8 +136,6 @@ def tree_update(tree: PyTree, base_tree: PyTree) -> PyTree:
         A new PyTree tree with its internal states reconstructed to reflect 
         the updated base values.
     """
-    from parax.filters import is_probabilistic
-
     def _rebuild(orig, base):
         if is_probabilistic(orig):
             return orig.update(base)

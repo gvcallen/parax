@@ -71,7 +71,6 @@ def tree_base(tree: PyTree) -> PyTree:
     Returns:
         A PyTree containing the extracted base values.
     """
-    from parax.filters import is_bounded
     def _extract(x):
         if not is_bounded(x):
             return x
@@ -92,8 +91,6 @@ def tree_lower(tree: PyTree) -> PyTree:
     Returns:
         A PyTree representing the lower bounds in base space.
     """
-    from parax.filters import is_bounded
-
     def _get_lower(x):
         if is_bounded(x):
             return x.bounds[0]
@@ -117,8 +114,6 @@ def tree_upper(tree: PyTree) -> PyTree:
     Returns:
         A PyTree representing the upper bounds in base space.
     """
-    from parax.filters import is_bounded
-
     def _get_upper(x):
         if is_bounded(x):
             return x.bounds[1]
@@ -159,8 +154,6 @@ def tree_update(tree: PyTree, base_tree: PyTree) -> PyTree:
         A new PyTree tree with its internal states reconstructed to reflect 
         the updated base values.
     """
-    from parax.filters import is_bounded
-
     def _rebuild(orig, base):
         if is_bounded(orig):
             return orig.update(base)

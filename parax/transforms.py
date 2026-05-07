@@ -10,7 +10,7 @@ to be bijective (invertible), and do not define bounds.
 """
 
 from abc import abstractmethod
-from typing import Union, Callable, Any
+from typing import Union, Callable, Any, TypeGuard
 
 import jax
 import jax.numpy as jnp
@@ -42,6 +42,13 @@ class AbstractTransform(eqx.Module):
             The transformed array.
         """
         pass
+
+
+def is_transform(x: Any) -> TypeGuard[AbstractTransform]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractTransform`.
+    """
+    return isinstance(x, AbstractTransform)
 
 
 class Affine(AbstractTransform):
@@ -400,8 +407,6 @@ class TreeTransform(AbstractTransform):
             ValueError: If the provided PyTree contains no transform leaves.
         """
         # Local import prevents circular dependency at initialization time
-        from parax.filters import is_transform
-
         leaves = jax.tree.leaves(transforms, is_leaf=is_transform)
         if not leaves:
             raise ValueError("The pytree of transforms cannot be empty.")
@@ -419,8 +424,6 @@ class TreeTransform(AbstractTransform):
         Returns:
             A new PyTree containing the transformed arrays.
         """
-        from parax.filters import is_transform
-
         def _apply_transform(transform: Any, val: Any) -> Any:
             if not is_transform(transform):
                 return val

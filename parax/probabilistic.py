@@ -2,7 +2,7 @@
 An abstract interface for PyTrees that have an associated probability distribution.
 """
 from abc import abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Any, TypeGuard
 
 from jaxtyping import PyTree
 import jax
@@ -53,6 +53,13 @@ class AbstractProbabilistic(eqx.Module, Generic[Base]):
         pass
 
 
+def is_probabilistic(x: Any) -> TypeGuard[AbstractProbabilistic]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractProbabilistic`.
+    """
+    return isinstance(x, AbstractProbabilistic)
+
+
 def tree_base(tree: PyTree) -> PyTree:
     """
     Extracts a PyTree of base values from a probabilistic tree. 
@@ -96,7 +103,7 @@ def tree_distribution(tree: PyTree) -> PyTree:
             return unwrap(x.distribution)
         if eqx.is_inexact_array(x):
             return ImproperUniform(shape=jnp.shape(x))
-        return x
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither static, probabilistic nor an array in `parax.probabilistic.tree_distribution`. Value: {x}")
 
     distributions = jax.tree_util.tree_map(_get_distribution, tree, is_leaf=is_probabilistic)
     return distributions

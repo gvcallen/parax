@@ -6,7 +6,7 @@ and gradient stopping within JAX PyTrees.
 """
 
 from abc import abstractmethod
-from typing import Generic, TypeVar, Callable, Any, Union
+from typing import Generic, TypeVar, Callable, Any, Union, TypeGuard
 
 import equinox as eqx
 import jax
@@ -58,6 +58,13 @@ def unwrap(tree: PyTree):
     return _unwrap(tree, include_self=True)
 
 
+def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
+    """
+    return isinstance(x, AbstractUnwrappable)
+
+
 class Parameterized(AbstractUnwrappable[T]):
     """
     Unwrap into an arbitrary object by calling a function with arguments.
@@ -70,7 +77,7 @@ class Parameterized(AbstractUnwrappable[T]):
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
-    def __init__(self, fn: Callable, *args, **kwargs):
+    def __init__(self, fn: Callable, *args: Any, **kwargs: Any):
         """
         Args:
             fn: The callable to execute upon unwrapping.
@@ -100,7 +107,7 @@ class Computed(AbstractUnwrappable[T]):
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
 
-    def __init__(self, fn: Callable, tree: T, *args, **kwargs):
+    def __init__(self, fn: Callable, tree: T, *args: Any, **kwargs: Any):
         """
         Args:
             tree: The target PyTree to map the computation over.
@@ -153,6 +160,21 @@ class Frozen(AbstractUnwrappable[T], AbstractConstant[T]):
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
     
 
+def as_frozen(tree: Union[T | Frozen[T]]) -> T:
+    """
+    Returns `tree` wrapped in a `parax.Frozen` module, creating one if needed.
+
+    Args:
+        tree: An arbitrary tree.
+
+    Returns:
+        A frozen version of the tree. If it is already frozen, returns it directly.
+    """    
+    if isinstance(tree, Frozen):
+        return tree
+    return Frozen(tree)
+    
+
 class Static(AbstractUnwrappable[T]):
     """
     Wraps a tree and marks it as static.
@@ -170,3 +192,45 @@ class Static(AbstractUnwrappable[T]):
 
     def unwrap(self) -> T:
         return self.tree
+    
+
+def as_static(tree: Union[T | Static[T]]) -> T:
+    """
+    Returns `tree` wrapped in a `parax.Static` module, creating one if needed.
+
+    Args:
+        tree: An arbitrary tree.
+
+    Returns:
+        A static version of the tree. If it is already static, returns it directly.
+    """    
+    if isinstance(tree, Static):
+        return tree
+    return Static(tree)
+
+
+def as_frozen_or_static(tree: Union[T | Static[T]]) -> Union[Frozen, Static]:
+    """
+    Returns `tree` wrapped in either a `parax.Static` or `parax.Frozen` module, creating one if needed.
+
+    If `tree` is a JAX array or a structured PyTree, it is wrapped in `parax.Frozen`. 
+    If `tree` is an unregistered Python object (an opaque leaf e.g. a lambda), it is wrapped in `parax.Static` 
+    to safely bypass JAX transformations.
+
+    Args:
+        tree: An arbitrary PyTree, array, or Python object.
+
+    Returns:
+        A static or frozen version of the tree. If it is already static or frozen, returns it directly.
+    """
+    if isinstance(tree, Frozen | Static):
+        return tree
+    
+    # Ask JAX how it views this object
+    # If JAX can't unpack it, it returns a list containing exactly the object itself.
+    leaves, _ = jax.tree_util.tree_flatten(tree)
+    is_opaque_leaf = (len(leaves) == 1) and (leaves[0] is tree)
+    
+    if is_opaque_leaf and not eqx.is_array(tree):
+        return as_static(tree)
+    return as_frozen(tree)

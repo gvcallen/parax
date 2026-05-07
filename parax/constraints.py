@@ -5,7 +5,7 @@ This module provides the tools to map unconstrained optimizer spaces
 (spanning the real line) into bounded physical spaces.
 """
 
-from typing import Union, Any
+from typing import Union, Any, TypeGuard
 
 import jax
 import equinox as eqx
@@ -36,6 +36,13 @@ class AbstractConstraint(eqx.Module):
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
+
+
+def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractConstraint`.
+    """
+    return isinstance(x, AbstractConstraint)
 
 
 class RealLine(AbstractConstraint):
@@ -278,8 +285,6 @@ class TreeConstraint(AbstractConstraint):
             ValueError: If the provided PyTree contains no constraint leaves.
         """
         # Local import prevents circular dependency at initialization time
-        from parax.filters import is_constraint
-
         leaves = jax.tree.leaves(constraints, is_leaf=is_constraint)
         if not leaves:
             raise ValueError("The pytree of constraints cannot be empty.")
@@ -292,8 +297,6 @@ class TreeConstraint(AbstractConstraint):
         Extracts a PyTree of lower bounds and a PyTree of upper bounds.
         Non-constraint nodes in the original PyTree are left unmodified.
         """
-        from parax.filters import is_constraint
-
         def get_lower(node: Any) -> Any:
             if not is_constraint(node):
                 return node
@@ -315,7 +318,6 @@ class TreeConstraint(AbstractConstraint):
         Returns a `distreqx.TreeMap` bijector that applies each respective 
         leaf constraint's bijector.
         """
-        from parax.filters import is_constraint
         from distreqx.bijectors import TreeMap
 
         def get_bijector(node: Any) -> Any:

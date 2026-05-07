@@ -6,7 +6,7 @@ array-like objects that can be directly injected into JAX computations
 or unwrapped prior to execution.
 """
 from abc import abstractmethod
-from typing import Any, Iterator, Callable
+from typing import Any, Iterator, Callable, TypeGuard
 import dataclasses
 
 import jax
@@ -15,11 +15,11 @@ from jaxtyping import Array, Inexact
 import equinox as eqx
 
 from parax.constraints import AbstractConstraint, RealLine
-from parax.unwrappables import AbstractUnwrappable, Frozen, unwrap
+from parax.constant import AbstractConstant, as_free
+from parax.unwrappables import AbstractUnwrappable, as_frozen
+from parax.annotated import AbstractAnnotated
 from parax.bounded import AbstractBounded
 from parax.probabilistic import AbstractProbabilistic
-from parax.constant import AbstractConstant
-from parax.annotated import AbstractAnnotated
 
 from distreqx.distributions import AbstractDistribution, ImproperUniform
 
@@ -112,10 +112,35 @@ This includes any Parax variables (like `Tagged`, `Constrained`, `Derived`)
 as well as standard JAX inexact arrays.
 """
 
-def _as_param(x):
-    if isinstance(x, AbstractVariable):
-        return x
-    return jnp.asarray(x)
+
+def is_variable(x: Any) -> TypeGuard[AbstractVariable]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractVariable`.
+    """
+    return isinstance(x, AbstractVariable)
+
+
+def is_param(x: Any) -> bool:
+    """
+    Returns True if `x` is an instance of `parax.AbstractVariable`
+    or returns True for `eqx.is_inexact_array`.
+    """
+    return isinstance(x, AbstractVariable) or eqx.is_inexact_array(x)
+
+
+def as_param(value: Any) -> Any:
+    """
+    Returns `value` as a `parax.Param`, wrapping it if necessary.
+
+    Args:
+        value: An arbitrary value or array.
+
+    Returns:
+        The instantiated parameter.
+    """    
+    if is_param(value):
+        return value
+    return jnp.asarray(value)
 
 
 class Tagged(AbstractVariable, AbstractAnnotated[dict]):
@@ -129,12 +154,13 @@ class Tagged(AbstractVariable, AbstractAnnotated[dict]):
         raw_value: The raw value used by optimizers and samplers.
         metadata: Additional arbitrary metadata.
     """
-    raw_value: Param = eqx.field(converter=_as_param)
+    raw_value: Param = eqx.field(converter=as_param)
     metadata: dict = eqx.field(default_factory=dict, static=True)
 
     @property
     def value(self) -> Array:
         return jnp.asarray(self.raw_value)
+
 
 class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
     """
@@ -168,6 +194,21 @@ class Fixed(AbstractVariable, AbstractConstant[AbstractVariable]):
         return jax.lax.stop_gradient(value)
    
 
+def as_fixed(value: Param) -> Fixed:
+    """
+    Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.
+
+    Args:
+        value: An arbitrary variable or array-like object.
+
+    Returns:
+        A fixed version of the variable.
+    """    
+    if isinstance(value, Fixed):
+        return value
+    return Fixed(value)
+
+
 class Derived(AbstractVariable):
     """
     A derived variable.
@@ -182,8 +223,8 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    fn: Callable = eqx.field(converter=Frozen)
-    raw_value: Param = eqx.field(converter=_as_param)
+    fn: Callable = eqx.field(converter=as_frozen)
+    raw_value: Param = eqx.field(converter=as_param)
 
     @property
     def value(self) -> Array:
@@ -192,7 +233,6 @@ class Derived(AbstractVariable):
         
         Returns the raw state transformed by the derivation function.
         """
-        from parax.converters import as_free
         return as_free(self.fn)(jnp.asarray(self.raw_value))
 
 
@@ -210,8 +250,8 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         raw_value: The raw, unconstrained value mapping to the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
     """
-    constraint: AbstractConstraint = eqx.field(converter=Frozen)
-    raw_value: Param = eqx.field(converter=_as_param)
+    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
+    raw_value: Param = eqx.field(converter=as_param)
 
     def __init__(
         self,
@@ -236,7 +276,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
         
         # Array standardization
         if raw_value is not None:
-            raw_value = _as_param(raw_value)
+            raw_value = as_param(raw_value)
             shape = raw_value.shape
         else:
             value = jnp.asarray(value)
@@ -255,19 +295,16 @@ class Constrained(AbstractVariable, AbstractBounded[Array]):
        
     @property
     def base(self) -> Array:
-        from parax.converters import as_free
         return as_free(self.constraint).bijector.forward(self.raw_value)
     
     @property
     def bounds(self) -> tuple[Array, Array]:
-        from parax.converters import as_free
         constraint_bounds = as_free(self.constraint).bounds
         lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
     def update(self, base: Array) -> Array:
-        from parax.converters import as_free
         new_raw = as_free(self.constraint).bijector.inverse(base)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
@@ -291,8 +328,8 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
                    in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
-    distribution: AbstractDistribution = eqx.field(converter=Frozen)
-    raw_value: Param = eqx.field(converter=_as_param)
+    distribution: AbstractDistribution = eqx.field(converter=as_frozen)
+    raw_value: Param = eqx.field(converter=as_param)
 
     def __init__(
         self,
@@ -318,7 +355,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array]):
                 raise ValueError("`raw_value` must be provided in `parax.Random` if `distribution` does not support `mean`")
 
         # Array standardization
-        raw_value = _as_param(raw_value)
+        raw_value = as_param(raw_value)
         shape = raw_value.shape
         
         self.distribution = distribution
@@ -375,7 +412,7 @@ def derived(
 
     Args:
         fn: The callable used to transform the raw value.
-        value: The default raw value. If omitted, this field becomes required.
+        raw_value: The default raw value. If omitted, this field becomes required.
         
     Returns:
         An `equinox.field` properly configured for the field type.

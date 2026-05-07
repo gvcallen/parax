@@ -7,6 +7,15 @@ except PackageNotFoundError:
 
 from parax.replace import tree_replace as tree_replace
 
+from parax.constant import (
+    is_constant as is_constant,
+    as_free as as_free,
+)
+from parax.annotated import is_annotated as is_annotated
+from parax.bounded import is_bounded as is_bounded
+from parax.probabilistic import is_probabilistic as is_probabilistic
+from parax.constraints import is_constraint as is_constraint
+
 from parax.unwrappables import (
     AbstractUnwrappable as AbstractUnwrappable,
     Frozen as Frozen,
@@ -14,6 +23,10 @@ from parax.unwrappables import (
     Computed as Computed,
     Static as Static,
     unwrap as unwrap,
+    is_unwrappable as is_unwrappable,
+    as_frozen as as_frozen,
+    as_static as as_static,
+    as_frozen_or_static as as_frozen_or_static,
 )
 
 from parax.variables import (
@@ -30,24 +43,16 @@ from parax.variables import (
     random as random,
 )
 
-from parax.filters import (
-    is_constant as is_constant,
-    is_annotated as is_annotated,
+from parax.variables import (
     is_variable as is_variable,
     is_param as is_param,
-    is_unwrappable as is_unwrappable,
-    is_bounded as is_bounded,
-    is_probabilistic as is_probabilistic,
-    is_constraint as is_constraint,
-    is_distribution as is_distribution,
-    is_bijector as is_bijector,
+    as_param as as_param,
+    as_fixed as as_fixed,
 )
 
-from parax.converters import (
-    as_free as as_free,
-    as_fixed as as_fixed,
-    as_frozen as as_frozen,
-    as_param as as_param,
+from parax.filters import (
+    is_distribution as is_distribution,
+    is_bijector as is_bijector,
 )
 
 
@@ -61,6 +66,4 @@ from parax import (
     unwrappables as unwrappables,
     variables as variables,
     constraints as constraints,
-    filters as filters,
-    converters as converters,
 )

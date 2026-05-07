@@ -2,9 +2,10 @@
 An abstract interface for PyTrees that have "bounds".
 """
 from abc import abstractmethod
+from typing import TypeVar, Generic, Any, TypeGuard
+
 import jax
 import jax.numpy as jnp
-from typing import TypeVar, Generic
 import equinox as eqx
 from jaxtyping import PyTree
 
@@ -49,6 +50,13 @@ class AbstractBounded(eqx.Module, Generic[Base]):
             A new instance of the bounded object, updated to reflect the new base.
         """
         pass
+
+
+def is_bounded(x: Any) -> TypeGuard[AbstractBounded]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractBounded`.
+    """
+    return isinstance(x, AbstractBounded)
     
 
 def tree_base(tree: PyTree) -> PyTree:

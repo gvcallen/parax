@@ -2,10 +2,9 @@
 Interfaces for attaching metadata to Equinox modules.
 """
 
-from typing import Any
+from typing import TypeVar, Generic, TypeGuard, Any
 
 import equinox as eqx
-from typing import TypeVar, Generic
 
 T = TypeVar("T")
 
@@ -21,3 +20,12 @@ class AbstractAnnotated(eqx.Module, Generic[T]):
         metadata: Returns the underlying metadata.
     """
     metadata: eqx.AbstractVar[T]
+
+
+
+def is_annotated(x: Any) -> TypeGuard[AbstractAnnotated]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractAnnotated`
+    (i.e. has metadata).
+    """
+    return isinstance(x, AbstractAnnotated)

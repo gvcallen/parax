@@ -23,9 +23,6 @@ class AbstractProbabilistic(eqx.Module, Generic[T]):
     associated with them. That is, samples from the resultant
     distribution should match the PyTree structure of `self`.
 
-    Makes use of the concept of a "base" space
-    where inference algorithms operate.
-    
     Used as a type check for `parax.is_probabilistic`. 
 
     Attributes:

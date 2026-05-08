@@ -45,7 +45,6 @@ Next, we define the log posterior. We assume Gaussian noise with a standard devi
 Note how we do all probabilistic calculations in the probability space, and only unwrap the model for the forward pass.
 <!-- pytest-codeblocks:cont -->
 ```python
-def log_posterior_fn(params, static, x_data, y_true):
 import jax
 import jax.numpy as jnp
 
@@ -145,7 +144,7 @@ plt.show()
 
 ## 5. Advantages of Parax
 
-You may have noticed that we could have accomplished the above without the added abstraction of `parax.Random` variable wrappers (i.e. by defining our models using `distreqx` distributions directly). However, building models using Parax variables (`parax.AbstractVariables`) has a number of quality-of-life benefits:
+You may have noticed that we could have accomplished the above without the added abstraction of `parax.Random` variable wrappers (i.e. by defining our models using `distreqx` distributions and using tree mapping directly). However, building models using Parax variables (`parax.AbstractVariables`) has a number of quality-of-life benefits:
 
 - *Parameters as first-class citizens*. Models contain parameters - not distributions. By prioritizing a parameter-centered approach and using tree tools to setup our model, we maintain a clear separation of concerns.
 - *Variable manipulation*. For example, you can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.

@@ -12,7 +12,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
-from distreqx.distributions import AbstractDistribution
+import distreqx.distributions as dists
 from distreqx.bijectors import (
     AbstractBijector, 
     Sigmoid, 
@@ -365,33 +365,57 @@ class Custom(AbstractConstraint):
         return self._custom_bijector
     
 
-def get_constraint_for_distribution(dist: AbstractDistribution) -> AbstractConstraint:
+def get_constraint_for_distribution(dist: dists.AbstractDistribution) -> AbstractConstraint:
     """
     Infers the physical support of a distreqx distribution and returns 
     the corresponding constraint mapping.
-    """
-    # 1. Infer the boundaries using the icdf
-    # Passing scalar 0.0 and 1.0 will broadcast to the distribution's event/batch shape
-    lower_bound = dist.icdf(0.0)
-    upper_bound = dist.icdf(1.0)
-    
-    # 2. Determine boundedness (using jnp.all to safely handle multivariate arrays)
-    is_lower_bounded = not jnp.all(jnp.isneginf(lower_bound))
-    is_upper_bounded = not jnp.all(jnp.isposinf(upper_bound))
 
-    # 3. Route to the appropriate Constraint class
-    if not is_lower_bounded and not is_upper_bounded:
+    Resolution Strategy:
+    1. Exact type matching for common `distreqx` distributions.
+    2. Fallback to `icdf(0.0)` and `icdf(1.0)` evaluation.
+    3. Last resort: Unconstrained `RealLine`.
+    """
+    if isinstance(dist, (dists.Normal, dists.Logistic)):
+        return RealLine(shape=dist.event_shape)
+        
+    elif isinstance(dist, (dists.MultivariateNormalDiag, 
+                           dists.MultivariateNormalFullCovariance, 
+                           dists.MultivariateNormalTri)):
         return RealLine(shape=dist.event_shape)
 
-    elif is_lower_bounded and not is_upper_bounded:
-        if jnp.all(lower_bound == 0.0):
-            return Positive(shape=dist.event_shape, dtype=lower_bound.dtype)
-        return GreaterThan(lower=lower_bound)
+    elif isinstance(dist, (dists.LogNormal, dists.Gamma)):
+        return Positive(shape=dist.event_shape)
 
-    elif not is_lower_bounded and is_upper_bounded:
-        if jnp.all(upper_bound == 0.0):
-            return Negative(shape=dist.event_shape, dtype=upper_bound.dtype)
-        return LessThan(upper=upper_bound)
+    elif isinstance(dist, dists.Beta):
+        return Interval(
+            lower=jnp.zeros(dist.event_shape), 
+            upper=jnp.ones(dist.event_shape)
+        )
 
-    else:
-        return Interval(lower=lower_bound, upper=upper_bound)
+    elif isinstance(dist, dists.Uniform):
+        return Interval(lower=dist.low, upper=dist.high)
+
+    try:
+        lower_bound = dist.icdf(0.0)
+        upper_bound = dist.icdf(1.0)
+        
+        is_lower_bounded = not jnp.all(jnp.isneginf(lower_bound))
+        is_upper_bounded = not jnp.all(jnp.isposinf(upper_bound))
+
+        if is_lower_bounded and not is_upper_bounded:
+            if jnp.all(lower_bound == 0.0):
+                return Positive(shape=dist.event_shape, dtype=lower_bound.dtype)
+            return GreaterThan(lower=lower_bound)
+
+        elif not is_lower_bounded and is_upper_bounded:
+            if jnp.all(upper_bound == 0.0):
+                return Negative(shape=dist.event_shape, dtype=upper_bound.dtype)
+            return LessThan(upper=upper_bound)
+
+        elif is_lower_bounded and is_upper_bounded:
+            return Interval(lower=lower_bound, upper=upper_bound)
+
+    except (NotImplementedError, AttributeError, ValueError, TypeError):
+        pass
+
+    return RealLine(shape=dist.event_shape)

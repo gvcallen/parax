@@ -333,9 +333,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
         constraint: The constraint that defines the support of `distribution`.
                     Can be None, in which case this function will attempt
                     to automatically infer the constraint from the distribution's
-                    `icdf` function. If this fails, the real line will be used.
-                    In future versions of Parax, a constraint registry will be used,
-                    supporting common bounded distributions.
+                    using `parax.constraints.get_constraint_for_distribution`.
         raw_value: The raw un-probabilistic value. Can be None,
                    in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
@@ -373,11 +371,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
 
         # Constraint resolution
         if constraint is None:
-            try:
-                constraint = get_constraint_for_distribution(distribution)
-            except:
-                shape = value.shape if value is not None else jnp.asarray(raw_value).shape
-                constraint = RealLine(shape=shape)
+            constraint = get_constraint_for_distribution(distribution)
 
         # Calculate unconstrained raw_value
         if value is not None:

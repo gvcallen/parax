@@ -176,7 +176,7 @@ class Fixed(AbstractVariable, AbstractConstant[Param]):
     Attributes:
         raw_value: The underlying variable that is being fixed.
     """
-    raw_value: Param
+    raw_value: Param = eqx.field(converter=as_param)
 
     def __init__(self, raw_value: Param | None = None):
         """

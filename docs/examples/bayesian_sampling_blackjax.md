@@ -29,7 +29,7 @@ initial_model = BayesianLinearModel(weight=1.0, bias=0.0)
 
 In this tutorial, we will use `blackjax` for Bayesian sampling. We need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior.
 
-First, we use `parax.probabilistic` to extract the initial model values in the "base" probability space (where the distributions are defined), as well as our joint prior.  We then partition the base model and prior values into parameters and static metadata.
+First, we use `parax.probabilistic` to extract the initial model values in the probability space (where the distributions are defined), as well as our joint prior. We then partition the values into parameters and static metadata.
 
 <!-- pytest-codeblocks:cont -->
 ```python

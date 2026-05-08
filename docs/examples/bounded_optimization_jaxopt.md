@@ -28,7 +28,7 @@ Note that we can nest parameters (like `y` above) and the constraints apply on t
 
 ## 2. Setting up the loss
 
-Next, we extract the bounds and unwrap the bounded values, and partition the bounded model and bounds into parameters and static metadata. Note how only wrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This only unwraps all nodes in a chain in the tree when it reaches a bounded node, which matches the bounds returned by `parax.bounded.tree_bounds` (which internally uses `is_leaf=parax.is_bounded`).
+Next, we extract the bounds and unwrap the bounded values, and partition the bounded model and bounds into parameters and static metadata.
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -40,6 +40,8 @@ params, static = eqx.partition(initial_bounded, filter_spec, is_leaf=prx.is_cons
 lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 ```
+
+Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping (while traversing the tree inside-out) until it encounters a bounded node. Note that the resultant unwrapped model will naturally match the PyTree structure returned by `parax.bounded.tree_bounds`, since it *stops* at bounded nodes using an outside-in (top down) traversal (via `is_leaf=parax.is_bounded`).
 
 Now we can define our objective:
 <!-- pytest-codeblocks:cont -->

@@ -41,7 +41,7 @@ lower, _ = eqx.partition(lower_bounds, filter_spec, is_leaf=prx.is_constant)
 upper, _ = eqx.partition(upper_bounds, filter_spec, is_leaf=prx.is_constant)
 ```
 
-Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping (while traversing the tree inside-out) until it encounters a bounded node. Note that the resultant unwrapped model will naturally match the PyTree structure returned by `parax.bounded.tree_bounds`, since it *stops* at bounded nodes using an outside-in (top down) traversal (via `is_leaf=parax.is_bounded`).
+Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping (while traversing the tree inside-out) until it encounters a bounded node. The resultant unwrapped model will naturally match the PyTree structure returned by `parax.bounded.tree_bounds`, since this method *stops* at bounded nodes using an outside-in (top down) traversal (via `is_leaf=parax.is_bounded`).
 
 Now we can define our objective:
 <!-- pytest-codeblocks:cont -->

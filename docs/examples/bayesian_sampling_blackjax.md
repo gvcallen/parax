@@ -25,9 +25,9 @@ initial_model = BayesianLinearModel(weight=1.0, bias=1.0)
 
 ## 2. Setting up the log posterior
 
-In this tutorial, we will use `blackjax` for Bayesian sampling. We need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior.
+In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be using an unconstrained MCMC sampler, we need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior. To accomplish this, we will use explicitly use *bijectors*.
 
-First, we use `parax.probabilistic` to extract the initial model values in the probability space (where the distributions are defined), as well as our joint prior. We then partition the values into parameters and static metadata.
+First, we use `parax.probabilistic` and `parax.unwrap` to extract the initial unconstrained values, prior and bijector. Since the log prior *must accurately represent the geometry of the unconstrained space*, we calculate it directly in that space (using `parax.probabilistic.tree_unconstrained_distribution`) to avoid having to do a manual log-determinant-Jacobian correction.
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -40,9 +40,7 @@ initial_unconstrained = bijector_to_constrained.inverse(initial_constrained)
 params, static = eqx.partition(initial_unconstrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
 ```
 
-Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
-
-Note how we do all probabilistic calculations in the probability space, and only unwrap the model for the forward pass.
+Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`. Note that we fully unwrap the model for the forward pass.
 <!-- pytest-codeblocks:cont -->
 ```python
 import jax
@@ -99,7 +97,7 @@ param_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 
 Because `blackjax` preserves the PyTree structure of our inputs, `mcmc_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.wrap` to reconstruct the model and easily plot parameters and functional posteriors!
 
-We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our probability space, it is always best practice to unwrap before evaluation.
+We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our constrained space, it is always best practice to unwrap before evaluation.
 
 Finally, we generate predictions across the input space and plot the results.
 

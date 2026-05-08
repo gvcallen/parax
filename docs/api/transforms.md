@@ -20,8 +20,8 @@
 
 ::: parax.transforms.Chain
 
-::: parax.transforms.BijectorTransform
+::: parax.transforms.Bijective
 
-::: parax.transforms.CustomTransform
+::: parax.transforms.Custom
 
-::: parax.transforms.TreeTransform
+::: parax.transforms.Leafwise

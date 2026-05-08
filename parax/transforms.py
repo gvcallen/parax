@@ -358,7 +358,7 @@ class Chain(AbstractTransform):
         return x
 
 
-class BijectorTransform(AbstractTransform):
+class Bijective(AbstractTransform):
     """
     A transformation powered by a distreqx bijector.
 
@@ -382,7 +382,7 @@ class BijectorTransform(AbstractTransform):
         return self.bijector.forward(x)
     
 
-class TreeTransform(AbstractTransform):
+class Leafwise(AbstractTransform):
     """
     Represents a PyTree of transformations mapping over a PyTree of inputs.
     
@@ -426,13 +426,13 @@ class TreeTransform(AbstractTransform):
         """
         def _apply_transform(transform: Any, val: Any) -> Any:
             if not is_transform(transform):
-                return val
+                raise ValueError(f"Found a leaf node of type {type(transform)} that is not a transform in `parax.transforms.Leafwise`. Value: {transform}")
             return transform(val)
 
         return jax.tree_util.tree_map(_apply_transform, self.tree, x, is_leaf=is_transform)
 
 
-class CustomTransform(AbstractTransform):
+class Custom(AbstractTransform):
     """
     An escape hatch for power users who need to apply an arbitrary function 
     as a transformation while strictly adhering to the `AbstractTransform` type hierarchy.

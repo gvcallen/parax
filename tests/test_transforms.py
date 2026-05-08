@@ -21,9 +21,9 @@ from parax.transforms import (
     Softmax,
     Normalize,
     Chain,
-    BijectorTransform,
-    TreeTransform,
-    CustomTransform,
+    Bijective,
+    Leafwise,
+    Custom,
 )
 
 
@@ -163,7 +163,7 @@ def test_bijector_transform():
     x = jnp.array([1.0, 2.0])
     # distreqx Shift bijector
     bijector = DistreqxShift(shift=jnp.array(5.0))
-    transform = BijectorTransform(bijector=bijector)
+    transform = Bijective(bijector=bijector)
     
     out = transform(x)
     npt.assert_allclose(out, jnp.array([6.0, 7.0]))
@@ -183,7 +183,7 @@ def test_tree_transform():
         "b": [Scale(2.0), Shift(-1.0)]
     }
     
-    tree_transform = TreeTransform(transforms)
+    tree_transform = Leafwise(transforms)
     out = tree_transform(inputs)
     
     npt.assert_allclose(out["a"], jnp.array(3.0))
@@ -192,11 +192,11 @@ def test_tree_transform():
 
 
 def test_custom_transform():
-    """Tests a lambda function wrapped in CustomTransform."""
+    """Tests a lambda function wrapped in Custom."""
     x = jnp.array([1.0, 2.0, 3.0])
     
     # Square the input
-    transform = CustomTransform(fn=lambda x: x ** 2)
+    transform = Custom(fn=lambda x: x ** 2)
     out = transform(x)
     
     npt.assert_allclose(out, jnp.array([1.0, 4.0, 9.0]))

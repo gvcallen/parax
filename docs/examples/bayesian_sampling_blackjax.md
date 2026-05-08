@@ -45,7 +45,7 @@ params, static = eqx.partition(initial_values, filter_spec, is_leaf=prx.is_const
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
 
-Note how we do all probabilistic calculations in the base space, and only unwrap the model for the forward pass.
+Note how we do all probabilistic calculations in the probability space, and only unwrap the model for the forward pass.
 <!-- pytest-codeblocks:cont -->
 ```python
 def log_posterior_fn(params, static, x_data, y_true):
@@ -90,14 +90,14 @@ def run_mcmc(key, state, num_steps):
     return samples
 
 sample_key = jr.key(0)
-base_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
+mcmc_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 ```
 
 ## 4. Evaluating the results
 
-Because `blackjax` preserves the PyTree structure of our inputs, `base_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.probabilistic.tree_update` to reconstruct the model and easily plot parameters and functional posteriors!
+Because `blackjax` preserves the PyTree structure of our inputs, `mcmc_samples` has the exact same structure as our partitioned params tree. We can use `eqx.filter_jit` along with `parax.wrap` to reconstruct the model and easily plot parameters and functional posteriors!
 
-We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our base space, it is always best practice to unwrap before evaluation.
+We'll discard the first 500 steps as warmup/burn-in. Then, we create the combined model and update it. Although we technically didn't use any parax "unwrappables" on top of our probability space, it is always best practice to unwrap before evaluation.
 
 Finally, we generate predictions across the input space and plot the results.
 
@@ -105,7 +105,7 @@ Finally, we generate predictions across the input space and plot the results.
 ```python
 import matplotlib.pyplot as plt
 
-clean_samples = jax.tree.map(lambda x: x[500:], base_samples)
+clean_samples = jax.tree.map(lambda x: x[500:], mcmc_samples)
 
 value_models = eqx.combine(clean_samples, static)
 sampled_models = prx.wrap(initial_model, value_models, only_if=prx.is_probabilistic)

@@ -1,5 +1,5 @@
 """
-The general interface for PyTree unwrapping using `parax.unwrap`.
+The general interface for PyTree wrapping using `parax.wrap`.
 """
 
 from abc import abstractmethod
@@ -14,32 +14,68 @@ T = TypeVar("T")
 
 
 class AbstractWrappable(eqx.Module, Generic[T]):
-    """An abstract class representing a PyTree node to be wrapped.
+    """An abstract class representing a PyTree node capable of wrapping another tree.
+
+    This interface is the counterpart to `parax.AbstractUnwrappable`. It is 
+    typically used to define how an object should reconstruct or "re-wrap" a 
+    tree that was previously unwrapped.
     """
 
     @abstractmethod
     def wrap(self, tree: T) -> Self:
-        """Returns the unwrapped pytree, assuming no wrapped subnodes exist."""
+        """Wraps the provided tree inside this node's structure.
+
+        Args:
+            tree: The unwrapped tree or raw value to be wrapped.
+
+        Returns:
+            A new instance of this node containing the wrapped tree.
+        """
         pass
 
 
 def is_wrappable(x: Any) -> TypeGuard[AbstractWrappable]:
-    """
-    Returns True if `x` is an instance of `parax.AbstractWrappable`.
+    """Checks if a given object is a wrappable node.
+
+    Args:
+        x: The object to check.
+
+    Returns:
+        True if `x` is an instance of `AbstractWrappable`, False otherwise.
     """
     return isinstance(x, AbstractWrappable)
 
 
 def wrap(template_tree: PyTree, unwrapped_tree: PyTree, only_if: Callable[[Any], bool] = None) -> PyTree:
-    """
-    Map across an unwrapped PyTree and a template PyTree, recursively resolving 
-    all `AbstractWrappable` nodes to reconstruct the wrapped tree.
+    """Recursively resolves `AbstractWrappable` nodes to reconstruct a wrapped PyTree.
 
-    Wrapping is done outside-in (top-down), which perfectly inverts the inside-out 
-    (bottom-up) process of `unwrap`. A node is only wrapped if it meets the `only_if` 
-    condition itself, or is a descendant of a node that met the condition.
+    This function maps across a `template_tree` and an `unwrapped_tree` simultaneously. 
+    Wrapping is performed outside-in (top-down), perfectly inverting the inside-out 
+    (bottom-up) process of `parax.unwrap`. 
+    
+    **Note:** This function is typically used to re-wrap a PyTree that was previously 
+    unwrapped via `parax.unwrap` and `parax.AbstractUnwrappable`.
 
-    By default, all nodes are eligible for wrapping.
+    If the `only_if` predicate is provided, the wrapping process is conditionally gated.
+    The tree is searched top-down, and wrapping only triggers for subtrees that 
+    satisfy the condition. Once a node satisfies `only_if`, that entire subtree 
+    is fully wrapped.
+
+    Behavior with `only_if`:
+        1. If `only_if(node)` is True: The node and all of its `AbstractWrappable` 
+           descendants are fully wrapped.
+        2. If `only_if(node)` is False: The node itself bypasses wrapping, but the 
+           search continues recursively into its children.
+
+    Args:
+        template_tree: The original (or blueprint) PyTree containing `AbstractWrappable` nodes.
+        unwrapped_tree: The PyTree containing the raw, unwrapped values.
+        only_if: An optional predicate function `Callable[[Any], bool]`. If provided, 
+            only subtrees evaluating to True (and their descendants) are wrapped.
+
+    Returns:
+        A new PyTree where the appropriate values from `unwrapped_tree` have been 
+        wrapped using the template nodes.
     """
     def _do_wrap(t_node, u_node, *, include_self: bool):
         def _map_fn(t_leaf, u_leaf):

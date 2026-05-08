@@ -12,6 +12,6 @@
 
 ::: parax.constraints.Negative
 
-::: parax.constraints.TreeConstraint
+::: parax.constraints.Leafwise
 
-::: parax.constraints.CustomConstraint
+::: parax.constraints.Custom

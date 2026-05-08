@@ -5,7 +5,7 @@ In this example, we perform Bayesian optimization (*maximum a posteriori estimat
 This is an advanced example building on previous examples. It demonstrates several concepts at once:
 
 - Modeling of correlated parameters and derived random variables using `parax.Random` and `parax.Derived`.
-- Extracting both the joint and one-by-one distributions using `tree_joint` and `tree_distribution` in `parax.probabilistic`.
+- Extracting both the joint and one-by-one distributions using `tree_joint_distribution` and `tree_distributions` in `parax.probabilistic`.
 - Perform a hypercube transform and evaluating the joint log probability using `icdf`, `cdf` and `log_prob`.
 
 ## 1. Defining the model
@@ -54,7 +54,7 @@ To setup the log posterior, we unwrap the model into the bounded space, and then
 import parax.probabilistic as prxp
 
 initial_bounded = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-base_distributions = prxp.tree_distribution(initial_model)
+base_distributions = prxp.tree_distributions(initial_model)
 initial_cube = jax.tree.map(lambda d, b: d.cdf(b), base_distributions, initial_bounded, is_leaf=prx.is_distribution)
 
 def hypercube_transform(cube):
@@ -63,7 +63,7 @@ def hypercube_transform(cube):
     return jax.tree.map(lambda d, u: d.icdf(u), base_distributions, safe_cube, is_leaf=prx.is_distribution)
 ```
 
-Note that, to extract the hypercube values, we used `parax.probabilistic.tree_distribution` as opposed to `parax.probabilistic.tree_joint`. This is because the former simply extracts the individual underlying distributions directly, as opposed to returning a single joint distribution for the entire model.
+Note that, to extract the hypercube values, we used `parax.probabilistic.tree_distributions` as opposed to `parax.probabilistic.tree_joint_distribution`. This is because the former simply extracts the individual underlying distributions directly, as opposed to returning a single joint distribution for the entire model.
 
 Now, we can easily transform the initial base model values to the hypercube using `jax.tree.map` and the underlying normal `cdf` function. We then partition these models using `eqx.partition` and extract lower and upper bounds for the optimizer:
 
@@ -79,7 +79,7 @@ Finally, we can extract the full joint distribution of the model and setup the n
 
 <!-- pytest-codeblocks:cont -->
 ```python
-base_joint = prxp.tree_joint(initial_model)
+base_joint = prxp.tree_joint_distribution(initial_model)
 def negative_log_posterior(params, static, x_data, y_data):
     cube_model = eqx.combine(params, static)
     base_model = hypercube_transform(cube_model)

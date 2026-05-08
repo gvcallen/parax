@@ -2,27 +2,25 @@
 
 This example demonstrates Bayesian sampling of a linear regression model with independent priors using `blackjax`.
 
-**NB**: This example unwraps random variables onto the real line before sampling. Random variables with finite support are not yet fully catered for.
-
 ## 1. Defining the model
 
 Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of regular parameters, we will assign probability distributions to our variables using `prx.Random` variables to establish our priors.
 
-We'll define the model class, assign normal priors to our weight and bias, and initialize the model with our initial guesses.
+We'll define the model class, assign a normal and uniform prior to our weight and bias respectively, and initialize the model with our initial guesses.
 
 ```python
 import equinox as eqx
 import parax as prx
-from distreqx.distributions import Normal
+from distreqx.distributions import Uniform, Normal
 
 class BayesianLinearModel(eqx.Module):
     weight: prx.Param = prx.random(Normal(0.0, 5.0))
-    bias: prx.Param = prx.random(Normal(0.0, 2.0))
+    bias: prx.Param = prx.random(Uniform(0.0, 2.0))
 
     def __call__(self, x):
         return self.weight * x + self.bias
 
-initial_model = BayesianLinearModel(weight=1.0, bias=0.0)
+initial_model = BayesianLinearModel(weight=1.0, bias=1.0)
 ```
 
 ## 2. Setting up the log posterior
@@ -33,14 +31,13 @@ First, we use `parax.probabilistic` to extract the initial model values in the p
 
 <!-- pytest-codeblocks:cont -->
 ```python
-import jax
-import jax.numpy as jnp
+unconstrained_prior = prx.probabilistic.tree_unconstrained_distribution(initial_model)
+bijector_to_constrained = prx.probabilistic.tree_leafwise_bijector(initial_model)
 
-prior = prx.probabilistic.tree_joint(initial_model)
-initial_values = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
+initial_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
+initial_unconstrained = bijector_to_constrained.inverse(initial_constrained)
 
-filter_spec = eqx.is_inexact_array
-params, static = eqx.partition(initial_values, filter_spec, is_leaf=prx.is_constant)
+params, static = eqx.partition(initial_unconstrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
 ```
 
 Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`.
@@ -49,10 +46,16 @@ Note how we do all probabilistic calculations in the probability space, and only
 <!-- pytest-codeblocks:cont -->
 ```python
 def log_posterior_fn(params, static, x_data, y_true):
-    values = eqx.combine(params, static)
-    log_prior = prior.log_prob(values)
+import jax
+import jax.numpy as jnp
+
+def log_posterior_fn(params, static, x_data, y_true):
+    unconstrained = eqx.combine(params, static)
     
-    unwrapped = prx.unwrap(values)
+    log_prior = unconstrained_prior.log_prob(unconstrained)
+    constrained = bijector_to_constrained.forward(unconstrained)
+    
+    unwrapped = prx.unwrap(constrained)
     y_pred = jax.vmap(unwrapped)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
     
@@ -84,13 +87,13 @@ def run_mcmc(key, state, num_steps):
     def step_fn(state, rng_key):
         state, _ = nuts.step(rng_key, state)
         return state, state.position
-    
+
     keys = jr.split(key, num_steps)
     _, samples = jax.lax.scan(step_fn, state, keys)
     return samples
 
 sample_key = jr.key(0)
-mcmc_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
+param_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
 ```
 
 ## 4. Evaluating the results
@@ -105,12 +108,12 @@ Finally, we generate predictions across the input space and plot the results.
 ```python
 import matplotlib.pyplot as plt
 
-clean_samples = jax.tree.map(lambda x: x[500:], mcmc_samples)
+clean_param_samples = jax.tree.map(lambda x: x[500:], param_samples)
+unconstrained_samples = eqx.combine(clean_param_samples, static)
+constrained_samples = bijector_to_constrained.forward(unconstrained_samples)
 
-value_models = eqx.combine(clean_samples, static)
-sampled_models = prx.wrap(initial_model, value_models, only_if=prx.is_probabilistic)
-
-unwrapped_models = prx.unwrap(sampled_models)
+model_samples = eqx.filter_vmap(eqx.Partial(prx.wrap, only_if=prx.is_probabilistic), in_axes=(None, eqx.if_array(0)))(initial_model, constrained_samples)
+unwrapped_models = prx.unwrap(model_samples)
 
 x_plot = jnp.linspace(-3, 3, 100)
 y_preds = eqx.filter_vmap(unwrapped_models)(x_plot).T
@@ -119,12 +122,12 @@ y_lower, y_upper = jnp.percentile(y_preds, jnp.array([2.5, 97.5]), axis=0)
 
 fig, axes = plt.subplots(1, 3, figsize=(16, 4))
 
-axes[0].hist(clean_samples.weight, bins=30, density=True, color='steelblue', edgecolor='black')
+axes[0].hist(unwrapped_models.weight, bins=30, density=True, color='steelblue', edgecolor='black')
 axes[0].axvline(2.5, color='red', linestyle='dashed', linewidth=2, label='True Value')
 axes[0].set_title('Weight Posterior')
 axes[0].legend()
 
-axes[1].hist(clean_samples.bias, bins=30, density=True, color='seagreen', edgecolor='black')
+axes[1].hist(unwrapped_models.bias, bins=30, density=True, color='seagreen', edgecolor='black')
 axes[1].axvline(1.0, color='red', linestyle='dashed', linewidth=2, label='True Value')
 axes[1].set_title('Bias Posterior')
 axes[1].legend()
@@ -144,6 +147,6 @@ plt.show()
 
 You may have noticed that we could have accomplished the above without the added abstraction of `parax.Random` variable wrappers (i.e. by defining our models using `distreqx` distributions directly). However, building models using Parax variables (`parax.AbstractVariables`) has a number of quality-of-life benefits:
 
-- *Easy fixing of variables*. You can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.
-- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Using Parax, we could easily define a factory that wraps a `parax.Constrained` in a `parax.Random`, allowing us to toggle between bounded optimation and inference.
-- *Parameters as first-class citizens*. Models contain parameters - not distributions. By prioritizing a parameter-centred approach, and simply attaching priors as metadata and using tree tools at model setup, we maintain a clear separation of concerns. This naturally has downstream benefits.
+- *Parameters as first-class citizens*. Models contain parameters - not distributions. By prioritizing a parameter-centered approach and using tree tools to setup our model, we maintain a clear separation of concerns.
+- *Variable manipulation*. For example, you can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.
+- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Using Parax, we could easily define a factory that wraps a `parax.Random` variable in a `parax.Constrained`, allowing us to toggle between bounded optimation and inference.

@@ -16,33 +16,58 @@ class AbstractUnwrappable(eqx.Module, Generic[T]):
     """An abstract class representing a deferred or wrapped PyTree node.
 
     Unwrappables act as placeholders within a PyTree. When `parax.unwrap` 
-    is called on the tree, these nodes execute custom logic (like computation 
-    or gradient stopping) and replace themselves with their output.
+    is called on the tree, these nodes execute custom logic (such as delayed 
+    computation, parameter injection, or gradient stopping) and replace 
+    themselves with their output.
     """
 
     @abstractmethod
     def unwrap(self) -> T:
-        """Returns the unwrapped pytree, assuming no wrapped subnodes exist."""
+        """Evaluates and returns the underlying unwrapped PyTree node.
+        
+        Returns:
+            The resolved underlying value, assuming no wrapped subnodes exist.
+        """
         pass
 
 
 def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
-    """
-    Returns True if `x` is an instance of `parax.AbstractUnwrappable`.
+    """Checks if a given object is an unwrappable node.
+    
+    Args:
+        x: The object to check.
+        
+    Returns:
+        True if `x` is an instance of `AbstractUnwrappable`, False otherwise.
     """
     return isinstance(x, AbstractUnwrappable)
 
 
 def unwrap(tree: Any, only_if: Callable[[Any], bool] = None) -> Any:
-    """
-    Map across a PyTree and conditionally resolve `AbstractUnwrappable` nodes.
-    
-    Unwrapping is done inside-out, but gated by the `unwrap_from` condition.
-    A node is only unwrapped if it is a root itself, or if it is a 
-    descendant of a root. Nodes above roots are not unwrapped unless 
-    they also have a root as a parent.
+    """Recursively resolves `AbstractUnwrappable` nodes within a PyTree.
 
-    By default, all nodes are considered roots.
+    By default, unwrapping is performed inside-out (bottom-up) across the entire 
+    tree. Every `AbstractUnwrappable` node is replaced by the result of its 
+    `unwrap()` method.
+
+    If the `only_if` predicate is provided, unwrapping is conditionally gated. 
+    The tree is searched top-down, and unwrapping only triggers for subtrees 
+    that satisfy the condition. Once a node satisfies `only_if`, that entire 
+    subtree is fully unwrapped. 
+
+    Behavior with `only_if`:
+        1. If `only_if(node)` is True: The node and all of its `AbstractUnwrappable` 
+           descendants are fully resolved.
+        2. If `only_if(node)` is False: The node is left wrapped, but the search 
+           continues recursively into its children.
+
+    Args:
+        tree: The PyTree to unwrap.
+        only_if: An optional predicate function `Callable[[Any], bool]`. If provided, 
+            only subtrees evaluating to True (and their descendants) are unwrapped.
+
+    Returns:
+        A new PyTree with the appropriate `AbstractUnwrappable` nodes resolved.
     """
     def _do_unwrap(node, *, include_self: bool):
         def _map_fn(leaf):
@@ -82,15 +107,18 @@ def unwrap(tree: Any, only_if: Callable[[Any], bool] = None) -> Any:
     return _search_and_unwrap(tree, include_self=True)
 
 
-def as_unwrapped(tree: Union[T | PyTree[T]]) -> T:
-    """
-    Calls `tree.unwrap` once and only if it is an `AbstractUnwrappable`, otherwise returns it.
+def as_unwrapped(tree: Union[T, PyTree[T]]) -> T:
+    """Conditionally unwraps the root node if it is an `AbstractUnwrappable`.
+    
+    Unlike `unwrap`, this function does not recursively traverse the PyTree. 
+    It only evaluates the top-level object.
 
     Args:
-        tree: The tree to (potentially) unwrap.
+        tree: The tree or node to potentially unwrap.
 
     Returns:
-        The unwrapped tree.
+        The unwrapped result if `tree` was an `AbstractUnwrappable`, 
+        otherwise returns the original `tree` unmodified.
     """
     if isinstance(tree, AbstractUnwrappable):
         return tree.unwrap()

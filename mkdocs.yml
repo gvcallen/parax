@@ -57,13 +57,15 @@ nav:
     - Bayesian hypercube optimization (with correlated variables): examples/bayesian_hypercube_optimization.md
   - API:
     - Interfaces:
+      - Unwrappable: api/unwrappable.md
+      - Wrappable: api/wrappable.md
       - Constant: api/constant.md
       - Annotated: api/annotated.md
       - Bounded: api/bounded.md
       - Probabilistic: api/probabilistic.md
-    - Parameters:
-      - Unwrappables: api/unwrappables.md
+    - Parameters/Tools:
       - Variables: api/variables.md
+      - Wrappers: api/wrappers.md
       - Constraints: api/constraints.md
       - Transforms: api/transforms.md
     - Misc:

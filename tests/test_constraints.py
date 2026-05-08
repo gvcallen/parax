@@ -10,9 +10,9 @@ from parax.constraints import (
     Interval,
     Positive,
     Negative,
-    TransformedConstraint,
-    TreeConstraint,
-    CustomConstraint,
+    Transformed,
+    Leafwise,
+    Custom,
 )
 from distreqx.bijectors import ScalarAffine
 
@@ -93,7 +93,7 @@ def test_transformed_constraint_monotonic_decrease():
     # A bijector that multiplies by -2
     inverting_bijector = ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(-2.0))
     
-    transformed = TransformedConstraint(base, inverting_bijector)
+    transformed = Transformed(base, inverting_bijector)
     lower, upper = transformed.bounds
     
     # Original bounds (1, 5) mapped by -2 become (-2, -10).
@@ -115,7 +115,7 @@ def test_tree_constraint_valid_pytree():
         }
     }
     
-    tree_constraint = TreeConstraint(tree_of_constraints)
+    tree_constraint = Leafwise(tree_of_constraints)
     lower_bounds, upper_bounds = tree_constraint.bounds
     
     # Constraint bounds should be extracted maintaining PyTree structure
@@ -134,8 +134,8 @@ def test_tree_constraint_empty_rejection():
     # An actually empty PyTree will yield 0 leaves, triggering the ValueError
     empty_tree = {}
     
-    with pytest.raises(ValueError, match="The pytree of constraints cannot be empty."):
-        TreeConstraint(empty_tree)
+    with pytest.raises(ValueError, match="The pytree of `tree` cannot be empty."):
+        Leafwise(empty_tree)
 
 
 def test_custom_constraint():
@@ -143,7 +143,7 @@ def test_custom_constraint():
     custom_bijector = ScalarAffine(shift=jnp.array(10.0), scale=jnp.array(1.0))
     custom_bounds = (jnp.array(0.0), jnp.array(20.0))
     
-    constraint = CustomConstraint(bijector=custom_bijector, bounds=custom_bounds)
+    constraint = Custom(bijector=custom_bijector, bounds=custom_bounds)
     
     assert constraint.bounds == custom_bounds
     assert constraint.bijector is custom_bijector

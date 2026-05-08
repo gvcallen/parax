@@ -8,6 +8,8 @@
 
 ::: parax.is_unwrappable
 
+::: parax.is_wrappable
+
 ::: parax.is_bounded
 
 ::: parax.is_probabilistic

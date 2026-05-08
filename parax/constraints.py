@@ -12,6 +12,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
+from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import (
     AbstractBijector, 
     Sigmoid, 
@@ -24,15 +25,14 @@ class AbstractConstraint(eqx.Module):
     """
     The base class for all physical constraints in Parax.
     
-    A constraint acts as a bridge between hard physical boundaries (used by 
-    bounded optimizers or user inspection) and topological mappings (used by 
-    unconstrained ML optimizers).
-
-    Constraints may be used directly on arrays or mapped over PyTrees.
+    Constraints are a higher-level concept that provide bounds and bijectors over constrained domains.
+    This is useful for use with unconstrained solvers (which require a bijector from the
+    unconstrained real line to the constrained domain) and bounded solvers (which accept
+    lower and upper bounds directly).
 
     Attributes:
         bounds: A tuple containing the lower and upper bounds of the constrained space.
-        bijector: The underlying mapping from the unconstrained real line to the bounded space.
+        bijector: A `distreqx.bijectors.AbstractBijector` mapping from the unconstrained real line to the constrained space.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
@@ -205,7 +205,7 @@ class Negative(LessThan):
         super().__init__(upper=jnp.zeros(shape, dtype=dtype))
 
 
-class TransformedConstraint(AbstractConstraint):
+class Transformed(AbstractConstraint):
     """
     A constraint modified by an arbitrary distreqx bijector.
     
@@ -260,7 +260,7 @@ class TransformedConstraint(AbstractConstraint):
         return Chain([self.custom_bijector, self.base_constraint.bijector])
   
 
-class TreeConstraint(AbstractConstraint):
+class Leafwise(AbstractConstraint):
     """
     Represents a PyTree of constraints mapping over a PyTree of inputs.
     
@@ -274,22 +274,22 @@ class TreeConstraint(AbstractConstraint):
 
     def __init__(
         self, 
-        constraints: PyTree[AbstractConstraint],
+        tree: PyTree[AbstractConstraint],
     ):
         """
         Args:
-            constraints: A PyTree containing `AbstractConstraint` leaves.
+            tree: A PyTree containing `AbstractConstraint` leaves.
                 Non-constraint leaves are ignored.
         
         Raises:
             ValueError: If the provided PyTree contains no constraint leaves.
         """
         # Local import prevents circular dependency at initialization time
-        leaves = jax.tree.leaves(constraints, is_leaf=is_constraint)
+        leaves = jax.tree.leaves(tree, is_leaf=is_constraint)
         if not leaves:
-            raise ValueError("The pytree of constraints cannot be empty.")
+            raise ValueError("The pytree of `tree` cannot be empty.")
 
-        self.tree = constraints
+        self.tree = tree
 
     @property
     def bounds(self) -> tuple[PyTree[Array], PyTree[Array]]:
@@ -299,38 +299,38 @@ class TreeConstraint(AbstractConstraint):
         """
         def get_lower(node: Any) -> Any:
             if not is_constraint(node):
-                return node
+                raise ValueError(f"Found a leaf node of type {type(node)} that is not a constraint in `parax.constraints.Leafwise`. Value: {node}")
             return node.bounds[0]
         
         def get_upper(node: Any) -> Any:
             if not is_constraint(node):
-                return node
+                raise ValueError(f"Found a leaf node of type {type(node)} that is not a constraint in `parax.constraints.Leafwise`. Value: {node}")
             return node.bounds[1]
                 
-        lower = jax.tree_util.tree_map(get_lower, self.tree, is_leaf=is_constraint)
-        upper = jax.tree_util.tree_map(get_upper, self.tree, is_leaf=is_constraint)
+        lower = jax.tree.map(get_lower, self.tree, is_leaf=is_constraint)
+        upper = jax.tree.map(get_upper, self.tree, is_leaf=is_constraint)
         
         return lower, upper
 
     @property
     def bijector(self) -> AbstractBijector:
         """
-        Returns a `distreqx.TreeMap` bijector that applies each respective 
+        Returns a `distreqx.bijectors.Leafwise` bijector that applies each respective 
         leaf constraint's bijector.
         """
-        from distreqx.bijectors import TreeMap
+        from distreqx.bijectors import Leafwise as LeafwiseBijector
 
         def get_bijector(node: Any) -> Any:
             if not is_constraint(node):
-                return node
+                raise ValueError(f"Found a leaf node of type {type(node)} that is not a constraint in `parax.constraints.Leafwise`. Value: {node}")
             return node.bijector
         
-        bijector = jax.tree_util.tree_map(get_bijector, self.tree, is_leaf=is_constraint)
+        bijector = jax.tree.map(get_bijector, self.tree, is_leaf=is_constraint)
 
-        return TreeMap(bijector)
+        return LeafwiseBijector(bijector)
     
 
-class CustomConstraint(AbstractConstraint):
+class Custom(AbstractConstraint):
     """
     An escape hatch for power users who need a specific distreqx bijector 
     mapping with predefined physical bounds.
@@ -363,3 +363,35 @@ class CustomConstraint(AbstractConstraint):
     @property
     def bijector(self) -> AbstractBijector:
         return self._custom_bijector
+    
+
+def get_constraint_for_distribution(dist: AbstractDistribution) -> AbstractConstraint:
+    """
+    Infers the physical support of a distreqx distribution and returns 
+    the corresponding constraint mapping.
+    """
+    # 1. Infer the boundaries using the icdf
+    # Passing scalar 0.0 and 1.0 will broadcast to the distribution's event/batch shape
+    lower_bound = dist.icdf(0.0)
+    upper_bound = dist.icdf(1.0)
+    
+    # 2. Determine boundedness (using jnp.all to safely handle multivariate arrays)
+    is_lower_bounded = not jnp.all(jnp.isneginf(lower_bound))
+    is_upper_bounded = not jnp.all(jnp.isposinf(upper_bound))
+
+    # 3. Route to the appropriate Constraint class
+    if not is_lower_bounded and not is_upper_bounded:
+        return RealLine(shape=dist.event_shape)
+
+    elif is_lower_bounded and not is_upper_bounded:
+        if jnp.all(lower_bound == 0.0):
+            return Positive(shape=dist.event_shape, dtype=lower_bound.dtype)
+        return GreaterThan(lower=lower_bound)
+
+    elif not is_lower_bounded and is_upper_bounded:
+        if jnp.all(upper_bound == 0.0):
+            return Negative(shape=dist.event_shape, dtype=upper_bound.dtype)
+        return LessThan(upper=upper_bound)
+
+    else:
+        return Interval(lower=lower_bound, upper=upper_bound)

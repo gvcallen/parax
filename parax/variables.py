@@ -14,7 +14,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Inexact
 import equinox as eqx
 
-from parax.constraints import AbstractConstraint, RealLine
+from parax.constraints import AbstractConstraint, RealLine, get_constraint_for_distribution
 from parax.constant import AbstractConstant
 from parax.unwrappable import AbstractUnwrappable, as_unwrapped
 from parax.wrappable import AbstractWrappable
@@ -318,60 +318,89 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
 
-class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractWrappable[Array]):
+class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Array], AbstractWrappable[Array]):
     """
-    A random variable.
+    A random variable with an optional constraint.
     
     The distribution is specified via a `distreqx.distributions.AbstractDistribution`.
+    The constraint is specified via a `parax.constraint.AbstractConstraint`.
 
     The variable implements the `parax.probabilistic.AbstractProbabilistic` interface
     to integrate with stochastic samplers and other algorithms.
 
     Attributes:
         distribution: The probability distribution of `raw_value`.
+        constraint: The constraint that defines the support of `distribution`.
+                    Can be None, in which case this function will attempt
+                    to automatically infer the constraint from the distribution's
+                    `icdf` function. If this fails, the real line will be used.
+                    In future versions of Parax, a constraint registry will be used,
+                    supporting common bounded distributions.
         raw_value: The raw un-probabilistic value. Can be None,
                    in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
     distribution: AbstractDistribution = eqx.field(converter=as_frozen)
+    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
     raw_value: Param = eqx.field(converter=as_param)
 
     def __init__(
         self,
-        distribution: AbstractDistribution | None = None,
-        raw_value: Param = None,
+        distribution: AbstractDistribution,
+        constraint: AbstractConstraint | None = None,
+        value: Array | None = None,
+        *,
+        raw_value: Param | None = None,
     ):
         """
         Args:
             raw_value: The un-probabilistic raw value.
-            distribution: The probability distribution. If None, defaults to `distreqx.distributions.ImproperUniform.
+            distribution: The probability distribution.
+            constraint: The distribution's constraint. If `None`, then a 
         """
-        # Distribution standardization
-        if distribution is None:
-            distribution = ImproperUniform(shape=shape)
-            if raw_value is None:
-                raw_value = 0.0
+        if value is not None and raw_value is not None:
+            raise ValueError("Cannot provide both `value` and `raw_value`.")
 
-        # Try to extract raw_value from mean:
-        if raw_value is None:
+        # Derive physical value if both are missing
+        if value is None and raw_value is None:
             try:
-                raw_value = distribution.mean()
-            except:
-                raise ValueError("`raw_value` must be provided in `parax.Random` if `distribution` does not support `mean`")
+                value = jnp.array(distribution.mean())
+            except Exception:
+                raise ValueError(
+                    "`value` or `raw_value` must be provided if the "
+                    "distribution does not support `mean()`."
+                )
 
-        # Array standardization
-        raw_value = as_param(raw_value)
-        shape = raw_value.shape
-        
+        # Constraint resolution
+        if constraint is None:
+            try:
+                constraint = get_constraint_for_distribution(distribution)
+            except:
+                shape = value.shape if value is not None else jnp.asarray(raw_value).shape
+                constraint = RealLine(shape=shape)
+
+        # Calculate unconstrained raw_value
+        if value is not None:
+            raw_value = constraint.bijector.inverse(jnp.asarray(value))
+
         self.distribution = distribution
+        self.constraint = constraint
         self.raw_value = raw_value
 
     @property
+    def bounds(self) -> tuple[Array, Array]:
+        constraint_bounds = as_unwrapped(self.constraint).bounds
+        lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
+        upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
+        return lower, upper
+
+    @property
     def value(self) -> Array:
-        return self.raw_value
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
     
     def wrap(self, value: Array) -> Self:
-        return eqx.tree_at(lambda x: x.raw_value, self, value)
+        new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
 
 def tagged(
     raw_value: Param = dataclasses.MISSING,
@@ -451,6 +480,7 @@ def constrained(
 
 def random(
     distribution: AbstractDistribution | None = None,
+    constraint: AbstractConstraint | None = None,
     value: Param = dataclasses.MISSING,
 ) -> Any:
     """
@@ -464,7 +494,7 @@ def random(
         An `equinox.field` properly configured for the field type.
     """
     def converter(x: Any) -> AbstractVariable:
-        return Random(distribution=distribution, raw_value=x)
+        return Random(distribution=distribution, constraint=constraint, value=x)
 
     field_kwargs = {"converter": converter}
     if value is not dataclasses.MISSING:

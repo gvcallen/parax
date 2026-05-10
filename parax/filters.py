@@ -25,28 +25,28 @@ def is_bijector(x: Any) -> TypeGuard[AbstractBijector]:
     return isinstance(x, AbstractBijector)
 
 
-def remove(pytree: PyTree, condition: Callable[[Any], bool], *, stop_at: Callable[[Any], bool] = None) -> Any:
+def remove(pytree: PyTree, condition: Callable[[Any], bool], *, stop_if: Callable[[Any], bool] = None) -> Any:
     """Removes nodes from a PyTree that match a given condition.
 
     Replaces matching nodes with None. Halts traversal at matching nodes,
-    as well as any nodes matching `stop_at`.
+    as well as any nodes matching `stop_if`.
 
     Args:
         pytree (PyTree): The input PyTree to filter.
         condition (Callable[[Any], bool]): A function that evaluates to True 
             for nodes that should be removed.
-        stop_at (Callable[[Any], bool]): A function that evaluates to True 
-            for nodes that shouldn't be traversed into.
+        stop_if (Callable[[Any], bool]): A function that evaluates to True 
+            for leaf nodes in addition to `condition`.
 
     Returns:
         Any: A copy of the PyTree with the matched nodes replaced by None.
     """
-    if stop_at is None:
-        stop_at = lambda _: False
+    if stop_if is None:
+        stop_if = lambda _: False
 
     return eqx.filter(
         pytree, 
         filter_spec=condition, 
-        is_leaf=lambda x: stop_at(x) or condition(x), 
+        is_leaf=lambda x: stop_if(x) or condition(x), 
         inverse=True
     )

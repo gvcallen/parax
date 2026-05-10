@@ -63,8 +63,8 @@ Next, we partition the model to remove static metadata and constant values, and 
 <!-- pytest-codeblocks:cont -->
 ```python
 init_params, static = eqx.partition(init_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
-distributions = prx.remove(distributions_all, prx.is_constant, stop_at=prx.is_distribution)
-joint = prx.remove(joint_all, prx.is_constant, stop_at=prx.is_distribution)
+distributions = prx.remove(distributions_all, prx.is_constant, stop_if=prx.is_distribution)
+joint = prx.remove(joint_all, prx.is_constant, stop_if=prx.is_distribution)
 ```
 
 Finally, we can transform our parameters into the hypercube using the `cdf`, and define the inverse hypercube transform using the `icdf`, as well as the negative log posterior which combines everything together:

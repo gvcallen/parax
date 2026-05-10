@@ -43,8 +43,8 @@ Next, we partition and filter the parameters to remove static metadata and fixed
 <!-- pytest-codeblocks:cont -->
 ```python
 params, static = eqx.partition(initial_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
-unconstrained_prior = prx.remove(unconstrained_prior_all, prx.is_constant, stop_at=prx.is_distribution)
-bijector_to_constrained = prx.remove(bijector_to_constrained_all, prx.is_constant, stop_at=prx.is_bijector)
+unconstrained_prior = prx.remove(unconstrained_prior_all, prx.is_constant, stop_if=prx.is_distribution)
+bijector_to_constrained = prx.remove(bijector_to_constrained_all, prx.is_constant, stop_if=prx.is_bijector)
 ```
 
 Similar to the example on bounded optimization, we must remove any constants so that are prior and bijector align with the structure of our parameters.

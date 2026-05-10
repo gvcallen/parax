@@ -40,9 +40,9 @@ lower = prx.remove(lower_all, prx.is_constant)
 upper = prx.remove(upper_all, prx.is_constant)
 ```
 
-Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping (while traversing the tree inside-out) until it encounters a bounded node. The resultant unwrapped model will naturally match the PyTree structure returned by `parax.bounded.tree_bounds`, since this method *stops* at bounded nodes using an outside-in (top down) traversal (via `is_leaf=parax.is_bounded`).
+Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping until a bounded node is encountered, resulting in a PyTree whose structure will naturally match that returned by `parax.bounded.tree_bounds`.
 
-Notice also that we must use `prx.remove` (to remove and constant values) so that the shape of our bounds align with our parameters.
+Notice also that we must use `prx.remove` (to remove any constant values) so that the shape of our bounds align with our parameters.
 
 Now we can define our objective:
 <!-- pytest-codeblocks:cont -->

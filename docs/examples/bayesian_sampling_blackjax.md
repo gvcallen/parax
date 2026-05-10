@@ -36,7 +36,7 @@ unconstrained_prior_all = prx.probabilistic.tree_unconstrained_distribution(init
 bijector_to_constrained_all = prx.probabilistic.tree_leafwise_bijector(initial_model)
 ```
 
-Note that we need use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.
+Note that we need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.
 
 Next, we partition and filter the parameters to remove static metadata and fixed values:
 
@@ -47,7 +47,7 @@ unconstrained_prior = prx.remove(unconstrained_prior_all, prx.is_constant, stop_
 bijector_to_constrained = prx.remove(bijector_to_constrained_all, prx.is_constant, stop_if=prx.is_bijector)
 ```
 
-Similar to the example on bounded optimization, we must remove any constants so that are prior and bijector align with the structure of our parameters.
+Similar to the example on bounded optimization, we must remove any constants so that our prior and bijector align with the structure of our parameters.
 
 Finally, we project our constrained parameters to the unconstrained space, and define the log posterior to be Gaussian likelihood with a standard deviation of `1.0`.
 <!-- pytest-codeblocks:cont -->
@@ -154,4 +154,4 @@ You may have noticed that we could have accomplished the above without the added
 
 - *Parameters as first-class citizens*. Models contain parameters - not distributions. By prioritizing a parameter-centered approach and using tree tools to setup our model, we maintain a clear separation of concerns.
 - *Variable manipulation*. For example, you can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.
-- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Using Parax, we could easily define a factory that wraps a `parax.Random` variable in a `parax.Constrained`, allowing us to toggle between bounded optimation and inference.
+- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Using Parax, we could easily define a factory that wraps a `parax.Random` variable in a `parax.Constrained`, allowing us to toggle between bounded optimization and inference.

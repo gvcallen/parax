@@ -5,8 +5,8 @@ In this example, we perform Bayesian optimization (*maximum a posteriori estimat
 This is an advanced example building on previous examples. It demonstrates several concepts at once:
 
 - Modeling of correlated parameters and derived random variables using `parax.Random` and `parax.Derived`.
-- Extracting both the joint and one-by-one distributions using `tree_joint_distribution` and `tree_distributions` in `parax.probabilistic`.
-- Perform a hypercube transform and evaluating the joint log probability using `icdf`, `cdf` and `log_prob`.
+- Extracting both the joint and individual distribution(s) using `tree_joint_distribution` and `tree_distributions` in `parax.probabilistic`.
+- Performing a hypercube transform and evaluating the joint log probability using `icdf`, `cdf` and `log_prob`.
 
 ## 1. Defining the model
 Similar to the Bayesian sampling example, we define a linear regression model $y = w \cdot x + b$. However, instead of defining the weight and bias with individual priors, we model them using a joint covariance matrix. We use a derived variable via a Cholesky decomposition (as opposed to using a multivariate normal from `distreqx.distributions`) so that we can map independent standard `Normal` distribution to the unit hypercube using their native `cdf` and `icdf` functions.
@@ -47,53 +47,50 @@ initial_model = CorrelatedBayesianModel()
 
 ## 2. Setting up the negative log posterior
 
-To setup the log posterior, we unwrap the model into the bounded space, and then extract the distributions and initial hypercube values:
+To setup the objective negative log posterior, we first need to perform model *extraction* and then *filtering*.
+
+First, we *partially unwrap* the model to resolve it into its constrained, probabilistic values, and we also extract its individual and joint distribution(s) which match the shape of these values:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-import parax.probabilistic as prxp
+init_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
+distributions_all = prx.probabilistic.tree_distributions(initial_model)
+joint_all = prx.probabilistic.tree_joint_distribution(initial_model)
+```
 
-initial_bounded = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-base_distributions = prxp.tree_distributions(initial_model)
-initial_cube = jax.tree.map(lambda d, b: d.cdf(b), base_distributions, initial_bounded, is_leaf=prx.is_distribution)
+Next, we partition the model to remove static metadata and constant values, and also remove any constant nodes from the distributions (similar to other example):
 
-def hypercube_transform(cube):
+<!-- pytest-codeblocks:cont -->
+```python
+init_params, static = eqx.partition(init_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
+distributions = prx.remove(distributions_all, prx.is_constant, stop_at=prx.is_distribution)
+joint = prx.remove(distributions_all, prx.is_constant, stop_at=prx.is_distribution)
+```
+
+Finally, we can transform our parameters into the hypercube using the `cdf`, and define the inverse hypercube transform using the `icdf`, as well as the negative log posterior which combines everything together:
+
+<!-- pytest-codeblocks:cont -->
+```python
+init_cube_params = jax.tree.map(lambda d, b: d.cdf(b), distributions, init_params, is_leaf=prx.is_distribution)
+
+def hypercube_transform(distributions, cube_params):
     eps = jnp.finfo(jnp.float32).eps
-    safe_cube = jax.tree.map(lambda x: jnp.clip(x, eps, 1.0 - eps), cube)
-    return jax.tree.map(lambda d, u: d.icdf(u), base_distributions, safe_cube, is_leaf=prx.is_distribution)
-```
+    safe_cube = jax.tree.map(lambda x: jnp.clip(x, eps, 1.0 - eps), cube_params)
+    return jax.tree.map(lambda d, u: d.icdf(u), distributions, safe_cube, is_leaf=prx.is_distribution)
 
-Note that, to extract the hypercube values, we used `parax.probabilistic.tree_distributions` as opposed to `parax.probabilistic.tree_joint_distribution`. This is because the former simply extracts the individual underlying distributions directly, as opposed to returning a single joint distribution for the entire model.
-
-Now, we can easily transform the initial base model values to the hypercube using `jax.tree.map` and the underlying normal `cdf` function. We then partition these models using `eqx.partition` and extract lower and upper bounds for the optimizer:
-
-<!-- pytest-codeblocks:cont -->
-
-```python
-params, static = eqx.partition(initial_cube, eqx.is_inexact_array, is_leaf=prx.is_constant)
-zeros = jax.tree.map(jnp.zeros_like, params)
-ones = jax.tree.map(jnp.ones_like, params)
-```
-
-Finally, we can extract the full joint distribution of the model and setup the negative log posterior to return the negative of the joint log prior plus the log likelihood.
-
-<!-- pytest-codeblocks:cont -->
-```python
-base_joint = prxp.tree_joint_distribution(initial_model)
-def negative_log_posterior(params, static, x_data, y_data):
-    cube_model = eqx.combine(params, static)
-    base_model = hypercube_transform(cube_model)
-    log_prior = base_joint.log_prob(base_model)
-
-    unwrapped_model = prx.unwrap(base_model)
-    y_pred = jax.vmap(unwrapped_model)(x_data)
-    log_likelihood = jnp.sum(Normal(y_pred, unwrapped_model.sigma).log_prob(y_data))
+def negative_log_posterior(cube_params, distributions, static, joint, x_data, y_data):
+    params = hypercube_transform(distributions, cube_params)
+    unwrapped = prx.unwrap(eqx.combine(params, static))
+    
+    log_prior = joint.log_prob(params)
+    y_pred = jax.vmap(unwrapped)(x_data)
+    log_likelihood = jnp.sum(Normal(y_pred, unwrapped.sigma).log_prob(y_data))
     return -(log_prior + log_likelihood)
 ```
 
 ## 3. Running the optimizer
 
-Finally, we can run the optimizer. We generate some dummy data,
+We can now run the optimizer! First, we generate some dummy data:
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -106,24 +103,34 @@ true_sigma = 0.5
 y_data = true_w * x_data + true_b + true_sigma * jax.random.normal(key, x_data.shape)
 ```
 
-and then run JAxopt:
+and then define our hypercube bounds and run JAXopt:
 
 <!-- pytest-codeblocks:cont -->
 ```python
 import jaxopt
 
+zeros = jax.tree.map(jnp.zeros_like, init_cube_params)
+ones = jax.tree.map(jnp.ones_like, init_cube_params)
+
 solver = jaxopt.ScipyBoundedMinimize(fun=negative_log_posterior)
 results = solver.run(
-    init_params=params, 
+    init_params=init_cube_params,
     bounds=(zeros, ones),
+    distributions=distributions,
     static=static,
+    joint=joint,
     x_data=x_data,
     y_data=y_data,
 )
+```
 
-cube_model = eqx.combine(results.params, static)
-bounded_model = hypercube_transform(cube_model)
-map_model = prx.wrap(initial_model, bounded_model, only_if=prx.is_probabilistic)
+Finally, we can map the optimized hypercube parameters back to our model:
+<!-- pytest-codeblocks:cont -->
+```python
+opt_cube_params = results.params
+opt_params = hypercube_transform(distributions, opt_cube_params)
+opt_values = eqx.combine(opt_params, static)
+opt_model = prx.wrap(initial_model, opt_values, only_if=prx.is_probabilistic)
 ```
 
 If we print out the results, we see our maximum a posteriori estimate aligns with our simulated data:
@@ -131,12 +138,12 @@ If we print out the results, we see our maximum a posteriori estimate aligns wit
 <!-- pytest-codeblocks:cont -->
 ```python
 print("--- Inline Correlated MAP Estimation ---")
-print(f"True Weight: {true_w:<5} | MAP Weight: {map_model.theta.value[0]:.3f}")
+print(f"True Weight: {true_w:<5} | MAP Weight: {opt_model.theta.value[0]:.3f}")
 # True: 2.5, MAP: 2.499
 
-print(f"True Bias:   {true_b:<5} | MAP Bias:   {map_model.theta.value[1]:.3f}")
+print(f"True Bias:   {true_b:<5} | MAP Bias:   {opt_model.theta.value[1]:.3f}")
 # True: -1.0, MAP: -0.942
 
-print(f"True Sigma:  {true_sigma:<5} | MAP Sigma:  {map_model.sigma.value:.3f}")
+print(f"True Sigma:  {true_sigma:<5} | MAP Sigma:  {opt_model.sigma.value:.3f}")
 # True: 0.5, MAP: 0.470
 ```

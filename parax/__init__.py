@@ -64,6 +64,7 @@ from parax.variables import (
 from parax.filters import (
     is_distribution as is_distribution,
     is_bijector as is_bijector,
+    remove as remove,
 )
 
 

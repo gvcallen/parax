@@ -25,37 +25,46 @@ initial_model = BayesianLinearModel(weight=1.0, bias=1.0)
 
 ## 2. Setting up the log posterior
 
-In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be using an unconstrained MCMC sampler, we need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior. To accomplish this, we will use explicitly use *bijectors*.
+In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be using an unconstrained MCMC sampler, we need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior. To accomplish this, we will explicitly use *bijectors*.
 
-First, we use `parax.probabilistic` and `parax.unwrap` to extract the initial unconstrained values, prior and bijector. Since the log prior *must accurately represent the geometry of the unconstrained space*, we calculate it directly in that space (using `parax.probabilistic.tree_unconstrained_distribution`) to avoid having to do a manual log-determinant-Jacobian correction.
+First, we use `parax.probabilistic` and `parax.unwrap` to extract all initial unconstrained values, prior and bijector:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-unconstrained_prior = prx.probabilistic.tree_unconstrained_distribution(initial_model)
-bijector_to_constrained = prx.probabilistic.tree_leafwise_bijector(initial_model)
-
 initial_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-initial_unconstrained = bijector_to_constrained.inverse(initial_constrained)
-
-params, static = eqx.partition(initial_unconstrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
+unconstrained_prior_all = prx.probabilistic.tree_unconstrained_distribution(initial_model)
+bijector_to_constrained_all = prx.probabilistic.tree_leafwise_bijector(initial_model)
 ```
 
-Next, we define the log posterior. We assume Gaussian noise with a standard deviation of `1.0`. Note that we fully unwrap the model for the forward pass.
+Note that we need use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.
+
+Next, we partition and filter the parameters to remove static metadata and fixed values:
+
+<!-- pytest-codeblocks:cont -->
+```python
+params, static = eqx.partition(initial_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
+unconstrained_prior = prx.remove(unconstrained_prior_all, prx.is_constant, stop_at=prx.is_distribution)
+bijector_to_constrained = prx.remove(bijector_to_constrained_all, prx.is_constant, stop_at=prx.is_bijector)
+```
+
+Similar to the example on bounded optimization, we must remove any constants so that are prior and bijector align with the structure of our parameters.
+
+Finally, we project our constrained parameters to the unconstrained space, and define the log posterior to be Gaussian likelihood with a standard deviation of `1.0`.
 <!-- pytest-codeblocks:cont -->
 ```python
 import jax
 import jax.numpy as jnp
 
-def log_posterior_fn(params, static, x_data, y_true):
-    unconstrained = eqx.combine(params, static)
+init_unconstrained_params = bijector_to_constrained.inverse(params)
+
+def log_posterior_fn(unconstrained_params, static, bijector_to_constrained, unconstrained_prior, x_data, y_true):
+    params = bijector_to_constrained.forward(unconstrained_params)
+    unwrapped = prx.unwrap(eqx.combine(params, static))
     
-    log_prior = unconstrained_prior.log_prob(unconstrained)
-    constrained = bijector_to_constrained.forward(unconstrained)
-    
-    unwrapped = prx.unwrap(constrained)
+    log_prior = unconstrained_prior.log_prob(unconstrained_params)
     y_pred = jax.vmap(unwrapped)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
-    
+
     return log_prior + log_likelihood
 ```
 
@@ -73,11 +82,11 @@ rng_key = jr.key(42)
 x_data = jnp.linspace(-2, 2, 50)
 y_data = 2.5 * x_data + 1.0 + jr.normal(rng_key, (50,))
 
-logprob = lambda p: log_posterior_fn(p, static, x_data, y_data)
-inv_mass_matrix = jnp.ones_like(ravel_pytree(params)[0])
+logprob = lambda p: log_posterior_fn(p, static, bijector_to_constrained, unconstrained_prior, x_data, y_data)
+inv_mass_matrix = jnp.ones_like(ravel_pytree(init_unconstrained_params)[0])
 nuts = blackjax.nuts(logprob, step_size=1e-2, inverse_mass_matrix=inv_mass_matrix)
 
-initial_state = nuts.init(params)
+init_state = nuts.init(init_unconstrained_params)
 
 @eqx.filter_jit
 def run_mcmc(key, state, num_steps):
@@ -90,7 +99,7 @@ def run_mcmc(key, state, num_steps):
     return samples
 
 sample_key = jr.key(0)
-param_samples = run_mcmc(sample_key, initial_state, num_steps=2000)
+unconstrained_param_samples = run_mcmc(sample_key, init_state, num_steps=2000)
 ```
 
 ## 4. Evaluating the results
@@ -105,26 +114,25 @@ Finally, we generate predictions across the input space and plot the results.
 ```python
 import matplotlib.pyplot as plt
 
-clean_param_samples = jax.tree.map(lambda x: x[500:], param_samples)
-unconstrained_samples = eqx.combine(clean_param_samples, static)
-constrained_samples = bijector_to_constrained.forward(unconstrained_samples)
+clean_unconstrained_param_samples = jax.tree.map(lambda x: x[500:], unconstrained_param_samples)
+constrained_param_samples = bijector_to_constrained.forward(clean_unconstrained_param_samples)
 
-model_samples = eqx.filter_vmap(eqx.Partial(prx.wrap, only_if=prx.is_probabilistic), in_axes=(None, eqx.if_array(0)))(initial_model, constrained_samples)
-unwrapped_models = prx.unwrap(model_samples)
+def predict(params, static, x):
+    return prx.unwrap(eqx.combine(params, static))(x)
 
 x_plot = jnp.linspace(-3, 3, 100)
-y_preds = eqx.filter_vmap(unwrapped_models)(x_plot).T
+y_preds = jax.vmap(predict, in_axes=(None, None, 0))(constrained_param_samples, static, x_plot).T
 y_mean = jnp.mean(y_preds, axis=0)
 y_lower, y_upper = jnp.percentile(y_preds, jnp.array([2.5, 97.5]), axis=0)
 
 fig, axes = plt.subplots(1, 3, figsize=(16, 4))
 
-axes[0].hist(unwrapped_models.weight, bins=30, density=True, color='steelblue', edgecolor='black')
+axes[0].hist(constrained_param_samples.weight, bins=30, density=True, color='steelblue', edgecolor='black')
 axes[0].axvline(2.5, color='red', linestyle='dashed', linewidth=2, label='True Value')
 axes[0].set_title('Weight Posterior')
 axes[0].legend()
 
-axes[1].hist(unwrapped_models.bias, bins=30, density=True, color='seagreen', edgecolor='black')
+axes[1].hist(constrained_param_samples.bias, bins=30, density=True, color='seagreen', edgecolor='black')
 axes[1].axvline(1.0, color='red', linestyle='dashed', linewidth=2, label='True Value')
 axes[1].set_title('Bias Posterior')
 axes[1].legend()

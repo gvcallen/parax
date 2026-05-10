@@ -25,7 +25,7 @@ def is_bijector(x: Any) -> TypeGuard[AbstractBijector]:
     return isinstance(x, AbstractBijector)
 
 
-def remove(pytree: PyTree, condition: Callable[[Any], bool], *, stop_at: Callable[[Any], bool]) -> Any:
+def remove(pytree: PyTree, condition: Callable[[Any], bool], *, stop_at: Callable[[Any], bool] = None) -> Any:
     """Removes nodes from a PyTree that match a given condition.
 
     Replaces matching nodes with None. Halts traversal at matching nodes,
@@ -41,6 +41,9 @@ def remove(pytree: PyTree, condition: Callable[[Any], bool], *, stop_at: Callabl
     Returns:
         Any: A copy of the PyTree with the matched nodes replaced by None.
     """
+    if stop_at is None:
+        stop_at = lambda _: False
+
     return eqx.filter(
         pytree, 
         filter_spec=condition, 

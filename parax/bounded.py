@@ -18,16 +18,11 @@ class AbstractBounded(eqx.Module, Generic[T]):
     The abstract interface for a bounded PyTree.
 
     Used as a type check for `parax.is_bounded`. 
+
+    Attributes:
+        bounds: Returns the current PyTree bounds. Each must have a matching PyTree structure as `self`.
     """
-    @property
-    @abstractmethod
-    def bounds(self) -> tuple[T, T]:
-        """
-        Returns the current PyTree bounds.
-        
-        Each must have a matching PyTree structure as `self`.
-        """
-        raise NotImplementedError
+    bounds: eqx.AbstractVar[tuple[T, T]]
 
 
 def is_bounded(x: Any) -> TypeGuard[AbstractBounded]:

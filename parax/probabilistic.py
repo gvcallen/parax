@@ -1,7 +1,8 @@
 """
 An abstract interface for PyTrees that have an associated probability distribution.
 """
-from typing import Generic, TypeVar, Any, TypeGuard
+from abc import abstractmethod
+from typing import Generic, TypeVar, Any, TypeGuard, Self
 
 from jaxtyping import PyTree
 import jax
@@ -12,26 +13,45 @@ import equinox as eqx
 from distreqx.bijectors import Inverse, Leafwise as LeafwiseBijector
 from distreqx.distributions import AbstractDistribution, Joint, Transformed
 from parax.constraints import AbstractConstraint, Leafwise as LeafwiseConstraint, RealLine
+from parax.constrainable import AbstractConstrainable
 from parax.unwrappable import unwrap
 
 T = TypeVar("T")
 
 
-class AbstractProbabilistic(eqx.Module, Generic[T]):
+class AbstractProbabilistic(AbstractConstrainable[T]):
     """
     The abstract interface for a probabilistic PyTree.
 
     Probabilistic PyTrees have a probability distribution
-    associated with them. That is, samples from the resultant
-    distribution should match the PyTree structure of `self`.
+    associated with them. That is, the event shape of the
+    distribution matches the PyTree structure of `self`.
 
     Used as a type check for `parax.is_probabilistic`. 
 
     Attributes:
         distribution: The probability distribution associated with this PyTree node.
+        constraint: Returns the active constraint of the PyTree.
+        bounds: Returns the current PyTree bounds. Each must have a matching PyTree structure as `self`.
     """
     distribution: eqx.AbstractVar[AbstractDistribution]
     constraint: eqx.AbstractVar[AbstractConstraint]
+    bounds: eqx.AbstractVar[tuple[T, T]]
+
+    @abstractmethod
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        """
+        Returns a new instance of the PyTree with the updated constraint,
+        ensuring internal state (like unconstrained raw values) is 
+        recalculated if necessary.
+
+        Args:
+            constraint: The new constraint to apply.
+
+        Returns:
+            A new instance of the constrainable PyTree.
+        """
+        raise NotImplementedError    
 
 
 def is_probabilistic(x: Any) -> TypeGuard[AbstractProbabilistic]:

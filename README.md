@@ -5,7 +5,6 @@
 - Parameters with metadata
 - Computed PyTrees and callable parameterizations
 - Derived, constrained, fixed, and random variables
-- Arbitrary nesting of the above
 - Abstract interfaces and associated tree manipulation tools
 
 This makes Parax great for:

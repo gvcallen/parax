@@ -21,9 +21,10 @@ from parax.wrappable import AbstractWrappable
 from parax.wrappers import as_frozen, as_frozen_or_static
 from parax.annotated import AbstractAnnotated
 from parax.bounded import AbstractBounded
+from parax.constrainable import AbstractConstrainable
 from parax.probabilistic import AbstractProbabilistic
 
-from distreqx.distributions import AbstractDistribution, ImproperUniform
+from distreqx.distributions import AbstractDistribution
 
 class AbstractVariable(AbstractUnwrappable[Array]):
     """
@@ -240,11 +241,12 @@ class Derived(AbstractVariable):
         """
         return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
     
-    def wrap(self, value: Array) -> Self:
-        return eqx.tree_at(lambda m: m.raw_value, self, value)    
 
-
-class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Array]):
+class Constrained(
+    AbstractVariable,
+    AbstractConstrainable[Array],
+    AbstractWrappable[Array]
+):
     """
     A constrained variable.
     
@@ -255,18 +257,18 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
     for integration with bounded optimizers.
 
     Attributes:
-        raw_value: The raw, unconstrained value mapping to the real number line.
+        raw_value: The raw, unconstrained value on the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
     """
     constraint: AbstractConstraint = eqx.field(converter=as_frozen)
-    raw_value: Param = eqx.field(converter=as_param)
+    raw_value: Array = eqx.field(converter=jnp.asarray)
 
     def __init__(
         self,
         constraint: AbstractConstraint | None = None,
         value: Array | None = None,
         *,
-        raw_value: Param | None = None,
+        raw_value: Array | None = None,
     ):
         """
         Args:
@@ -284,7 +286,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         
         # Array standardization
         if raw_value is not None:
-            raw_value = as_param(raw_value)
+            raw_value = jnp.asarray(raw_value)
             shape = raw_value.shape
         else:
             value = jnp.asarray(value)
@@ -303,6 +305,9 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         self.constraint = constraint
         self.raw_value = raw_value
        
+    @property
+    def value(self) -> Array:
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
     
     @property
     def bounds(self) -> tuple[Array, Array]:
@@ -311,16 +316,19 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
     
-    @property
-    def value(self) -> Array:
-        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        return Constrained(constraint=constraint, value=self.value)    
     
     def wrap(self, value: Array) -> Self:
         new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
 
-class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Array], AbstractWrappable[Array]):
+class Random(
+    AbstractVariable,
+    AbstractProbabilistic[Array],
+    AbstractWrappable[Array]
+):
     """
     A random variable with an optional constraint.
     
@@ -336,13 +344,13 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
                     Can be None, in which case this function will attempt
                     to automatically infer the constraint from the distribution's
                     using `parax.constraints.get_constraint_for_distribution`.
-        raw_value: The raw un-probabilistic value. Can be None,
-                   in which case the mean of the distribution is used.
+        raw_value: The raw un-probabilistic value on the real number line. 
+                   Can be None, in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
     distribution: AbstractDistribution = eqx.field(converter=as_frozen)
     constraint: AbstractConstraint = eqx.field(converter=as_frozen)
-    raw_value: Param = eqx.field(converter=as_param)
+    raw_value: Array = eqx.field(converter=jnp.asarray)
 
     def __init__(
         self,
@@ -350,7 +358,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
         constraint: AbstractConstraint | None = None,
         value: Array | None = None,
         *,
-        raw_value: Param | None = None,
+        raw_value: Array | None = None,
     ):
         """
         Args:
@@ -370,7 +378,7 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
                     "`value` or `raw_value` must be provided if the "
                     "distribution does not support `mean()`."
                 )
-
+            
         # Constraint resolution
         if constraint is None:
             constraint = get_constraint_for_distribution(distribution)
@@ -379,22 +387,27 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
         if value is not None:
             raw_value = constraint.bijector.inverse(jnp.asarray(value))
             if jnp.any(jnp.isnan(raw_value)):
-                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")            
+                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")
+        else:
+            raw_value = jnp.asarray(raw_value)
 
         self.distribution = distribution
         self.constraint = constraint
         self.raw_value = raw_value
 
     @property
+    def value(self) -> Array:
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+    
+    @property
     def bounds(self) -> tuple[Array, Array]:
         constraint_bounds = as_unwrapped(self.constraint).bounds
         lower = jnp.broadcast_to(constraint_bounds[0], self.value.shape)
         upper = jnp.broadcast_to(constraint_bounds[1], self.value.shape)
         return lower, upper
-
-    @property
-    def value(self) -> Array:
-        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+    
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        return Random(distribution=self.distribution, constraint=constraint, value=self.value)
     
     def wrap(self, value: Array) -> Self:
         new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
@@ -454,7 +467,7 @@ def derived(
 
 def constrained(
     constraint: AbstractConstraint | None = None,
-    value: Param = dataclasses.MISSING,
+    value: Array = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Constrained` variable.
@@ -479,7 +492,7 @@ def constrained(
 def random(
     distribution: AbstractDistribution | None = None,
     constraint: AbstractConstraint | None = None,
-    value: Param = dataclasses.MISSING,
+    value: Array = dataclasses.MISSING,
 ) -> Any:
     """
     Specifies a dataclass field for a Parax `parax.Random` variable.

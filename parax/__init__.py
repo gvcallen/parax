@@ -15,6 +15,7 @@ from parax.annotated import is_annotated as is_annotated
 from parax.bounded import is_bounded as is_bounded
 from parax.probabilistic import is_probabilistic as is_probabilistic
 from parax.constraints import is_constraint as is_constraint
+from parax.constrainable import is_constrainable as is_constrainable
 from parax.transforms import is_transform as is_transform
 
 from parax.unwrappable import (
@@ -52,9 +53,6 @@ from parax.variables import (
     derived as derived,
     constrained as constrained,
     random as random,
-)
-
-from parax.variables import (
     is_variable as is_variable,
     is_param as is_param,
     as_param as as_param,
@@ -72,6 +70,7 @@ from parax import (
     annotated as annotated,
     constant as constant,
     constraints as constraints,
+    constrainable as constrainable,
     bounded as bounded,
     experimental as experimental,
     probabilistic as probabilistic,

@@ -289,7 +289,7 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         else:
             value = jnp.asarray(value)
             shape = value.shape
-        
+
         # Constraint and distribution standardization
         if constraint is None:
             constraint = RealLine(shape=shape)
@@ -297,6 +297,8 @@ class Constrained(AbstractVariable, AbstractBounded[Array], AbstractWrappable[Ar
         # Raw value standardization
         if value is not None:
             raw_value = constraint.bijector.inverse(value)
+            if jnp.any(jnp.isnan(raw_value)):
+                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")
 
         self.constraint = constraint
         self.raw_value = raw_value
@@ -376,6 +378,8 @@ class Random(AbstractVariable, AbstractProbabilistic[Array], AbstractBounded[Arr
         # Calculate unconstrained raw_value
         if value is not None:
             raw_value = constraint.bijector.inverse(jnp.asarray(value))
+            if jnp.any(jnp.isnan(raw_value)):
+                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")            
 
         self.distribution = distribution
         self.constraint = constraint

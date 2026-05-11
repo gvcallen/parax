@@ -1,5 +1,5 @@
-::: parax.bounded.AbstractConstrainable
+::: parax.constrainable.AbstractConstrainable
 
-::: parax.bounded.tree_constraint
+::: parax.constrainable.tree_constraint
 
-::: parax.bounded.tree_constrain
+::: parax.constrainable.tree_constrain

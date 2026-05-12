@@ -177,17 +177,15 @@ class Tied(AbstractUnwrappable):
                 parameter before injecting it into the target. Defaults to the 
                 identity function.
         """
-        # Replace the target with a static placeholder to hide it from optimizers
-        stripped_tree = eqx.tree_at(target, tree, _TiedPlaceholder())
+        base_tree = tree.tree if isinstance(tree, Tied) else tree
+        stripped_tree = eqx.tree_at(target, base_tree, _TiedPlaceholder())
         new_tie = (target, source, tie_fn)
-        ties = (new_tie, )
-        
-        # Support chaining multiple Tied wrappers together
         if isinstance(tree, Tied):
-            ties = ties + tree.ties
+            self.ties = tree.ties + (new_tie,)
+        else:
+            self.ties = (new_tie,)
             
         self.tree = stripped_tree
-        self.ties = ties
 
     def unwrap(self) -> Any:
         """Evaluates and resolves all parameter ties.

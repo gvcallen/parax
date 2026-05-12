@@ -120,13 +120,11 @@ class _TiedPlaceholder(eqx.Module):
 
 
 class Tied(AbstractUnwrappable):
-    """An Equinox-native wrapper that ties model parameters together dynamically.
+    """An wrapper that ties model subtrees/parameters together.
 
-    This class intercepts the `unwrap` pass. It strips the target parameter from 
-    the underlying PyTree (replacing it with a static `_TiedPlaceholder`) so that 
-    optimizers completely ignore it. During `unwrap`, it dynamically fetches the 
-    current state of the source parameter, applies the transformation, and injects 
-    it back into the tree.
+    Upon initialization, any tied parameters are replaced with placeholders.
+    Then, during unwrap, parameters are fetched from the target tried
+    and injected into the source tree.
 
     Attributes:
         tree: The underlying Equinox module or PyTree.

@@ -122,7 +122,7 @@ class _TiedPlaceholder(eqx.Module):
 class Tied(AbstractUnwrappable):
     """A wrapper that ties subtrees/parameters together.
 
-    Upon initialization, any tied parameters are replaced with placeholders.
+    Upon initialization, any tied sources are replaced with placeholders.
     Then, during unwrap, values are fetched from the target tree and injected
     into the source tree.
 

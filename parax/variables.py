@@ -143,7 +143,7 @@ def as_param(value: Any) -> Any:
     """    
     if is_param(value):
         return value
-    return jnp.asarray(value)
+    return jnp.asarray(value, dtype=float)
 
 
 class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]):

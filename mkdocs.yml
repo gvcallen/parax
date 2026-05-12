@@ -62,6 +62,7 @@ nav:
       - Constant: api/constant.md
       - Annotated: api/annotated.md
       - Bounded: api/bounded.md
+      - Constrainable: api/constrainable.md
       - Probabilistic: api/probabilistic.md
     - Parameters/Tools:
       - Variables: api/variables.md

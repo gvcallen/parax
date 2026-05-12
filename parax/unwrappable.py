@@ -43,7 +43,7 @@ def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
     return isinstance(x, AbstractUnwrappable)
 
 
-def unwrap(tree: Any, only_if: Callable[[Any], bool] = None) -> Any:
+def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], bool] = None) -> T:
     """Recursively resolves `AbstractUnwrappable` nodes within a PyTree.
 
     By default, unwrapping is performed inside-out (bottom-up) across the entire 

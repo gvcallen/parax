@@ -36,6 +36,7 @@ from parax.wrappers import (
     Parameterized as Parameterized,
     Computed as Computed,
     Static as Static,
+    Tied as Tied,
     as_frozen as as_frozen,
     as_static as as_static,
     as_frozen_or_static as as_frozen_or_static,

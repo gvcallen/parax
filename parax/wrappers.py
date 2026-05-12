@@ -5,19 +5,16 @@ This module provides tools for deferred evaluation, parameterization,
 and gradient stopping within JAX PyTrees.
 """
 
-from abc import abstractmethod
-from typing import Generic, TypeVar, Callable, Any, Union, TypeGuard, Self
+from typing import TypeVar, Callable, Any, Union, Self
 
 import equinox as eqx
 import jax
-from jaxtyping import PyTree
 
 from parax.constant import AbstractConstant
-from parax.unwrappable import AbstractUnwrappable
+from parax.unwrappable import AbstractUnwrappable, unwrap
 from parax.wrappable import AbstractWrappable
 
 T = TypeVar("T")
-
 
 class Parameterized(AbstractUnwrappable[T]):
     """
@@ -115,6 +112,99 @@ class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
     
     def wrap(self, tree: T) -> Self:
         return Frozen(tree)
+    
+
+class _TiedPlaceholder(eqx.Module):
+    """A static, empty marker used to hide parameters from optimizers."""
+    pass
+
+
+class Tied(AbstractUnwrappable):
+    """An Equinox-native wrapper that ties model parameters together dynamically.
+
+    This class intercepts the `unwrap` pass. It strips the target parameter from 
+    the underlying PyTree (replacing it with a static `_TiedPlaceholder`) so that 
+    optimizers completely ignore it. During `unwrap`, it dynamically fetches the 
+    current state of the source parameter, applies the transformation, and injects 
+    it back into the tree.
+
+    Attributes:
+        tree: The underlying Equinox module or PyTree.
+        ties: A static tuple of parameter ties, formatted as 
+            `(target_extractor, source_extractor, tie_fn)`.
+
+    Example:
+        >>> class Gaussian(eqx.Module):
+        ...     mu: jax.Array
+        ...     sigma: jax.Array
+        ...
+        >>> model = Gaussian(mu=jnp.array(1.0), sigma=jnp.array(1.0))
+        >>> 
+        >>> # Tie sigma to always be 2x mu (`tie_fn` can also be left out for identity)
+        >>> tied_model = Tied(
+        ...     tree=model,
+        ...     target=lambda m: m.sigma,
+        ...     source=lambda m: m.mu,
+        ...     tie_fn=lambda mu: mu * 2.0
+        ... )
+        >>>
+        >>> # Optimizers will now only see `mu`
+        >>> opt_state = optax.sgd(0.1).init(eqx.filter(tied_model, eqx.is_inexact_array))
+        >>> 
+        >>> # Unwrapping resolves the tie dynamically
+        >>> active_model = unwrap(tied_model)
+        >>> print(active_model.sigma) # Output: 2.0
+    """
+    tree: Any
+    ties: tuple = eqx.field(static=True)
+    
+    def __init__(
+        self, 
+        tree: Any, 
+        target: Callable[[Any], Any], 
+        source: Callable[[Any], Any], 
+        tie_fn: Callable[[Any], Any] = lambda x: x
+    ):
+        """Initializes the Tied wrapper and strips the target parameter.
+
+        Args:
+            tree: The root PyTree or Equinox module to wrap.
+            target: A callable (lens) that extracts the parameter to be replaced 
+                (e.g., `lambda m: m.layer.weight`).
+            source: A callable (lens) that extracts the parameter to draw values 
+                from (e.g., `lambda m: m.layer.bias`).
+            tie_fn: An optional transformation function applied to the source 
+                parameter before injecting it into the target. Defaults to the 
+                identity function.
+        """
+        # Replace the target with a static placeholder to hide it from optimizers
+        stripped_tree = eqx.tree_at(target, tree, _TiedPlaceholder())
+        new_tie = (target, source, tie_fn)
+        ties = (new_tie, )
+        
+        # Support chaining multiple Tied wrappers together
+        if isinstance(tree, Tied):
+            ties = ties + tree.ties
+            
+        self.tree = stripped_tree
+        self.ties = ties
+
+    def unwrap(self) -> Any:
+        """Evaluates and resolves all parameter ties.
+
+        Iterates through all registered ties, extracts the source values, applies 
+        their respective transformation functions, and re-injects them into the 
+        active PyTree before passing the tree to the standard `unwrap` function.
+
+        Returns:
+            The fully unwrapped PyTree with all target parameters resolved.
+        """
+        current_tree = self.tree
+        for target_ext, source_ext, tie_fn in self.ties:
+            source_val = unwrap(source_ext(current_tree))
+            tied_val = tie_fn(source_val)
+            current_tree = eqx.tree_at(target_ext, current_tree, tied_val)
+        return unwrap(current_tree)
     
 
 def as_frozen(tree: Union[T | Frozen[T]]) -> T:

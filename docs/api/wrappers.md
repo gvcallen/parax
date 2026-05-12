@@ -5,3 +5,5 @@
 ::: parax.Computed
 
 ::: parax.Static
+
+::: parax.Tied

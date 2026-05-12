@@ -2,7 +2,7 @@
 An abstract interface for PyTrees that have an associated probability distribution.
 """
 from abc import abstractmethod
-from typing import Generic, TypeVar, Any, TypeGuard, Self
+from typing import TypeVar, Any, TypeGuard, Self
 
 from jaxtyping import PyTree
 import jax
@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 
-from distreqx.bijectors import Inverse, Leafwise as LeafwiseBijector
+from distreqx.bijectors import AbstractBijector
 from distreqx.distributions import AbstractDistribution, Joint, Transformed
 from parax.constraints import AbstractConstraint, Leafwise as LeafwiseConstraint, RealLine
 from parax.constrainable import AbstractConstrainable
@@ -81,14 +81,14 @@ def tree_distributions(tree: PyTree) -> PyTree:
     """
     from distreqx.distributions import ImproperUniform
 
-    def _get_distribution(x):
+    def _get_distribution(path, x):
         if is_probabilistic(x):
             return unwrap(x.distribution)
         if eqx.is_inexact_array(x):
             return ImproperUniform(shape=jnp.shape(x))
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither probabilistic nor an array in `parax.probabilistic.tree_distributions`. Value: {x}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither probabilistic nor an array in `parax.probabilistic.tree_distributions`. Value: {x}, path: {path}")
 
-    distributions = jax.tree.map(_get_distribution, tree, is_leaf=is_probabilistic)
+    distributions = jax.tree.map_with_path(_get_distribution, tree, is_leaf=is_probabilistic)
     return distributions
 
 
@@ -160,7 +160,7 @@ def tree_leafwise_constraint(tree: PyTree) -> LeafwiseConstraint:
     return LeafwiseConstraint(tree_constraints(tree))
 
 
-def tree_leafwise_bijector(tree: PyTree) -> LeafwiseBijector:
+def tree_leafwise_bijector(tree: PyTree) -> AbstractBijector:
     """
     Extracts the constraint bijector of a PyTree.
     
@@ -193,4 +193,6 @@ def tree_unconstrained_distribution(tree: PyTree) -> Joint:
     """
     joint = tree_joint_distribution(tree)
     bijector = tree_leafwise_bijector(tree)
+    
+    from distreqx.bijectors import Inverse
     return Transformed(joint, Inverse(bijector))

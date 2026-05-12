@@ -178,7 +178,7 @@ def as_variable(value: Any) -> Any:
     """    
     if is_variable(value):
         return value
-    return Real(value, dtype=float)
+    return Real(value)
 
 
 class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]):

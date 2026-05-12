@@ -148,9 +148,9 @@ def as_param(value: Any) -> Any:
 
 class Real(AbstractVariable, AbstractWrappable[Array]):
     """
-    A simple real variable.
+    A plane real variable.
 
-    Useful as a placeholder, or for frameworks that only want to allow
+    Useful as a placeholder, e.g. for frameworks that only want to allow
     `parax.AbstractVariable` instances to be trainable.
 
     Attributes:

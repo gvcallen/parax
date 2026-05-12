@@ -45,7 +45,7 @@ from parax.wrappers import (
 from parax.variables import (
     AbstractVariable as AbstractVariable,
     Param as Param,
-    Var as Var,
+    Real as Real,
     Tagged as Tagged,
     Fixed as Fixed,
     Derived as Derived,

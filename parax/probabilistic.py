@@ -11,7 +11,7 @@ import equinox as eqx
 
 
 from distreqx.bijectors import AbstractBijector
-from distreqx.distributions import AbstractDistribution, Joint, Transformed
+from distreqx.distributions import AbstractDistribution, Transformed
 from parax.constraints import AbstractConstraint, Leafwise as LeafwiseConstraint, RealLine
 from parax.constrainable import AbstractConstrainable
 from parax.unwrappable import unwrap
@@ -121,7 +121,7 @@ def tree_constraints(tree: PyTree) -> PyTree:
     return constraints
 
 
-def tree_joint_distribution(tree: PyTree) -> Joint:
+def tree_joint_distribution(tree: PyTree) -> AbstractDistribution:
     """
     Extracts the single joint probability distributions of a PyTree.
     
@@ -140,6 +140,7 @@ def tree_joint_distribution(tree: PyTree) -> Joint:
     Returns:
         A single joint distribution whose event shape matches the structure of `tree`.
     """
+    from distreqx.distributions import Joint
     return Joint(tree_distributions(tree))
 
 
@@ -176,7 +177,7 @@ def tree_leafwise_bijector(tree: PyTree) -> AbstractBijector:
     return tree_leafwise_constraint(tree).bijector    
 
 
-def tree_unconstrained_distribution(tree: PyTree) -> Joint:
+def tree_unconstrained_distribution(tree: PyTree) -> AbstractDistribution:
     """
     Extracts the joint, unconstrained probability distribution of a PyTree.
     

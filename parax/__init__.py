@@ -45,6 +45,7 @@ from parax.wrappers import (
 from parax.variables import (
     AbstractVariable as AbstractVariable,
     Param as Param,
+    Var as Var,
     Tagged as Tagged,
     Fixed as Fixed,
     Derived as Derived,
@@ -57,6 +58,7 @@ from parax.variables import (
     is_variable as is_variable,
     is_param as is_param,
     as_param as as_param,
+    as_variable as as_variable,
     as_fixed as as_fixed,
 )
 

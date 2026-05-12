@@ -2,6 +2,8 @@
 
 ::: parax.Param
 
+::: parax.Real
+
 ::: parax.Tagged
 
 ::: parax.Fixed

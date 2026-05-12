@@ -146,6 +146,41 @@ def as_param(value: Any) -> Any:
     return jnp.asarray(value, dtype=float)
 
 
+class Real(AbstractVariable, AbstractWrappable[Array]):
+    """
+    A simple real variable.
+
+    Useful as a placeholder, or for frameworks that only want to allow
+    `parax.AbstractVariable` instances to be trainable.
+
+    Attributes:
+        raw_value: The raw value used by optimizers and samplers.
+    """
+    raw_value: Param = eqx.field(converter=as_param)
+
+    @property
+    def value(self) -> Array:
+        return jnp.asarray(self.raw_value)
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda m: m.raw_value, self, value)
+    
+    
+def as_variable(value: Any) -> Any:
+    """
+    Returns `value` as a `parax.AbstractVariable`, wrapping it if necessary.
+
+    Args:
+        value: An arbitrary value or array.
+
+    Returns:
+        The instantiated parameter.
+    """    
+    if is_variable(value):
+        return value
+    return Real(value, dtype=float)
+
+
 class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]):
     """
     A variable with dictionary metadata.

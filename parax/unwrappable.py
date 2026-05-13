@@ -2,6 +2,7 @@
 The general interface for PyTree unwrapping using `parax.unwrap`.
 """
 
+import functools
 from abc import abstractmethod
 from typing import Generic, TypeVar, Callable, Any, Union, TypeGuard
 
@@ -105,6 +106,20 @@ def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], boo
     if only_if is None:  # fast path
         return _do_unwrap(tree, include_self=True)    
     return _search_and_unwrap(tree, include_self=True)
+
+
+def unwrap_self(method):
+    """
+    Decorator for Equinox module methods. 
+    Unwraps `self` before executing the method so all ties/deferred 
+    parameters are resolved.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        # Explicitly use the data function on self
+        unwrapped_self = unwrap(self)
+        return method(unwrapped_self, *args, **kwargs)
+    return wrapper
 
 
 def as_unwrapped(tree: Union[T, PyTree[T]]) -> T:

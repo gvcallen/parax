@@ -49,14 +49,14 @@ def tree_lower(tree: PyTree) -> PyTree:
     Returns:
         A PyTree representing the lower bounds.
     """
-    def _get_lower(x):
+    def _get_lower(path, x):
         if is_bounded(x):
             return x.bounds[0]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, -jnp.inf)
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_lower`. Value: {x}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_lower`. Value: {x}, path: {path}")
 
-    lower = jax.tree_util.tree_map(_get_lower, tree, is_leaf=is_bounded)
+    lower = jax.tree.map_with_path(_get_lower, tree, is_leaf=is_bounded)
     return lower
 
 
@@ -77,14 +77,14 @@ def tree_upper(tree: PyTree) -> PyTree:
     Returns:
         A PyTree representing the upper bounds.
     """
-    def _get_upper(x):
+    def _get_upper(path, x):
         if is_bounded(x):
             return x.bounds[1]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, jnp.inf)
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_upper`. Value: {x}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_upper`. Value: {x}, path: {path}")
 
-    upper = jax.tree_util.tree_map(_get_upper, tree, is_leaf=is_bounded)
+    upper = jax.tree.map_with_path(_get_upper, tree, is_leaf=is_bounded)
     return upper
 
 

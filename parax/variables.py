@@ -197,15 +197,10 @@ class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]
         return jnp.asarray(self.raw_value)
     
     def wrap(self, value: Array) -> Self:
-        if is_wrappable(self.raw_value):
-            new_raw_value = self.raw_value.wrap(value)
-        else:
-            new_raw_value = value
-        
-        return eqx.tree_at(lambda m: m.raw_value, self, new_raw_value)
+        return eqx.tree_at(lambda m: m.raw_value, self, value)
 
 
-class Fixed(AbstractVariable, AbstractConstant[Param]):
+class Fixed(AbstractVariable, AbstractConstant[Param], AbstractWrappable[Array]):
     """
     A fixed variable.
     
@@ -235,6 +230,9 @@ class Fixed(AbstractVariable, AbstractConstant[Param]):
         if isinstance(self.raw_value, AbstractVariable):
             value = value.value
         return jax.lax.stop_gradient(value)
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda m: m.raw_value, self, value)    
    
 
 def as_fixed(value: Param) -> Fixed:

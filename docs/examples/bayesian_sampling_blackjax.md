@@ -154,4 +154,4 @@ You may have noticed that we could have accomplished the above without the added
 
 - *Parameters as first-class citizens*. Models contain parameters - not distributions. By prioritizing a parameter-centered approach and using tree tools to setup our model, we maintain a clear separation of concerns.
 - *Variable manipulation*. For example, you can't "fix a distribution" after-the-fact without complex filtering, but you can easily wrap a `parax.Random` variable in a `parax.Fixed` variable.
-- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Using Parax, we could easily define a factory that wraps a `parax.Random` variable in a `parax.Constrained`, allowing us to toggle between bounded optimization and inference.
+- *Compatibility with optimization*. It is common to want to swap between optimization and Bayesian sampling. Because `parax.Random` implement `parax.bounds.AbstractBounded`, we can easily optimize within the support of the distribution.

@@ -14,9 +14,9 @@ import jax.numpy as jnp
 from jaxtyping import Array, Inexact
 import equinox as eqx
 
-from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution
+from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution, is_constrainable, is_constrained
 from parax.constants import AbstractConstant
-from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque
+from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque, is_wrappable
 from parax.annotation import AbstractAnnotated
 from parax.bounds import AbstractBounded
 from parax.probability import AbstractProbabilistic
@@ -30,7 +30,7 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     Derive from this class and override `value` to implement
     custom variable unwrapping behaviour.
 
-    All parameters in Parax, such as `parax.Param`,
+    All parameters in Parax, such as `parax.Random`,
     `parax.Constrained` etc., derive from this class.
 
     **Corner Case Note (Math & Dunders):** Because this class implements the 
@@ -102,8 +102,8 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     def __float__(self) -> float: return float(self.value) # type: ignore
     def __index__(self) -> int: return self.value.__index__()
     def __round__(self, ndigits: int = 0) -> Array: return jnp.round(self.value, ndigits) 
-
-
+    
+    
 Param = AbstractVariable | Inexact[Array, "..."]
 """
 A type alias representing a JAX parameter.
@@ -143,7 +143,47 @@ def as_param(value: Any) -> Any:
     return jnp.asarray(value, dtype=float)
 
 
-class Real(AbstractVariable, AbstractWrappable[Array]):
+
+
+class AbstractSimpleVariable(AbstractVariable, AbstractConstrainable[Array], AbstractWrappable[Array]):
+    """
+    A Mixin for variables that apply simple wrapping around a `raw_value` array.
+    
+    Makes the class `parax.constraints.AbstractConstrainable`,
+    allowing callers to constrain variables that weren't initially constrained.
+    """
+    raw_value: eqx.AbstractVar[Param]
+    
+    @property
+    @abstractmethod
+    def value(self) -> Array:
+        """Returns the underlying, fully computed value of the variable."""
+        pass        
+    
+    @property
+    def constraint(self) -> AbstractConstraint:
+        if is_constrained(self.raw_value):
+            return self.raw_value.constraint
+        return RealLine(self.raw_value.shape)
+    
+    @property
+    def bounds(self) -> tuple[Array, Array]:
+        if is_constrained(self.raw_value):
+            return self.raw_value.bounds
+        return RealLine(self.raw_value.shape).bounds
+    
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        if is_constrainable(self.raw_value):
+            new_raw_value = self.raw_value.constrain(constraint)
+        elif isinstance(self.raw_value, Array):
+            new_raw_value = Constrained(constraint, value=self.raw_value)
+        else:
+            raise ValueError(f"Cannot constrain a {type(self)} variable that wraps a {type(self.raw_value)} variable")
+        return self.wrap(new_raw_value)
+
+
+
+class Real(AbstractSimpleVariable):
     """
     A plane real variable.
 
@@ -154,13 +194,13 @@ class Real(AbstractVariable, AbstractWrappable[Array]):
         raw_value: The raw value used by optimizers and samplers.
     """
     raw_value: Param = eqx.field(converter=as_param)
-
+    
     @property
     def value(self) -> Array:
         return jnp.asarray(self.raw_value)
     
     def wrap(self, value: Array) -> Self:
-        return eqx.tree_at(lambda m: m.raw_value, self, value)
+        return eqx.tree_at(lambda m: m.raw_value, self, value)    
     
     
 def as_variable(value: Any) -> Any:
@@ -178,7 +218,7 @@ def as_variable(value: Any) -> Any:
     return Real(value)
 
 
-class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]):
+class Tagged(AbstractSimpleVariable, AbstractAnnotated[dict]):
     """
     A variable with dictionary metadata.
 
@@ -197,10 +237,10 @@ class Tagged(AbstractVariable, AbstractAnnotated[dict], AbstractWrappable[Array]
         return jnp.asarray(self.raw_value)
     
     def wrap(self, value: Array) -> Self:
-        return eqx.tree_at(lambda m: m.raw_value, self, value)
+        return eqx.tree_at(lambda m: m.raw_value, self, value)        
+    
 
-
-class Fixed(AbstractVariable, AbstractConstant[Param]):
+class Fixed(AbstractSimpleVariable, AbstractConstant[Param]):
     """
     A fixed variable.
     
@@ -210,7 +250,7 @@ class Fixed(AbstractVariable, AbstractConstant[Param]):
         raw_value: The underlying variable that is being fixed.
     """
     raw_value: Param = eqx.field(converter=as_param)
-
+        
     def __init__(self, raw_value: Param | None = None):
         """
         Args:
@@ -230,7 +270,10 @@ class Fixed(AbstractVariable, AbstractConstant[Param]):
         if isinstance(self.raw_value, AbstractVariable):
             value = value.value
         return jax.lax.stop_gradient(value)
-   
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda m: m.raw_value, self, value)        
+    
 
 def as_fixed(value: Param) -> Fixed:
     """
@@ -322,7 +365,7 @@ class Bounded(
         return jnp.asarray(self.raw_value)
     
     def wrap(self, value: Array) -> Self:
-        return eqx.tree_at(lambda x: x.raw_value, self, jnp.asarray(value))
+        return eqx.tree_at(lambda m: m.raw_value, self, value)
     
 
 class Constrained(
@@ -378,7 +421,7 @@ class Constrained(
         # Constraint and distribution standardization
         if constraint is None:
             constraint = RealLine(shape=shape)
-        
+            
         # Raw value standardization
         if value is not None:
             raw_value = constraint.bijector.inverse(value)
@@ -413,6 +456,7 @@ class Constrained(
 class Random(
     AbstractVariable,
     AbstractProbabilistic[Array],
+    AbstractConstrainable[Array],
     AbstractWrappable[Array]
 ):
     """

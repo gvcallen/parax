@@ -278,7 +278,7 @@ class Derived(AbstractVariable):
         return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
     
     
-class Transformed(AbstractVariable, AbstractWrappable(Array)):
+class Transformed(AbstractVariable, AbstractWrappable[Array]):
     """
     A variable transformed by a bijector.
      

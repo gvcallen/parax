@@ -334,8 +334,11 @@ class Constrained(
         # Raw value standardization
         if value is not None:
             raw_value = constraint.bijector.inverse(value)
-            if jnp.any(jnp.isnan(raw_value)):
-                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")
+            raw_value = eqx.error_if(
+                raw_value,
+                jnp.any(jnp.isnan(raw_value)),
+                "Constraint violated for variable upon initialization (produced NaNs)."
+            )
 
         self.constraint = constraint
         self.raw_value = raw_value
@@ -421,8 +424,11 @@ class Random(
         # Calculate unconstrained raw_value
         if value is not None:
             raw_value = constraint.bijector.inverse(jnp.asarray(value))
-            if jnp.any(jnp.isnan(raw_value)):
-                raise ValueError(f"Constraint {constraint} violated for variable with value `{value}` upon initialization")
+            raw_value = eqx.error_if(
+                raw_value,
+                jnp.any(jnp.isnan(raw_value)),
+                "Constraint violated for variable upon initialization (produced NaNs)."
+            )
         else:
             raw_value = jnp.asarray(raw_value)
 

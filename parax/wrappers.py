@@ -336,8 +336,7 @@ class Constrainable(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstr
 
     Attributes:
         tree: The wrapped tree.
-        bounds: The tree's bounds as a tuple matching its structure.
-        bounds: The tree's bounds as a tuple matching its structure.
+        constraint: The tree's constraint.
     """
     constraint: AbstractConstraint
     
@@ -363,9 +362,9 @@ class Probabilistic(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbab
     Implements `parax.probabilistic.AbstractProbabilistic`.
 
     Attributes:
+        distribution: The tree's associated probability distribution.
+        constraint: The tree and probability distribution's constraint.
         tree: The wrapped tree.
-        bounds: The tree's bounds as a tuple matching its structure.
-        bounds: The tree's bounds as a tuple matching its structure.
     """
     distribution: AbstractDistribution
     constraint: AbstractConstraint

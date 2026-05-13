@@ -43,6 +43,7 @@ from parax.variables import (
     Tagged as Tagged,
     Fixed as Fixed,
     Derived as Derived,
+    Transformed as Transformed,
     Bounded as Bounded,
     Constrained as Constrained,
     Random as Random,

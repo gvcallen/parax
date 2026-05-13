@@ -586,6 +586,30 @@ def derived(
     return eqx.field(**field_kwargs)
 
 
+def transformed(
+    bijector: AbstractBijector,
+    raw_value: Param = dataclasses.MISSING,
+) -> Any:
+    """
+    Specifies a dataclass field for a Parax `Transformed` variable.
+
+    Args:
+        bijector: The bijector used to transform the raw value.
+        raw_value: The raw value used by optimizers and samplers.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
+    """
+    def converter(x: Any) -> AbstractVariable:
+        return Transformed(bijector=bijector, raw_value=x)
+
+    field_kwargs = {"converter": converter}
+    if raw_value is not dataclasses.MISSING:
+        field_kwargs["default"] = raw_value
+        
+    return eqx.field(**field_kwargs)
+
+
 def bounded(
     bounds: tuple[Array, Array],
     raw_value: Param | None = None,

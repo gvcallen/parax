@@ -21,6 +21,7 @@ from parax.transforms import is_transform as is_transform
 from parax.unwrappable import (
     AbstractUnwrappable as AbstractUnwrappable,
     unwrap as unwrap,
+    unwrap_self as unwrap_self,
     is_unwrappable as is_unwrappable,
     as_unwrapped as as_unwrapped,
 )

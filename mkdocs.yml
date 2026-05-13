@@ -63,7 +63,6 @@ nav:
     - Bounds: api/bounds.md
     - Constraints: api/constraints.md
     - Probability: api/probability.md
-    - Transforms: api/transforms.md
     - Filters: api/filters.md
   - License: license.md
 

@@ -13,6 +13,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Inexact
 import equinox as eqx
+from distreqx.distributions import AbstractDistribution
+from distreqx.bijectors import AbstractBijector
 
 from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution
 from parax.constants import AbstractConstant
@@ -21,7 +23,6 @@ from parax.annotation import AbstractAnnotated
 from parax.bounds import AbstractBounded
 from parax.probability import AbstractProbabilistic
 
-from distreqx.distributions import AbstractDistribution
 
 class AbstractVariable(AbstractUnwrappable[Array]):
     """
@@ -261,8 +262,8 @@ class Derived(AbstractVariable):
     possible (e.g., applying `jax.nn.softmax` to raw logits).
 
     Attributes:
-        raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
+        raw_value: The raw value used by optimizers and samplers.
     """
     fn: Callable = eqx.field(converter=as_opaque)
     raw_value: Param = eqx.field(converter=as_param)
@@ -275,6 +276,33 @@ class Derived(AbstractVariable):
         Returns the raw state transformed by the derivation function.
         """
         return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
+    
+    
+class Transformed(AbstractVariable, AbstractWrappable(Array)):
+    """
+    A variable transformed by a bijector.
+     
+    The parameter's value is dynamically derived via a bijective transform.
+
+    Attributes:
+        bijector: The bijector used to transform the raw value.
+        raw_value: The raw value used by optimizers and samplers.
+    """
+    bijector: AbstractBijector = eqx.field(converter=as_opaque)
+    raw_value: Param = eqx.field(converter=as_param)
+
+    @property
+    def value(self) -> Array:
+        """
+        The derived value.
+        
+        Returns the raw state transformed by the derivation function.
+        """
+        return as_unwrapped(self.bijector).forward(jnp.asarray(self.raw_value))
+    
+    def wrap(self, value: Array) -> Self:
+        new_raw = as_unwrapped(self.bijector).inverse(value)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
     
     
 class Bounded(
@@ -416,6 +444,7 @@ class Constrained(
 class Random(
     AbstractVariable,
     AbstractProbabilistic[Array],
+    AbstractConstrainable[Array],
     AbstractWrappable[Array]
 ):
     """

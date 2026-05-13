@@ -10,6 +10,8 @@
 
 ::: parax.Derived
 
+::: parax.Transformed
+
 ::: parax.Bounded
 
 ::: parax.Constrained

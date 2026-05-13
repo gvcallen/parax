@@ -9,10 +9,16 @@ from typing import TypeVar, Callable, Any, Union, Self
 
 import equinox as eqx
 import jax
+from distreqx.distributions import AbstractDistribution
 
-from parax.constant import AbstractConstant
 from parax.unwrappable import AbstractUnwrappable, unwrap
+from parax.constant import AbstractConstant
 from parax.wrappable import AbstractWrappable
+from parax.annotated import AbstractAnnotated
+from parax.bounded import AbstractBounded
+from parax.constrainable import AbstractConstrainable
+from parax.probabilistic import AbstractProbabilistic
+from parax.constraints import AbstractConstraint
 
 T = TypeVar("T")
 
@@ -280,3 +286,100 @@ def as_frozen_or_static(tree: Union[T | Static[T]]) -> Union[Frozen, Static]:
     if is_opaque_leaf and not eqx.is_array(tree):
         return as_static(tree)
     return as_frozen(tree)
+
+
+class Annotated(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[dict]):
+    """
+    A wrapper to add dictionary metadata to an arbitrary PyTree.
+    
+    Implements `parax.annotated.AbstractAnnotated`.
+
+    Attributes:
+        tree: The wrapped tree.
+        metadata: The underlying metadata.
+    """
+    tree: T
+    metadata: dict
+    
+    def unwrap(self) -> T:
+        return self.tree
+    
+    def wrap(self, other: T) -> Self:
+        return Annotated(tree=other, metadata=self.metadata)
+    
+    
+class Bounded(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
+    """
+    A wrapper to add bounds to an arbitrary PyTree.
+    
+    Implements `parax.bounded.AbstractBounded`.
+
+    Attributes:
+        tree: The wrapped tree.
+        bounds: The tree's bounds as a tuple matching its structure.
+    """
+    bounds: tuple[T, T]
+    tree: T
+    
+    def unwrap(self) -> T:
+        return self.tree
+    
+    def wrap(self, other: T) -> Self:
+        return Annotated(ounds=self.bounds, tree=other)
+    
+    
+class Constrainable(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstrainable[T]):
+    """
+    A wrapper to add constraints to an arbitrary PyTree.
+    
+    Implements `parax.constrainable.AbstractConstrainable`.
+
+    Attributes:
+        tree: The wrapped tree.
+        bounds: The tree's bounds as a tuple matching its structure.
+        bounds: The tree's bounds as a tuple matching its structure.
+    """
+    constraint: AbstractConstraint
+    
+    tree: T
+    
+    def bounds(self) -> tuple[T, T]:
+        return self.constraint.bounds
+    
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        return Probabilistic(constraint=constraint, tree=self.tree)
+    
+    def unwrap(self) -> T:
+        return self.tree
+    
+    def wrap(self, other: T) -> Self:
+        return Probabilistic(constraint=self.constraint, tree=other)
+    
+    
+class Probabilistic(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabilistic[T]):
+    """
+    A wrapper to add a probability distribution to an arbitrary PyTree.
+    
+    Implements `parax.probabilistic.AbstractProbabilistic`.
+
+    Attributes:
+        tree: The wrapped tree.
+        bounds: The tree's bounds as a tuple matching its structure.
+        bounds: The tree's bounds as a tuple matching its structure.
+    """
+    distribution: AbstractDistribution
+    constraint: AbstractConstraint
+    
+    tree: T
+    
+    def bounds(self) -> tuple[T, T]:
+        return self.constraint.bounds
+    
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        return Probabilistic(distribution=self.distribution, constraint=constraint, tree=self.tree)
+    
+    def unwrap(self) -> T:
+        return self.tree
+    
+    def wrap(self, other: T) -> Self:
+        return Probabilistic(distribution=self.distribution, constraint=self.constraint, tree=other)

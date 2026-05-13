@@ -32,8 +32,8 @@ First, we use `parax.probability` and `parax.unwrap` to extract all initial unco
 <!-- pytest-codeblocks:cont -->
 ```python
 initial_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-unconstrained_prior_all = prx.probabilistic.tree_unconstrained_distribution(initial_model)
-bijector_to_constrained_all = prx.probabilistic.tree_leafwise_bijector(initial_model)
+unconstrained_prior_all = prx.probability.tree_unconstrained_distribution(initial_model)
+bijector_to_constrained_all = prx.constraints.tree_leafwise_bijector(initial_model)
 ```
 
 Note that we need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.

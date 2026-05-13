@@ -54,8 +54,8 @@ First, we *partially unwrap* the model to resolve it into its constrained, proba
 <!-- pytest-codeblocks:cont -->
 ```python
 init_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-distributions_all = prx.probabilistic.tree_distributions(initial_model)
-joint_all = prx.probabilistic.tree_joint_distribution(initial_model)
+distributions_all = prx.probability.tree_distributions(initial_model)
+joint_all = prx.probability.tree_joint_distribution(initial_model)
 ```
 
 Next, we partition the model to remove static metadata and constant values, and also remove any constant nodes from the distributions (similar to other example):

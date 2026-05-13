@@ -33,7 +33,7 @@ Next, we extract the bounds and unwrap the bounded values, and partition/filter 
 <!-- pytest-codeblocks:cont -->
 ```python
 initial_bounded = prx.unwrap(initial_model, only_if=prx.is_bounded)
-lower_all, upper_all = prx.bounded.tree_bounds(initial_model)
+lower_all, upper_all = prx.bounds.tree_bounds(initial_model)
 
 params, static = eqx.partition(initial_bounded, eqx.is_inexact_array, is_leaf=prx.is_constant)
 lower = prx.remove(lower_all, prx.is_constant)

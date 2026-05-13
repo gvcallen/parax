@@ -5,7 +5,7 @@ In this example, we perform Bayesian optimization (*maximum a posteriori estimat
 This is an advanced example building on previous examples. It demonstrates several concepts at once:
 
 - Modeling of correlated parameters and derived random variables using `parax.Random` and `parax.Derived`.
-- Extracting both the joint and individual distribution(s) using `tree_joint_distribution` and `tree_distributions` in `parax.probabilistic`.
+- Extracting both the joint and individual distribution(s) using `tree_joint_distribution` and `tree_distributions` in `parax.probability`.
 - Performing a hypercube transform and evaluating the joint log probability using `icdf`, `cdf` and `log_prob`.
 
 ## 1. Defining the model

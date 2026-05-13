@@ -14,15 +14,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, Inexact
 import equinox as eqx
 
-from parax.constraints import AbstractConstraint, RealLine, get_constraint_for_distribution
-from parax.constant import AbstractConstant
-from parax.unwrappable import AbstractUnwrappable, as_unwrapped
-from parax.wrappable import AbstractWrappable
-from parax.wrappers import as_frozen, as_frozen_or_static
-from parax.annotated import AbstractAnnotated
-from parax.bounded import AbstractBounded
-from parax.constrainable import AbstractConstrainable
-from parax.probabilistic import AbstractProbabilistic
+from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution
+from parax.constants import AbstractConstant
+from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque
+from parax.annotation import AbstractAnnotated
+from parax.bounds import AbstractBounded
+from parax.probability import AbstractProbabilistic
 
 from distreqx.distributions import AbstractDistribution
 
@@ -224,7 +221,7 @@ class Fixed(AbstractVariable, AbstractConstant[Param]):
             raw_value = raw_value.raw_value
         self.raw_value = raw_value    
 
-    def as_free(self) -> AbstractVariable:
+    def free(self) -> AbstractVariable:
         return self.raw_value
 
     @property
@@ -264,7 +261,7 @@ class Derived(AbstractVariable):
         raw_value: The raw value used by optimizers and samplers.
         fn: The callable used to transform the raw value.
     """
-    fn: Callable = eqx.field(converter=as_frozen_or_static)
+    fn: Callable = eqx.field(converter=as_opaque)
     raw_value: Param = eqx.field(converter=as_param)
 
     @property
@@ -275,6 +272,57 @@ class Derived(AbstractVariable):
         Returns the raw state transformed by the derivation function.
         """
         return as_unwrapped(self.fn)(jnp.asarray(self.raw_value))
+    
+    
+class Bounded(
+    AbstractVariable,
+    AbstractBounded[Array],
+    AbstractWrappable[Array]
+):
+    """
+    A bounded variable.
+    
+    This simply attaches bounds to an existing variable or an array,
+    and does not apply any bijective constraints. For enforcing
+    constraints on an array, use `parax.variables.Constrained`.
+    
+    Attributes:
+        bounds: The parameter bounds.
+        raw_value: The raw, unconstrained value on the real number line.
+    """
+    bounds: tuple[Array, Array] = eqx.field(converter=as_opaque)
+    raw_value: Param = eqx.field(converter=jnp.asarray)
+
+    def __init__(
+        self,
+        bounds: tuple[Array, Array],
+        raw_value: Param | None = None,
+    ):
+        """
+        Args:
+            bounds: The parameter bounds.
+            raw_value: The underlying value. Must lie within `bounds`.
+        """
+        if raw_value is not None:
+            raw_array = jnp.asarray(raw_value)
+            lower, upper = jnp.asarray(bounds)
+            
+            is_out_of_bounds = jnp.any((raw_array < lower) | (raw_array > upper))
+            raw_value = eqx.error_if(
+                raw_value,
+                is_out_of_bounds,
+                "Bounded variable initialized with a value outside of its specified bounds."
+            )
+
+        self.bounds = bounds
+        self.raw_value = raw_value
+        
+    @property
+    def value(self) -> Array:
+        return jnp.asarray(self.raw_value)
+    
+    def wrap(self, value: Array) -> Self:
+        return eqx.tree_at(lambda x: x.raw_value, self, jnp.asarray(value))
     
 
 class Constrained(
@@ -288,14 +336,14 @@ class Constrained(
     The constraint is specified via a `parax.AbstractConstraint`.
 
     The constraint is automatically applied as a bijection mapping during 
-    evaluation. Implements the `parax.bounded.AbstractBounded` interface
+    evaluation. Implements the `parax.bounds.AbstractBounded` interface
     for integration with bounded optimizers.
 
     Attributes:
-        raw_value: The raw, unconstrained value on the real number line.
         constraint: The parameter constraint defining bounds and bijector mappings.
+        raw_value: The raw, unconstrained value on the real number line.
     """
-    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
+    constraint: AbstractConstraint = eqx.field(converter=as_opaque)
     raw_value: Array = eqx.field(converter=jnp.asarray)
 
     def __init__(
@@ -373,7 +421,7 @@ class Random(
     The distribution is specified via a `distreqx.distributions.AbstractDistribution`.
     The constraint is specified via a `parax.constraint.AbstractConstraint`.
 
-    The variable implements the `parax.probabilistic.AbstractProbabilistic` interface
+    The variable implements the `parax.probability.AbstractProbabilistic` interface
     to integrate with stochastic samplers and other algorithms.
 
     Attributes:
@@ -386,8 +434,8 @@ class Random(
                    Can be None, in which case the mean of the distribution is used.
                    If the mean is not supported, an exception is thrown.
     """
-    distribution: AbstractDistribution = eqx.field(converter=as_frozen)
-    constraint: AbstractConstraint = eqx.field(converter=as_frozen)
+    distribution: AbstractDistribution = eqx.field(converter=as_opaque)
+    constraint: AbstractConstraint = eqx.field(converter=as_opaque)
     raw_value: Array = eqx.field(converter=jnp.asarray)
 
     def __init__(
@@ -498,6 +546,30 @@ def derived(
     """
     def converter(x: Any) -> AbstractVariable:
         return Derived(fn=fn, raw_value=x)
+
+    field_kwargs = {"converter": converter}
+    if raw_value is not dataclasses.MISSING:
+        field_kwargs["default"] = raw_value
+        
+    return eqx.field(**field_kwargs)
+
+
+def bounded(
+    bounds: tuple[Array, Array],
+    raw_value: Param | None = None,
+) -> Any:
+    """
+    Specifies a dataclass field for a Parax `Bounded` variable.
+
+    Args:
+        bounds: The parameter bounds.
+        raw_value: The raw, unconstrained value on the real number line.
+        
+    Returns:
+        An `equinox.field` properly configured for the field type.
+    """
+    def converter(x: Any) -> AbstractVariable:
+        return Bounded(bounds=bounds, raw_value=x)
 
     field_kwargs = {"converter": converter}
     if raw_value is not dataclasses.MISSING:

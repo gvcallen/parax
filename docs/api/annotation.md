@@ -1,0 +1,1 @@
+::: parax.annotation.AbstractAnnotated

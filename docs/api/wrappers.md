@@ -1,15 +1,29 @@
-::: parax.Frozen
+::: parax.AbstractUnwrappable
 
-::: parax.Parameterized
+::: parax.AbstractWrappable
 
-::: parax.Computed
+::: parax.unwrap
+
+::: parax.unwrap_self
+
+::: parax.wrap
+
+::: parax.Freeze
+
+::: parax.Parameterize
+
+::: parax.Apply
 
 ::: parax.Static
 
-::: parax.Tied
+::: parax.Tie
 
-::: parax.wrappers.Bounded
+::: parax.Bound
 
-::: parax.wrappers.Constrainable
+::: parax.Constrain
 
-::: parax.wrappers.Probabilistic
+::: parax.Probabilize
+
+::: parax.as_unwrapped
+
+::: parax.as_opaque

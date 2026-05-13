@@ -41,7 +41,7 @@ model = dataclasses.replace(model, baseline=prx.Fixed(model.baseline))
 
 Optimization libraries like `optimistix` expect standard JAX arrays. We need to split our model into trainable parameters and static metadata, and then re-combine during our forward pass.
 
-By passing `is_leaf=prx.is_constant` to `eqx.partition`, we can also separate out all `prx.Fixed` variables (and nested `prx.Frozen` models) into the static half of the tree.
+By passing `is_leaf=prx.is_constant` to `eqx.partition`, we can also separate out all `prx.Fixed` variables (and nested `prx.Freeze` models) into the static half of the tree.
 
 <!-- pytest-codeblocks:cont -->
 ```python

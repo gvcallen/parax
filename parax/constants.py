@@ -1,8 +1,8 @@
 """
-Abstract interfaces for defining constant (fixed/frozen) nodes in a model.
+Abstract interfaces for defining constants (fixed/frozen nodes) in a model.
 
 This module provides the canonical `AbstractConstant` tag used by Parax to 
-filter out fixed parameters and frozen layers during PyTree partitioning.
+filter out fixed parameters and freeze layers during PyTree partitioning.
 """
 
 from abc import abstractmethod
@@ -22,12 +22,12 @@ class AbstractConstant(eqx.Module, Generic[T]):
 
     **Note:** This interface *only* provides the structural tagging required 
     by Parax. It does not automatically apply `jax.lax.stop_gradient` during 
-    computations. Concrete implementations (like `parax.Frozen` and `parax.Fixed`) 
+    computations. Concrete implementations (like `parax.Freeze` and `parax.Fixed`) 
     handle the actual JAX-level gradient stopping and unwrapping logic.
     """
 
     @abstractmethod
-    def as_free(self) -> T:
+    def free(self) -> T:
         """Return the underlying value, stripping the constant tag."""
         pass
 
@@ -57,5 +57,5 @@ def as_free(value: Union[AbstractConstant[T], T]) -> T:
         The freed parameter, or the original value if it was not fixed.
     """    
     if is_constant(value):
-        return value.as_free()
+        return value.free()
     return value

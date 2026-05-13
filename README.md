@@ -55,14 +55,14 @@ jnp.sin(p1) + (2 * p2)
 You can also apply arbitrary computations to PyTrees and parameters using unwrapping:
 ```python
 pytree = {'a': 1.0, 'b': {'x': 2.0, 'y': prx.Derived(jnp.log, 3.0)}}
-wrapped = prx.Computed(jnp.exp, pytree)
+wrapped = prx.Apply(jnp.exp, pytree)
 
 prx.unwrap(wrapped)
 # {'a': Array(2.7182817),
 #  'b': {'x': Array(7.389056), 
 #        'y': Array(3.0)}}
 ```
-In the above example, `prx.Computed` operates on the whole PyTree's array-like nodes, while `prx.Derived` is an array-like `prx.AbstractVariable`.
+In the above example, `prx.Apply` operates on the whole PyTree's array-like nodes, while `prx.Derived` is an array-like `prx.AbstractVariable`.
 
 ## Next steps
 

@@ -1,11 +1,13 @@
 """
-Physical constraints and bijector mappings for parametric modeling.
+Constraints with bijector mapping and associated interfaces.
 
 This module provides the tools to map unconstrained optimizer spaces 
-(spanning the real line) into bounded physical spaces.
+(spanning the real line) into bounded physical spaces, as well as
+to mark a PyTree as constrainable.
 """
 
-from typing import Union, Any, TypeGuard
+from abc import abstractmethod
+from typing import TypeVar, Union, Any, TypeGuard, Self
 
 import jax
 import equinox as eqx
@@ -20,6 +22,11 @@ from distreqx.bijectors import (
     Shift, 
     ScalarAffine,
 )
+
+from parax.bounds import AbstractBounded
+
+T = TypeVar("Value")
+
 
 class AbstractConstraint(eqx.Module):
     """
@@ -419,3 +426,172 @@ def get_constraint_for_distribution(dist: dists.AbstractDistribution) -> Abstrac
         pass
 
     return RealLine(shape=dist.event_shape)
+
+
+class AbstractConstrained(AbstractBounded[T]):
+    """
+    The abstract interface for a constrained PyTree.
+
+    Used as a type check for `parax.is_constrained`.
+    
+    Implies that the PyTree has associated constraints (and therefore bounds),
+    but does not necessarily enforce that the PyTree follows those constraints.
+
+    Attributes:
+        constraint: Returns the active constraint of the PyTree.
+        bounds: Returns the current PyTree bounds. Each must have a matching PyTree structure as `self`.
+    """
+    constraint: eqx.AbstractVar[AbstractConstraint]
+    bounds: eqx.AbstractVar[tuple[T, T]]
+
+
+def is_constrained(x: Any) -> TypeGuard[AbstractConstrained]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractConstrained`.
+    
+    Args:
+        x: The object to check.
+        
+    Returns:
+        True if `x` implements `AbstractConstrained`, False otherwise.
+    """
+    return isinstance(x, AbstractConstrained)
+
+
+def tree_constraints(tree: PyTree) -> PyTree:
+    """
+    Extracts the individual constraints of a PyTree.
+    
+    Standard arrays default to `parax.constraints.RealLine`.
+
+    Note that this function does not allow non-array/constrainable leaf nodes.
+    If you have leaves in your tree that are neither arrays nor derive
+    from `parax.constraints.AbstractConstrainable`, be sure to mark
+    them as static or filter them out using e.g. `eqx.filter` first.    
+
+    Args:
+        tree: The PyTree model to extract constraints from.
+
+    Returns:
+        A PyTree representing the active constraints.
+    """
+    from parax.wrappers import unwrap
+    
+    def _get_constraint(x):
+        if is_constrained(x):
+            return unwrap(x.constraint)
+        if eqx.is_inexact_array(x):
+            return RealLine(shape=x.shape)
+        raise ValueError(
+            f"Found a leaf node of type {type(x)} that is neither constrained "
+            f"nor an array in `parax.constraints.tree_constraints`. Value: {x}"
+        )
+
+    return jax.tree_util.tree_map(_get_constraint, tree, is_leaf=is_constrained)
+
+
+def tree_leafwise_constraint(tree: PyTree) -> Leafwise:
+    """
+    Extracts the single leafwise constraint of a PyTree.
+    
+    Wraps the output of `parax.constraints.tree_constraints`
+    in a `parax.constraints.Leafwise` constraint to define
+    a single constraint that matches the shape of `tree`.
+
+    Args:
+        tree: The PyTree model containing probabilistic nodes or standard arrays.
+
+    Returns:
+        A single constraint whose shape matches the structure of `tree`.
+    """
+    return Leafwise(tree_constraints(tree))
+
+
+def tree_leafwise_bijector(tree: PyTree) -> AbstractBijector:
+    """
+    Extracts the constraint bijector of a PyTree.
+    
+    Returns the bijector of `parax.probability.tree_leafwise_constraint`,
+    which transforms unconstrained values to constrained values.
+
+    Args:
+        tree: The PyTree model containing probabilistic nodes or standard arrays.
+
+    Returns:
+        A single bijector whose shape matches the structure of `tree`.
+    """
+    return tree_leafwise_constraint(tree).bijector    
+
+
+class AbstractConstrainable(AbstractConstrained[T]):
+    """
+    The abstract interface for a constrainable PyTree.
+
+    Variables implementing this interface support the dynamic injection
+    and updating of constraints.
+
+    Used as a type check for `parax.is_constrainable`.
+    """
+    @abstractmethod
+    def constrain(self, constraint: AbstractConstraint) -> Self:
+        """
+        Returns a new instance of the PyTree with the updated constraint,
+        ensuring internal state (like unconstrained raw values) is 
+        recalculated if necessary.
+
+        Args:
+            constraint: The new constraint to apply.
+
+        Returns:
+            A new instance of the constrainable PyTree.
+        """
+        raise NotImplementedError
+
+
+def is_constrainable(x: Any) -> TypeGuard[AbstractConstrainable]:
+    """
+    Returns True if `x` is an instance of `parax.AbstractConstrainable`.
+    
+    Args:
+        x: The object to check.
+        
+    Returns:
+        True if `x` implements `AbstractConstrainable`, False otherwise.
+    """
+    return isinstance(x, AbstractConstrainable)
+
+
+def tree_constrain(tree: PyTree, constraints: PyTree) -> PyTree:
+    """
+    Applies a PyTree of constraints to a PyTree of constrainable PyTrees.
+    
+    Standard arrays will be returned untouched if the matching constraint 
+    is a `RealLine`. Attempting to apply a bounded constraint directly 
+    to a standard array will raise an error.
+
+    Args:
+        tree: The PyTree model to update. Must have a matching PyTree structure 
+            to `constraints`.
+        constraints: A PyTree of `parax.AbstractConstraint` objects.
+
+    Returns:
+        A new PyTree with the constraints applied.
+    """
+    def _apply_constraint(x, c):
+        if is_constrainable(x):
+            return x.constrain(c)
+        if eqx.is_inexact_array(x):
+            if isinstance(c, RealLine):
+                return x
+            raise TypeError(
+                "Cannot apply a bounded constraint to a raw JAX array directly. "
+                "Ensure the array is wrapped in a `parax.Constrained` variable first."
+            )
+        raise ValueError(
+            f"Found a leaf node of type {type(x)} that is neither constrainable "
+            f"nor an array in `parax.constraints.tree_constrain`. Value: {x}"
+        )
+
+    return jax.tree_util.tree_map(
+        _apply_constraint, tree, constraints, is_leaf=is_constrainable
+    )

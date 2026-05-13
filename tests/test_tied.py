@@ -4,8 +4,7 @@ import jax.numpy as jnp
 import equinox as eqx
 import optax
 
-from parax.unwrappable import unwrap
-from parax.wrappers import Tied, _TiedPlaceholder
+from parax.wrappers import Tie, _TiePlaceholder, unwrap
 
 # ==========================================
 # FIXTURES & DUMMY MODELS
@@ -30,14 +29,14 @@ def base_model():
 
 def test_tied_initialization(base_model):
     """Tests that the target is successfully stripped and replaced with a placeholder."""
-    tied_model = Tied(
+    tied_model = Tie(
         tree=base_model,
         target=lambda m: m.b,
         source=lambda m: m.a
     )
     
     # The target in the internal tree should be the placeholder
-    assert isinstance(tied_model.tree.b, _TiedPlaceholder)
+    assert isinstance(tied_model.tree.b, _TiePlaceholder)
     # The source should remain untouched
     assert tied_model.tree.a == jnp.array(2.0)
     # The tie metadata should be registered
@@ -46,7 +45,7 @@ def test_tied_initialization(base_model):
 
 def test_tied_unwrap_basic(base_model):
     """Tests that unwrap correctly computes the tied value on the fly."""
-    tied_model = Tied(
+    tied_model = Tie(
         tree=base_model,
         target=lambda m: m.b,
         source=lambda m: m.a,
@@ -65,7 +64,7 @@ def test_tied_unwrap_basic(base_model):
 def test_tied_chaining(base_model):
     """Tests that multiple Tied wrappers can be chained sequentially."""
     # b = a * 2 (b becomes 4.0)
-    tied_1 = Tied(
+    tied_1 = Tie(
         tree=base_model,
         target=lambda m: m.b,
         source=lambda m: m.a,
@@ -73,7 +72,7 @@ def test_tied_chaining(base_model):
     )
     
     # c = b + 10 (c becomes 14.0)
-    tied_2 = Tied(
+    tied_2 = Tie(
         tree=tied_1,
         target=lambda m: m.c,
         source=lambda m: m.b,
@@ -89,7 +88,7 @@ def test_tied_chaining(base_model):
 
 def test_optimizer_invisibility(base_model):
     """Tests that equinox correctly hides the tied parameter from the optimizer."""
-    tied_model = Tied(
+    tied_model = Tie(
         tree=base_model,
         target=lambda m: m.b,
         source=lambda m: m.a
@@ -102,12 +101,12 @@ def test_optimizer_invisibility(base_model):
     leaves = jax.tree_util.tree_leaves(trainable_params)
     assert len(leaves) == 2  
     
-    assert isinstance(trainable_params.tree.b, _TiedPlaceholder)
+    assert isinstance(trainable_params.tree.b, _TiePlaceholder)
 
 
 def test_gradient_flow_and_updates(base_model):
     """Tests that gradients flow properly and the tied parameter updates dynamically."""
-    tied_model = Tied(
+    tied_model = Tie(
         tree=base_model,
         target=lambda m: m.b,
         source=lambda m: m.a,

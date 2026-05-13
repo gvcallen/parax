@@ -6,7 +6,9 @@ from typing import TypeVar, Generic, TypeGuard, Any
 
 import equinox as eqx
 
+
 T = TypeVar("T")
+
 
 class AbstractAnnotated(eqx.Module, Generic[T]):
     """

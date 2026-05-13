@@ -1,3 +1,0 @@
-::: parax.AbstractWrappable
-
-::: parax.wrap

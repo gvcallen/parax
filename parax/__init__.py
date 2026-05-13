@@ -7,40 +7,34 @@ except PackageNotFoundError:
 
 from parax.replace import tree_replace as tree_replace
 
-from parax.constant import (
+from parax.constants import (
     is_constant as is_constant,
     as_free as as_free,
 )
-from parax.annotated import is_annotated as is_annotated
-from parax.bounded import is_bounded as is_bounded
-from parax.probabilistic import is_probabilistic as is_probabilistic
-from parax.constraints import is_constraint as is_constraint
-from parax.constrainable import is_constrainable as is_constrainable
+from parax.annotation import is_annotated as is_annotated
+from parax.bounds import is_bounded as is_bounded
+from parax.probability import is_probabilistic as is_probabilistic
+from parax.constraints import is_constraint as is_constraint, is_constrained as is_constrained, is_constrainable as is_constrainable
 from parax.transforms import is_transform as is_transform
 
-from parax.unwrappable import (
+from parax.wrappers import (
     AbstractUnwrappable as AbstractUnwrappable,
+    AbstractWrappable as AbstractWrappable,
+    wrap as wrap,
     unwrap as unwrap,
     unwrap_self as unwrap_self,
     is_unwrappable as is_unwrappable,
-    as_unwrapped as as_unwrapped,
-)
-
-from parax.wrappable import (
-    AbstractWrappable as AbstractWrappable,
-    wrap as wrap,
     is_wrappable as is_wrappable,
-)
-
-from parax.wrappers import (
-    Frozen as Frozen,
-    Parameterized as Parameterized,
-    Computed as Computed,
+    as_unwrapped as as_unwrapped,
+    Freeze as Freeze,
+    Parameterize as Parameterize,
+    Apply as Apply,
     Static as Static,
-    Tied as Tied,
-    as_frozen as as_frozen,
-    as_static as as_static,
-    as_frozen_or_static as as_frozen_or_static,
+    Tie as Tie,
+    Bound as Bound,
+    Constrain as Constrain,
+    Probabilize as Probabilize,
+    as_opaque as as_opaque,
 )
 
 from parax.variables import (
@@ -50,11 +44,13 @@ from parax.variables import (
     Tagged as Tagged,
     Fixed as Fixed,
     Derived as Derived,
+    Bounded as Bounded,
     Constrained as Constrained,
     Random as Random,
     tagged as tagged,
     derived as derived,
     constrained as constrained,
+    bounded as bounded,
     random as random,
     is_variable as is_variable,
     is_param as is_param,
@@ -69,15 +65,13 @@ from parax.filters import (
     remove as remove,
 )
 
-
 from parax import (
-    annotated as annotated,
-    constant as constant,
+    annotation as annotation,
+    bounds as bounds,
+    constants as constants,
     constraints as constraints,
-    constrainable as constrainable,
-    bounded as bounded,
     experimental as experimental,
-    probabilistic as probabilistic,
+    probability as probability,
     variables as variables,
     transforms as transforms,
     wrappers as wrappers,

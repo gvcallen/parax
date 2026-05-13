@@ -27,7 +27,7 @@ initial_model = BayesianLinearModel(weight=1.0, bias=1.0)
 
 In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be using an unconstrained MCMC sampler, we need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior. To accomplish this, we will explicitly use *bijectors*.
 
-First, we use `parax.probabilistic` and `parax.unwrap` to extract all initial unconstrained values, prior and bijector:
+First, we use `parax.probability` and `parax.unwrap` to extract all initial unconstrained values, prior and bijector:
 
 <!-- pytest-codeblocks:cont -->
 ```python

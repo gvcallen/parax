@@ -56,22 +56,15 @@ nav:
     - Bayesian sampling (BlackJAX): examples/bayesian_sampling_blackjax.md
     - Bayesian hypercube optimization (advanced): examples/bayesian_hypercube_optimization.md
   - API:
-    - Interfaces:
-      - Unwrappable: api/unwrappable.md
-      - Wrappable: api/wrappable.md
-      - Constant: api/constant.md
-      - Annotated: api/annotated.md
-      - Bounded: api/bounded.md
-      - Constrainable: api/constrainable.md
-      - Probabilistic: api/probabilistic.md
-    - Parameters/Tools:
-      - Variables: api/variables.md
-      - Wrappers: api/wrappers.md
-      - Constraints: api/constraints.md
-      - Transforms: api/transforms.md
-    - Misc:
-      - Filters: api/filters.md
-      - Converters: api/converters.md
+    - Wrappers: api/wrappers.md
+    - Variables: api/variables.md
+    - Constants: api/constants.md
+    - Annotation: api/annotation.md
+    - Bounds: api/bounds.md
+    - Constraints: api/constraints.md
+    - Probability: api/probability.md
+    - Transforms: api/transforms.md
+    - Filters: api/filters.md
   - License: license.md
 
 extra_javascript:

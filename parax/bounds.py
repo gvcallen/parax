@@ -1,7 +1,6 @@
 """
 An abstract interface for PyTrees that have "bounds".
 """
-from abc import abstractmethod
 from typing import TypeVar, Generic, Any, TypeGuard
 
 import jax
@@ -40,7 +39,7 @@ def tree_lower(tree: PyTree) -> PyTree:
 
     Note that this function does not allow non-array/bounded leaf nodes.
     If you have leaves in your tree that are neither arrays nor derive
-    from `parax.bounded.AbstractBounded`, be sure to mark
+    from `parax.bounds.AbstractBounded`, be sure to mark
     them as static or filter them out using e.g. `eqx.filter` first.    
 
     Args:
@@ -54,7 +53,7 @@ def tree_lower(tree: PyTree) -> PyTree:
             return x.bounds[0]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, -jnp.inf)
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_lower`. Value: {x}, path: {path}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounds.tree_lower`. Value: {x}, path: {path}")
 
     lower = jax.tree.map_with_path(_get_lower, tree, is_leaf=is_bounded)
     return lower
@@ -68,7 +67,7 @@ def tree_upper(tree: PyTree) -> PyTree:
 
     Note that this function does not allow non-array/bounded leaf nodes.
     If you have leaves in your tree that are neither arrays nor derive
-    from `parax.bounded.AbstractBounded`, be sure to mark
+    from `parax.bounds.AbstractBounded`, be sure to mark
     them as static or filter them out using e.g. `eqx.filter` first.    
 
     Args:
@@ -82,7 +81,7 @@ def tree_upper(tree: PyTree) -> PyTree:
             return x.bounds[1]
         if eqx.is_inexact_array(x):
             return jnp.full_like(x, jnp.inf)
-        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounded.tree_upper`. Value: {x}, path: {path}")
+        raise ValueError(f"Found a leaf node of type {type(x)} that is neither bounded nor an array in `parax.bounds.tree_upper`. Value: {x}, path: {path}")
 
     upper = jax.tree.map_with_path(_get_upper, tree, is_leaf=is_bounded)
     return upper
@@ -96,7 +95,7 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
 
     Note that this function does not allow non-array/bounded leaf nodes.
     If you have leaves in your tree that are neither arrays nor derive
-    from `parax.bounded.AbstractBounded`, be sure to mark
+    from `parax.bounds.AbstractBounded`, be sure to mark
     them as static or filter them out using e.g. `eqx.filter` first.    
 
     Args:

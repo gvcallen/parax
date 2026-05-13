@@ -1,28 +1,260 @@
 """
-The general interface for PyTree unwrapping using `parax.unwrap`.
+The interface and built-in classes for PyTree wrapping and unwrapping.
 
-This module provides tools for deferred evaluation, parameterization, 
-and gradient stopping within JAX PyTrees.
+This module provides abstract interfaces for wrappables/unwrappables,
+as well as tools for deferred evaluation, parameterization, gradient stopping
+and more for JAX PyTrees.
 """
+import functools
 
-from typing import TypeVar, Callable, Any, Union, Self
+from abc import abstractmethod
+from typing import Generic, TypeVar, TypeGuard, Callable, Any, Union, Self
 
 import equinox as eqx
 import jax
+from jaxtyping import PyTree
 from distreqx.distributions import AbstractDistribution
 
-from parax.unwrappable import AbstractUnwrappable, unwrap
-from parax.constant import AbstractConstant
-from parax.wrappable import AbstractWrappable
-from parax.annotated import AbstractAnnotated
-from parax.bounded import AbstractBounded
-from parax.constrainable import AbstractConstrainable
-from parax.probabilistic import AbstractProbabilistic
-from parax.constraints import AbstractConstraint
+from parax.constants import AbstractConstant
+from parax.annotation import AbstractAnnotated
+from parax.bounds import AbstractBounded
+from parax.probability import AbstractProbabilistic
+from parax.constraints import AbstractConstraint, AbstractConstrainable
+
 
 T = TypeVar("T")
 
-class Parameterized(AbstractUnwrappable[T]):
+
+class AbstractUnwrappable(eqx.Module, Generic[T]):
+    """An abstract class representing a deferred or wrapped PyTree node.
+
+    Unwrappables act as placeholders within a PyTree. When `parax.unwrap` 
+    is called on the tree, these nodes execute custom logic (such as delayed 
+    computation, parameter injection, or gradient stopping) and replace 
+    themselves with their output.
+    """
+
+    @abstractmethod
+    def unwrap(self) -> T:
+        """Evaluates and returns the underlying unwrapped PyTree node.
+        
+        Returns:
+            The resolved underlying value, assuming no wrapped subnodes exist.
+        """
+        pass
+
+
+def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
+    """Checks if a given object is an unwrappable node.
+    
+    Args:
+        x: The object to check.
+        
+    Returns:
+        True if `x` is an instance of `AbstractUnwrappable`, False otherwise.
+    """
+    return isinstance(x, AbstractUnwrappable)
+
+
+def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], bool] = None) -> T:
+    """Recursively resolves `AbstractUnwrappable` nodes within a PyTree.
+
+    By default, unwrapping is performed inside-out (bottom-up) across the entire 
+    tree. Every `AbstractUnwrappable` node is replaced by the result of its 
+    `unwrap()` method.
+
+    If the `only_if` predicate is provided, unwrapping is conditionally gated. 
+    The tree is searched top-down, and unwrapping only triggers for subtrees 
+    that satisfy the condition. Once a node satisfies `only_if`, that entire 
+    subtree is fully unwrapped. 
+
+    Behavior with `only_if`:
+        1. If `only_if(node)` is True: The node and all of its `AbstractUnwrappable` 
+           descendants are fully resolved.
+        2. If `only_if(node)` is False: The node is left wrapped, but the search 
+           continues recursively into its children.
+
+    Args:
+        tree: The PyTree to unwrap.
+        only_if: An optional predicate function `Callable[[Any], bool]`. If provided, 
+            only subtrees evaluating to True (and their descendants) are unwrapped.
+
+    Returns:
+        A new PyTree with the appropriate `AbstractUnwrappable` nodes resolved.
+    """
+    def _do_unwrap(node, *, include_self: bool):
+        def _map_fn(leaf):
+            if not is_unwrappable(leaf):
+                return leaf
+            # Recursively unwrap the children first (bottom-up)
+            resolved_node = _do_unwrap(leaf, include_self=False)
+            return resolved_node.unwrap()
+
+        def is_leaf(x):
+            included = True if x is not node else include_self
+            return is_unwrappable(x) and included
+
+        return jax.tree.map(_map_fn, node, is_leaf=is_leaf)
+    
+    def _search_and_unwrap(node, *, include_self: bool):
+        if include_self and only_if(node):
+            return _do_unwrap(node, include_self=True)
+            
+        def _map_fn(leaf):
+            if only_if(leaf):
+                return _do_unwrap(leaf, include_self=True)
+            
+            if is_unwrappable(leaf):
+                return _search_and_unwrap(leaf, include_self=False)
+            
+            return leaf
+
+        def is_leaf(x):
+            included = True if x is not node else include_self
+            return (is_unwrappable(x) or only_if(x)) and included
+
+        return jax.tree.map(_map_fn, node, is_leaf=is_leaf)
+    
+    if only_if is None:  # fast path
+        return _do_unwrap(tree, include_self=True)    
+    return _search_and_unwrap(tree, include_self=True)
+
+
+def unwrap_self(method):
+    """
+    Decorator for Equinox module methods. 
+    Unwraps `self` before executing the method so all ties/deferred 
+    parameters are resolved.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        # Explicitly use the data function on self
+        unwrapped_self = unwrap(self)
+        return method(unwrapped_self, *args, **kwargs)
+    return wrapper
+
+
+def as_unwrapped(tree: Union[T, PyTree[T]]) -> T:
+    """Conditionally unwraps the root node if it is an `AbstractUnwrappable`.
+    
+    Unlike `unwrap`, this function does not recursively traverse the PyTree. 
+    It only evaluates the top-level object.
+
+    Args:
+        tree: The tree or node to potentially unwrap.
+
+    Returns:
+        The unwrapped result if `tree` was an `AbstractUnwrappable`, 
+        otherwise returns the original `tree` unmodified.
+    """
+    if isinstance(tree, AbstractUnwrappable):
+        return tree.unwrap()
+    return tree
+
+
+class AbstractWrappable(eqx.Module, Generic[T]):
+    """An abstract class representing a PyTree node capable of wrapping another tree.
+
+    This interface is the counterpart to `parax.AbstractUnwrappable`. It is 
+    typically used to define how an object should reconstruct or "re-wrap" a 
+    tree that was previously unwrapped.
+    """
+
+    @abstractmethod
+    def wrap(self, tree: T) -> Self:
+        """Wraps the provided tree inside this node's structure.
+
+        Args:
+            tree: The unwrapped tree or raw value to be wrapped.
+
+        Returns:
+            A new instance of this node containing the wrapped tree.
+        """
+        pass
+
+
+def is_wrappable(x: Any) -> TypeGuard[AbstractWrappable]:
+    """Checks if a given object is a wrappable node.
+
+    Args:
+        x: The object to check.
+
+    Returns:
+        True if `x` is an instance of `AbstractWrappable`, False otherwise.
+    """
+    return isinstance(x, AbstractWrappable)
+
+
+def wrap(template_tree: PyTree, unwrapped_tree: PyTree, only_if: Callable[[Any], bool] = None) -> PyTree:
+    """Recursively resolves `AbstractWrappable` nodes to reconstruct a wrapped PyTree.
+
+    This function maps across a `template_tree` and an `unwrapped_tree` simultaneously. 
+    Wrapping is performed outside-in (top-down), perfectly inverting the inside-out 
+    (bottom-up) process of `parax.unwrap`. 
+    
+    **Note:** This function is typically used to re-wrap a PyTree that was previously 
+    unwrapped via `parax.unwrap` and `parax.AbstractUnwrappable`.
+
+    If the `only_if` predicate is provided, the wrapping process is conditionally gated.
+    The tree is searched top-down, and wrapping only triggers for subtrees that 
+    satisfy the condition. Once a node satisfies `only_if`, that entire subtree 
+    is fully wrapped.
+
+    Behavior with `only_if`:
+        1. If `only_if(node)` is True: The node and all of its `AbstractWrappable` 
+           descendants are fully wrapped.
+        2. If `only_if(node)` is False: The node itself bypasses wrapping, but the 
+           search continues recursively into its children.
+
+    Args:
+        template_tree: The original (or blueprint) PyTree containing `AbstractWrappable` nodes.
+        unwrapped_tree: The PyTree containing the raw, unwrapped values.
+        only_if: An optional predicate function `Callable[[Any], bool]`. If provided, 
+            only subtrees evaluating to True (and their descendants) are wrapped.
+
+    Returns:
+        A new PyTree where the appropriate values from `unwrapped_tree` have been 
+        wrapped using the template nodes.
+    """
+    def _do_wrap(t_node, u_node, *, include_self: bool):
+        def _map_fn(t_leaf, u_leaf):
+            if not is_wrappable(t_leaf):
+                return u_leaf
+            
+            partially_wrapped = t_leaf.wrap(u_leaf)
+            return _do_wrap(t_leaf, partially_wrapped, include_self=False)
+
+        def is_leaf(x):
+            included = True if x is not t_node else include_self
+            return is_wrappable(x) and included
+
+        return jax.tree.map(_map_fn, t_node, u_node, is_leaf=is_leaf)
+
+    def _search_and_wrap(t_node, u_node, *, include_self: bool):
+        if include_self and only_if(t_node):
+            return _do_wrap(t_node, u_node, include_self=True)
+
+        def _map_fn(t_leaf, u_leaf):
+            if only_if(t_leaf):
+                return _do_wrap(t_leaf, u_leaf, include_self=True)
+
+            if is_wrappable(t_leaf):
+                # Bypass wrapping this node, but keep searching its children
+                return _search_and_wrap(t_leaf, u_leaf, include_self=False)
+
+            return u_leaf
+
+        def is_leaf(x):
+            included = True if x is not t_node else include_self
+            return (is_wrappable(x) or only_if(x)) and included
+
+        return jax.tree.map(_map_fn, t_node, u_node, is_leaf=is_leaf)
+
+    if only_if is None:
+        return _do_wrap(template_tree, unwrapped_tree, include_self=True)
+    return _search_and_wrap(template_tree, unwrapped_tree, include_self=True)
+
+class Parameterize(AbstractUnwrappable[T]):
     """
     Unwrap into an arbitrary object by calling a function with arguments.
     
@@ -49,7 +281,7 @@ class Parameterized(AbstractUnwrappable[T]):
         return self.fn(*self.args, **self.kwargs)
 
 
-class Computed(AbstractUnwrappable[T]):
+class Apply(AbstractUnwrappable[T]):
     """
     Unwrap a PyTree by applying a function to its array-like leaves.
     
@@ -87,7 +319,7 @@ class Computed(AbstractUnwrappable[T]):
         return jax.tree.map(_map_fn, self.tree, is_leaf=eqx.is_array_like)
 
 
-class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
+class Freeze(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
     """
     Applies `jax.lax.stop_gradient` to all array-like leaves before unwrapping.
 
@@ -95,7 +327,7 @@ class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
     during optimization partitioning.
 
     **Corner Case Note:** The `__init__` automatically prevents double-wrapping. 
-    If you pass a `Frozen` object into `Frozen`, it safely absorbs it rather 
+    If you pass a `Freeze` object into `Freeze`, it safely absorbs it rather 
     than nesting them.
     """
     tree: T
@@ -105,11 +337,11 @@ class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
         Args:
             tree: The PyTree to freeze.
         """
-        if isinstance(tree, Frozen):
+        if isinstance(tree, Freeze):
             tree = tree.tree
         self.tree = tree
 
-    def as_free(self) -> T:
+    def free(self) -> T:
         return self.tree
 
     def unwrap(self) -> T:
@@ -117,15 +349,15 @@ class Frozen(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
     
     def wrap(self, tree: T) -> Self:
-        return Frozen(tree)
+        return Freeze(tree)
     
 
-class _TiedPlaceholder(eqx.Module):
+class _TiePlaceholder(eqx.Module):
     """A static, empty marker used to hide parameters from optimizers."""
     pass
 
 
-class Tied(AbstractUnwrappable):
+class Tie(AbstractUnwrappable):
     """A wrapper that ties subtrees/parameters together.
 
     Upon initialization, any tied sources are replaced with placeholders.
@@ -145,7 +377,7 @@ class Tied(AbstractUnwrappable):
         >>> model = Gaussian(mu=jnp.array(1.0), sigma=jnp.array(1.0))
         >>> 
         >>> # Tie sigma to always be 2x mu (`tie_fn` can also be left out for identity)
-        >>> tied_model = Tied(
+        >>> tied_model = Tie(
         ...     tree=model,
         ...     target=lambda m: m.sigma,
         ...     source=lambda m: m.mu,
@@ -169,7 +401,7 @@ class Tied(AbstractUnwrappable):
         source: Callable[[Any], Any], 
         tie_fn: Callable[[Any], Any] = lambda x: x
     ):
-        """Initializes the Tied wrapper and strips the target parameter.
+        """Initializes the Tie wrapper and strips the target parameter.
 
         Args:
             tree: The root PyTree or Equinox module to wrap.
@@ -181,10 +413,10 @@ class Tied(AbstractUnwrappable):
                 parameter before injecting it into the target. Defaults to the 
                 identity function.
         """
-        base_tree = tree.tree if isinstance(tree, Tied) else tree
-        stripped_tree = eqx.tree_at(target, base_tree, _TiedPlaceholder())
+        base_tree = tree.tree if isinstance(tree, Tie) else tree
+        stripped_tree = eqx.tree_at(target, base_tree, _TiePlaceholder())
         new_tie = (target, source, tie_fn)
-        if isinstance(tree, Tied):
+        if isinstance(tree, Tie):
             self.ties = tree.ties + (new_tie,)
         else:
             self.ties = (new_tie,)
@@ -209,21 +441,6 @@ class Tied(AbstractUnwrappable):
         return unwrap(current_tree)
     
 
-def as_frozen(tree: Union[T | Frozen[T]]) -> T:
-    """
-    Returns `tree` wrapped in a `parax.Frozen` module, creating one if needed.
-
-    Args:
-        tree: An arbitrary tree.
-
-    Returns:
-        A frozen version of the tree. If it is already frozen, returns it directly.
-    """    
-    if isinstance(tree, Frozen):
-        return tree
-    return Frozen(tree)
-    
-
 class Static(AbstractUnwrappable[T], AbstractWrappable[T]):
     """
     Wraps a tree and marks it as static.
@@ -246,26 +463,11 @@ class Static(AbstractUnwrappable[T], AbstractWrappable[T]):
         return Static(tree)
     
 
-def as_static(tree: Union[T | Static[T]]) -> T:
+def as_opaque(tree: Union[T | Static[T]]) -> Union[Freeze, Static]:
     """
-    Returns `tree` wrapped in a `parax.Static` module, creating one if needed.
+    Returns `tree` wrapped in either a `parax.Static` or `parax.Freeze` module, creating one if needed.
 
-    Args:
-        tree: An arbitrary tree.
-
-    Returns:
-        A static version of the tree. If it is already static, returns it directly.
-    """    
-    if isinstance(tree, Static):
-        return tree
-    return Static(tree)
-
-
-def as_frozen_or_static(tree: Union[T | Static[T]]) -> Union[Frozen, Static]:
-    """
-    Returns `tree` wrapped in either a `parax.Static` or `parax.Frozen` module, creating one if needed.
-
-    If `tree` is a JAX array or a structured PyTree, it is wrapped in `parax.Frozen`. 
+    If `tree` is a JAX array or a structured PyTree, it is wrapped in `parax.Freeze`. 
     If `tree` is an unregistered Python object (an opaque leaf e.g. a lambda), it is wrapped in `parax.Static` 
     to safely bypass JAX transformations.
 
@@ -273,9 +475,9 @@ def as_frozen_or_static(tree: Union[T | Static[T]]) -> Union[Frozen, Static]:
         tree: An arbitrary PyTree, array, or Python object.
 
     Returns:
-        A static or frozen version of the tree. If it is already static or frozen, returns it directly.
+        A static or freeze version of the tree. If it is already static or freeze, returns it directly.
     """
-    if isinstance(tree, Frozen | Static):
+    if isinstance(tree, Freeze | Static):
         return tree
     
     # Ask JAX how it views this object
@@ -284,15 +486,15 @@ def as_frozen_or_static(tree: Union[T | Static[T]]) -> Union[Frozen, Static]:
     is_opaque_leaf = (len(leaves) == 1) and (leaves[0] is tree)
     
     if is_opaque_leaf and not eqx.is_array(tree):
-        return as_static(tree)
-    return as_frozen(tree)
+        return Static(tree)
+    return Freeze(tree)
 
 
-class Annotated(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[dict]):
+class Annotate(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[dict]):
     """
     A wrapper to add dictionary metadata to an arbitrary PyTree.
     
-    Implements `parax.annotated.AbstractAnnotated`.
+    Implements `parax.annotation.AbstractAnnotated`.
 
     Attributes:
         tree: The wrapped tree.
@@ -305,14 +507,17 @@ class Annotated(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[
         return self.tree
     
     def wrap(self, other: T) -> Self:
-        return Annotated(tree=other, metadata=self.metadata)
+        return Annotate(tree=other, metadata=self.metadata)
     
     
-class Bounded(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
+class Bound(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
     """
-    A wrapper to add bounds to an arbitrary PyTree.
+    A wrapper to attach bounds to an arbitrary PyTree.
     
-    Implements `parax.bounded.AbstractBounded`.
+    Implements `parax.bounds.AbstractBounded`.
+    
+    Currently this wrapper does not check to ensure the leaf nodes
+    lie within the bounds.
 
     Attributes:
         tree: The wrapped tree.
@@ -325,14 +530,21 @@ class Bounded(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
         return self.tree
     
     def wrap(self, other: T) -> Self:
-        return Annotated(ounds=self.bounds, tree=other)
+        return Annotate(bounds=self.bounds, tree=other)
     
     
-class Constrainable(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstrainable[T]):
+class Constrain(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstrainable[T]):
     """
-    A wrapper to add constraints to an arbitrary PyTree.
+    A wrapper to attach a `parax.constraints.AbstractConstraint` to an arbitrary PyTree.
+    
+    Assumes the original PyTree is unconstrained
+    i.e. has array-like leaf nodes that are defined
+    over the entire real number line.
     
     Implements `parax.constrainable.AbstractConstrainable`.
+    
+    Currently this wrapper does not check to ensure the leaf nodes
+    lie within the constraints.
 
     Attributes:
         tree: The wrapped tree.
@@ -346,20 +558,20 @@ class Constrainable(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstr
         return self.constraint.bounds
     
     def constrain(self, constraint: AbstractConstraint) -> Self:
-        return Probabilistic(constraint=constraint, tree=self.tree)
+        return Constrain(constraint=constraint, tree=self.tree)
     
     def unwrap(self) -> T:
         return self.tree
     
     def wrap(self, other: T) -> Self:
-        return Probabilistic(constraint=self.constraint, tree=other)
+        return Constrain(constraint=self.constraint, tree=other)
     
     
-class Probabilistic(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabilistic[T]):
+class Probabilize(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabilistic[T]):
     """
     A wrapper to add a probability distribution to an arbitrary PyTree.
     
-    Implements `parax.probabilistic.AbstractProbabilistic`.
+    Implements `parax.probability.AbstractProbabilistic`.
 
     Attributes:
         distribution: The tree's associated probability distribution.
@@ -375,10 +587,10 @@ class Probabilistic(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbab
         return self.constraint.bounds
     
     def constrain(self, constraint: AbstractConstraint) -> Self:
-        return Probabilistic(distribution=self.distribution, constraint=constraint, tree=self.tree)
+        return Probabilize(distribution=self.distribution, constraint=constraint, tree=self.tree)
     
     def unwrap(self) -> T:
         return self.tree
     
     def wrap(self, other: T) -> Self:
-        return Probabilistic(distribution=self.distribution, constraint=self.constraint, tree=other)
+        return Probabilize(distribution=self.distribution, constraint=self.constraint, tree=other)

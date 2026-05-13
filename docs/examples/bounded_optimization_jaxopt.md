@@ -4,7 +4,7 @@ In this example, we optimize a bounded dummy model using `jaxopt`.
 
 ## 1. Defining the model
 
-`parax.bounded` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to unwrap any bounded leaves before feeding our model to the optimizer, and then re-wrap the final optimized result.
+`parax.bounds` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to unwrap any bounded leaves before feeding our model to the optimizer, and then re-wrap the final optimized result.
 
 First we initialize a dummy model:
 
@@ -40,7 +40,7 @@ lower = prx.remove(lower_all, prx.is_constant)
 upper = prx.remove(upper_all, prx.is_constant)
 ```
 
-Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping until a bounded node is encountered, resulting in a PyTree whose structure will naturally match that returned by `parax.bounded.tree_bounds`.
+Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping until a bounded node is encountered, resulting in a PyTree whose structure will naturally match that returned by `parax.bounds.tree_bounds`.
 
 Notice also that we must use `prx.remove` (to remove any constant values) so that the shape of our bounds align with our parameters.
 

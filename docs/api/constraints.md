@@ -1,5 +1,9 @@
 ::: parax.constraints.AbstractConstraint
 
+::: parax.constraints.AbstractConstrained
+
+::: parax.constraints.AbstractConstrainable
+
 ::: parax.constraints.RealLine
 
 ::: parax.constraints.GreaterThan
@@ -15,3 +19,11 @@
 ::: parax.constraints.Leafwise
 
 ::: parax.constraints.Custom
+
+::: parax.constraints.tree_constraints
+
+::: parax.constraints.tree_leafwise_constraint
+
+::: parax.constraints.tree_leafwise_bijector
+
+::: parax.constraints.tree_constrain

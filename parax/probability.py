@@ -11,6 +11,8 @@ import equinox as eqx
 
 from distreqx.distributions import AbstractDistribution, Transformed, Normal, Uniform
 from parax.constraints import AbstractConstraint, AbstractConstrained
+from parax.wrappers import is_unwrappable
+from parax.constants import is_constant
 
 
 T = TypeVar("T")
@@ -139,28 +141,56 @@ def truncate_distribution(
     else:
         raise ValueError(f"Distribution of type {type(dist)} cannot be truncated")
     
-    
-def _is_unwrappable_probabilistic(x):
-    from parax.wrappers import is_unwrappable
-    return is_probabilistic(x) and is_unwrappable(x) 
 
+def _is_unwrappable_probabilistic(x):
+    return is_probabilistic(x) and is_unwrappable(x) 
 
 def is_leaf(x):
     """
-    Returns if a node is a leaf for probabilistic solvers.
-    
-    Useful as the `is_leaf` argument for partitioning and combining.
+    Defines the tree traversal boundaries for probabilistic partitioning.
+
+    In the Parax ecosystem, certain custom nodes (like unwrappable probabilistic 
+    priors or posteriors) contain internal metadata. If Equinox traverses inside 
+    these nodes, it will strip their differentiable arrays away from their metadata, 
+    causing structural mismatches during recombination.
+
+    This function tells JAX/Equinox to treat these specific Parax objects as 
+    opaque, indivisible leaves. 
+
+    Args:
+        x: Any node encountered during PyTree traversal.
+
+    Returns:
+        bool: True if the node should NOT be traversed into. Matches:
+            1. Unwrappable probabilistic nodes (preserves their wrapper structure).
+            2. Constant nodes (protects static configuration objects).
     """
-    from parax.constants import is_constant
     return _is_unwrappable_probabilistic(x) or is_constant(x)
 
 def is_dynamic(x):
     """
-    Returns if a node is dynamic for probabilistic solvers.
-    
-    Useful as the filter spec for partitioning.
+    Identifies parameters that should be updated during probabilistic inference.
+
+    This function acts as the primary filter for `eqx.partition`, determining 
+    which nodes are routed to the `dynamic` (differentiable/optimizable) tree 
+    and which are left behind in the `static` tree.
+
+    Because `parax.probability.is_leaf` protects unwrappable nodes from being 
+    split open, this function captures those nodes completely whole, allowing 
+    them to be safely unwrapped *after* partitioning. Therefore, if you would
+    like to pass the full, wrapped nodes through a jit boundary, you should
+    include additional conditions or partitioning steps.
+
+    Args:
+        x: Any leaf node in the PyTree (as defined by `is_leaf`).
+
+    Returns:
+        bool: True if the node is meant for the inference engine. Matches:
+            1. Standard JAX inexact arrays (floating-point tensors).
+            2. Entire unwrappable probabilistic nodes.
+        Note: Explicitly returns False for `parax.constant` nodes, forcing 
+        them into the static tree.
     """    
-    from parax.constants import is_constant
     if is_constant(x): 
         return False
     if _is_unwrappable_probabilistic(x): 

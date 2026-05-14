@@ -608,7 +608,7 @@ def constrain_param(variable: Param, *constraints: AbstractConstraint) -> Param:
 
     Args:
         variable (Param): The target variable or standard JAX inexact array.
-        constraint (AbstractConstraint): The physical constraint to apply.
+        *constraints (AbstractConstraint): The physical constraints to apply.
 
     Returns:
         Param: A new instance of the variable with the constraint applied.

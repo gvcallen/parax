@@ -24,4 +24,4 @@
 
 ::: parax.as_fixed
 
-::: parax.variables.constrain
+::: parax.variables.constrain_param

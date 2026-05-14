@@ -20,7 +20,7 @@ class BayesianLinearModel(eqx.Module):
     def __call__(self, x):
         return self.weight * x + self.bias
 
-initial_model = BayesianLinearModel()
+model = BayesianLinearModel()
 ```
 
 ## 2. Setting up the log posterior

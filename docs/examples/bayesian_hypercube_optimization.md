@@ -42,36 +42,29 @@ class CorrelatedBayesianModel(eqx.Module):
         weight, bias = self.theta
         return weight * x + bias
 
-initial_model = CorrelatedBayesianModel()
+model = CorrelatedBayesianModel()
 ```
 
 ## 2. Setting up the negative log posterior
 
-To setup the objective negative log posterior, we first need to perform model *extraction* and then *filtering*.
+To setup the objective negative log posterior, we first need to perform model *partitioning* and then *extraction*.
 
-First, we *partially unwrap* the model to resolve it into its constrained, probabilistic values, and we also extract its individual and joint distribution(s) which match the shape of these values:
+We partition the model into dynamic and static nodes, and then unwrap any probabilistic nodes so that their structure aligns with the matching distributions.
 
 <!-- pytest-codeblocks:cont -->
 ```python
-init_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-distributions_all = prx.probability.tree_distributions(initial_model)
-joint_all = prx.probability.tree_joint_distribution(initial_model)
+dynamic, static = eqx.partition(model, prx.probability.is_dynamic, is_leaf=prx.probability.is_leaf)
+
+params = prx.unwrap(dynamic, only_if=prx.is_probabilistic)
+distributions = prx.probability.tree_distributions(dynamic)
+joint = prx.probability.tree_joint_distribution(dynamic)
 ```
 
-Next, we partition the model to remove static metadata and constant values, and also remove any constant nodes from the distributions (similar to other example):
+Then, we can transform our parameters into the hypercube using the `cdf`, and define the inverse hypercube transform using the `icdf`, as well as the negative log posterior which combines everything together:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-init_params, static = eqx.partition(init_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
-distributions = prx.remove(distributions_all, prx.is_constant, stop_if=prx.is_distribution)
-joint = prx.remove(joint_all, prx.is_constant, stop_if=prx.is_distribution)
-```
-
-Finally, we can transform our parameters into the hypercube using the `cdf`, and define the inverse hypercube transform using the `icdf`, as well as the negative log posterior which combines everything together:
-
-<!-- pytest-codeblocks:cont -->
-```python
-init_cube_params = jax.tree.map(lambda d, b: d.cdf(b), distributions, init_params, is_leaf=prx.is_distribution)
+cube_params = jax.tree.map(lambda d, b: d.cdf(b), distributions, params, is_leaf=prx.is_distribution)
 
 def hypercube_transform(distributions, cube_params):
     eps = jnp.finfo(jnp.float32).eps
@@ -80,7 +73,7 @@ def hypercube_transform(distributions, cube_params):
 
 def negative_log_posterior(cube_params, distributions, static, joint, x_data, y_data):
     params = hypercube_transform(distributions, cube_params)
-    unwrapped = prx.unwrap(eqx.combine(params, static))
+    unwrapped = prx.unwrap(eqx.combine(params, static, is_leaf=prx.probability.is_leaf))
     
     log_prior = joint.log_prob(params)
     y_pred = jax.vmap(unwrapped)(x_data)
@@ -109,12 +102,12 @@ and then define our hypercube bounds and run JAXopt:
 ```python
 import jaxopt
 
-zeros = jax.tree.map(jnp.zeros_like, init_cube_params)
-ones = jax.tree.map(jnp.ones_like, init_cube_params)
+zeros = jax.tree.map(jnp.zeros_like, cube_params)
+ones = jax.tree.map(jnp.ones_like, cube_params)
 
 solver = jaxopt.ScipyBoundedMinimize(fun=negative_log_posterior)
 results = solver.run(
-    init_params=init_cube_params,
+    init_params=cube_params,
     bounds=(zeros, ones),
     distributions=distributions,
     static=static,
@@ -129,8 +122,8 @@ Finally, we can map the optimized hypercube parameters back to our model:
 ```python
 opt_cube_params = results.params
 opt_params = hypercube_transform(distributions, opt_cube_params)
-opt_values = eqx.combine(opt_params, static)
-opt_model = prx.wrap(initial_model, opt_values, only_if=prx.is_probabilistic)
+opt_dynamic = prx.wrap(dynamic, opt_params, only_if=prx.is_probabilistic)
+opt_model = eqx.combine(opt_dynamic, static, is_leaf=prx.probability.is_leaf)
 ```
 
 If we print out the results, we see our maximum a posteriori estimate aligns with our simulated data:

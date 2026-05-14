@@ -10,9 +10,6 @@ from parax.variables import (
     Derived,
     Constrained,
     Fixed,
-    tagged,
-    derived,
-    constrained,
 )
 from parax.constraints import Positive
 
@@ -100,29 +97,3 @@ def test_fixed_stops_gradients():
     grad_val = jax.grad(loss_fn)(3.0)
     assert jnp.allclose(grad_val, 0.0)
 
-
-# ==========================================
-# Dataclass & PyTree Helpers
-# ==========================================
-
-def test_dataclass_helpers():
-    """
-    Test that the eqx.field helpers successfully cast raw values into 
-    variables, but gracefully passthrough existing variables to prevent 
-    double-wrapping.
-    """
-    class TestModel(eqx.Module):
-        # Python dataclass rules: fields without defaults MUST come before fields with defaults!
-        c_val: AbstractVariable = constrained(constraint=Positive())
-        d_val: AbstractVariable = derived(fn=jnp.exp)
-        p_val: AbstractVariable = tagged(raw_value=1.0)
-
-    # 1. Provide raw floats (Converters should wrap them)
-    model1 = TestModel(c_val=5.0, d_val=2.0)
-    assert isinstance(model1.p_val, Tagged)
-    assert isinstance(model1.c_val, Constrained)
-    assert isinstance(model1.d_val, Derived)
-    
-    assert jnp.allclose(model1.p_val.value, 1.0) # default used
-    assert jnp.allclose(model1.c_val.value, 5.0) # init via `value` due to kwarg pass
-    assert jnp.allclose(model1.d_val.raw_value, 2.0)

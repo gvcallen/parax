@@ -5,3 +5,7 @@
 ::: parax.bounds.tree_upper
 
 ::: parax.bounds.tree_bounds
+
+::: parax.bounds.is_dynamic
+
+::: parax.bounds.is_leaf

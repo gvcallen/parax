@@ -4,7 +4,7 @@ In this example, we optimize a bounded dummy model using `jaxopt`.
 
 ## 1. Defining the model
 
-`parax.bounds` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to unwrap any bounded leaves before feeding our model to the optimizer, and then re-wrap the final optimized result.
+`parax.bounds` caters for easy extraction of bounds from PyTrees containing `parax.AbstractBounded` nodes (e.g. `parax.Constrained` variables). We simply have to unwrap any bounded leaves before feeding our model to the optimizer, and then optionally re-wrap the optimized result.
 
 First we initialize a dummy model:
 
@@ -20,40 +20,38 @@ class DummyModel(eqx.Module):
     def __call__(self):
         return (self.x - 3.0)**2 + 1e6 * (self.y - 2.0e-3)**2
 
-initial_model = DummyModel()
+model = DummyModel()
 ```
 
 Note that we can nest parameters (like `y` above) and the constraints apply on the level we define them.
 
 ## 2. Setting up the loss
 
-Next, we extract the bounds and unwrap the bounded values, and partition/filter the bounded model and bounds into parameters and static metadata.
+Next, we partition the model into dynamic and static halves, and then unwrap the bounded values and extract their associated bounds:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-initial_bounded = prx.unwrap(initial_model, only_if=prx.is_bounded)
-lower_all, upper_all = prx.bounds.tree_bounds(initial_model)
+dynamic, static = eqx.partition(model, prx.bounds.is_dynamic, is_leaf=prx.bounds.is_leaf)
 
-params, static = eqx.partition(initial_bounded, eqx.is_inexact_array, is_leaf=prx.is_constant)
-lower = prx.remove(lower_all, prx.is_constant)
-upper = prx.remove(upper_all, prx.is_constant)
+params = prx.unwrap(dynamic, only_if=prx.is_bounded)
+lower, upper = prx.bounds.tree_bounds(dynamic)
 ```
 
-Notice how we only unwrap bounded nodes by passing `only_if=parax.is_bounded` to `parax.unwrap`. This delays any unwrapping until a bounded node is encountered, resulting in a PyTree whose structure will naturally match that returned by `parax.bounds.tree_bounds`.
-
-Notice also that we must use `prx.remove` (to remove any constant values) so that the shape of our bounds align with our parameters.
+Note the elegance of the above code. `prx.bounds.is_dynamic` and `prx.bounds.is_leaf` work together to remove any constant values and static data in a way that ensure the unwrapped `params` matches `lower` and `upper`, meaning we only need to perform a single partition.
 
 Now we can define our objective:
 <!-- pytest-codeblocks:cont -->
 ```python
 def objective(p):
-    unwrapped_model = prx.unwrap(eqx.combine(p, static))
+    unwrapped_model = prx.unwrap(eqx.combine(p, static, is_leaf=prx.bounds.is_leaf))
     return unwrapped_model()
 ```
 
+Note that `is_leaf` is critical if our model contains non-unwrappable `parax.bounds.AbstractBounded` nodes.
+
 ## 3. Running the optimizer
 
-Finally, we can run the optimizer and re-wrap the results (passing `only_if=parax.is_bounded` again):
+Finally, we can run the optimizer and optionally re-wrap the results (passing `only_if=parax.is_bounded` and `is_leaf` again):
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -65,16 +63,16 @@ results = solver.run(
     bounds=(lower, upper), 
 )
 
-opt_bounded = eqx.combine(results.params, static)
-final_model = prx.wrap(initial_model, opt_bounded, only_if=prx.is_bounded)
+opt_dynamic = prx.wrap(dynamic, results.params, only_if=prx.is_bounded)
+opt_model = eqx.combine(opt_dynamic, static, is_leaf=prx.bounds.is_leaf)
 ```
 
 Our parameters match the minimum of the dummy model:
 <!-- pytest-codeblocks:cont -->
 ```python
-final_model.x.value
+opt_model.x.value
 # ~3.0
 
-final_model.y.value
+opt_model.y.value
 # ~0.002
 ```

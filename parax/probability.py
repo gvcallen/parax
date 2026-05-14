@@ -138,3 +138,31 @@ def truncate_distribution(
         return Uniform(new_lower, new_upper)
     else:
         raise ValueError(f"Distribution of type {type(dist)} cannot be truncated")
+    
+    
+def _is_unwrappable_probabilistic(x):
+    from parax.wrappers import is_unwrappable
+    return is_probabilistic(x) and is_unwrappable(x) 
+
+
+def is_leaf(x):
+    """
+    Returns if a node is a leaf for probabilistic solvers.
+    
+    Useful as the `is_leaf` argument for partitioning and combining.
+    """
+    from parax.constants import is_constant
+    return _is_unwrappable_probabilistic(x) or is_constant(x)
+
+def is_dynamic(x):
+    """
+    Returns if a node is dynamic for probabilistic solvers.
+    
+    Useful as the filter spec for partitioning.
+    """    
+    from parax.constants import is_constant
+    if is_constant(x): 
+        return False
+    if _is_unwrappable_probabilistic(x): 
+        return True
+    return eqx.is_inexact_array(x)

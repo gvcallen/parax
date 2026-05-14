@@ -27,27 +27,18 @@ initial_model = BayesianLinearModel()
 
 In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be using an unconstrained MCMC sampler, we need to provide a function that takes our model parameters in an unconstrained space and returns an unnormalized log-posterior. To accomplish this, we will explicitly use *bijectors*.
 
-First, we use `parax.probability` and `parax.unwrap` to extract all initial unconstrained values, prior and bijector:
+First, we partition the model into dynamic and static nodes, and then extract all initial unconstrained values, the model's prior, and its constraint bijector:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-initial_constrained = prx.unwrap(initial_model, only_if=prx.is_probabilistic)
-unconstrained_prior_all = prx.probability.tree_unconstrained_distribution(initial_model)
-bijector_to_constrained_all = prx.constraints.tree_leafwise_bijector(initial_model)
+dynamic, static = eqx.partition(model, prx.probability.is_dynamic, is_leaf=prx.probability.is_leaf)
+
+params = prx.unwrap(dynamic, only_if=prx.is_probabilistic)
+unconstrained_prior = prx.probability.tree_unconstrained_distribution(dynamic)
+bijector_to_constrained = prx.constraints.tree_leafwise_bijector(dynamic)
 ```
 
 Note that we need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.
-
-Next, we partition and filter the parameters to remove static metadata and fixed values:
-
-<!-- pytest-codeblocks:cont -->
-```python
-params, static = eqx.partition(initial_constrained, eqx.is_inexact_array, is_leaf=prx.is_constant)
-unconstrained_prior = prx.remove(unconstrained_prior_all, prx.is_constant, stop_if=prx.is_distribution)
-bijector_to_constrained = prx.remove(bijector_to_constrained_all, prx.is_constant, stop_if=prx.is_bijector)
-```
-
-Similar to the example on bounded optimization, we must remove any constants so that our prior and bijector align with the structure of our parameters.
 
 Finally, we project our constrained parameters to the unconstrained space, and define the log posterior to be Gaussian likelihood with a standard deviation of `1.0`.
 <!-- pytest-codeblocks:cont -->
@@ -55,12 +46,12 @@ Finally, we project our constrained parameters to the unconstrained space, and d
 import jax
 import jax.numpy as jnp
 
-init_unconstrained_params = bijector_to_constrained.inverse(params)
+unconstrained_params = bijector_to_constrained.inverse(params)
 
 def log_posterior_fn(unconstrained_params, static, bijector_to_constrained, unconstrained_prior, x_data, y_true):
     params = bijector_to_constrained.forward(unconstrained_params)
-    unwrapped = prx.unwrap(eqx.combine(params, static))
-    
+    unwrapped = prx.unwrap(eqx.combine(params, static, is_leaf=prx.probability.is_leaf))
+
     log_prior = unconstrained_prior.log_prob(unconstrained_params)
     y_pred = jax.vmap(unwrapped)(x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
@@ -83,10 +74,10 @@ x_data = jnp.linspace(-2, 2, 50)
 y_data = 2.5 * x_data + 1.0 + jr.normal(rng_key, (50,))
 
 logprob = lambda p: log_posterior_fn(p, static, bijector_to_constrained, unconstrained_prior, x_data, y_data)
-inv_mass_matrix = jnp.ones_like(ravel_pytree(init_unconstrained_params)[0])
+inv_mass_matrix = jnp.ones_like(ravel_pytree(unconstrained_params)[0])
 nuts = blackjax.nuts(logprob, step_size=1e-2, inverse_mass_matrix=inv_mass_matrix)
 
-init_state = nuts.init(init_unconstrained_params)
+init_state = nuts.init(unconstrained_params)
 
 @eqx.filter_jit
 def run_mcmc(key, state, num_steps):

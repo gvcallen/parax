@@ -105,3 +105,31 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
         A tuple of two PyTrees `(lower_bounds, upper_bounds)`.
     """
     return tree_lower(tree), tree_upper(tree)
+
+
+def _is_unwrappable_bounded(x):
+    from parax.wrappers import is_unwrappable
+    return is_bounded(x) and is_unwrappable(x) 
+
+
+def is_leaf(x):
+    """
+    Returns if a node is a leaf for bounded optimization.
+    
+    Useful as the `is_leaf` argument for partitioning and combining.
+    """
+    from parax.constants import is_constant
+    return _is_unwrappable_bounded(x) or is_constant(x)
+
+def is_dynamic(x):
+    """
+    Returns if a node is dynamic for bounded optimization.
+    
+    Useful as the filter spec for partitioning.
+    """    
+    from parax.constants import is_constant
+    if is_constant(x): 
+        return False
+    if _is_unwrappable_bounded(x): 
+        return True
+    return eqx.is_inexact_array(x)

@@ -551,150 +551,29 @@ class Random(
         new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
 
-def tagged(
-    raw_value: Param = dataclasses.MISSING,
-    *,
-    metadata: dict | None = None,
-) -> Any:
+   
+def tree_named_params(tree: Any) -> dict[str, Any]:
     """
-    Specifies a dataclass field for a Parax `Tagged` variable.
+    Extracts a dictionary of named parameters from a JAX PyTree.
 
-    Args:
-        raw_value: The default raw value. If omitted, this field becomes required 
-            by the user during instantiation.
-        metadata: Additional static metadata to store.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
+    This function traverses a PyTree (such as an Equinox module)
+    and constructs readable string paths for each parameter leaf,
+    mapping these paths to their corresponding values.
+    
+    It is useful for inspecting model state, debugging, or logging.
+
+    Parameters
+    ----------
+    tree : Any
+        The JAX PyTree to inspect.
+
+    Returns
+    -------
+    dict[str, Any]
+        A dictionary where keys are string representations of the paths to the 
+        leaves (e.g., '.res.R' or '.cascade[0].L') and values are the leaves 
+        themselves.
     """
-    if metadata is None: metadata = {}
-
-    def converter(x: Any) -> AbstractVariable:
-        return Tagged(raw_value=x, metadata=metadata)
-
-    field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
-
-    return eqx.field(**field_kwargs)
-
-
-def derived(
-    fn: Callable = lambda x: x,
-    raw_value: Param = dataclasses.MISSING,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `Derived` variable.
-
-    Args:
-        fn: The callable used to transform the raw value.
-        raw_value: The default raw value. If omitted, this field becomes required.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        return Derived(fn=fn, raw_value=x)
-
-    field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
-        
-    return eqx.field(**field_kwargs)
-
-
-def transformed(
-    bijector: AbstractBijector,
-    raw_value: Param = dataclasses.MISSING,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `Transformed` variable.
-
-    Args:
-        bijector: The bijector used to transform the raw value.
-        raw_value: The raw value used by optimizers and samplers.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        return Transformed(bijector=bijector, raw_value=x)
-
-    field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
-        
-    return eqx.field(**field_kwargs)
-
-
-def bounded(
-    bounds: tuple[Array, Array],
-    raw_value: Param | None = None,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `Bounded` variable.
-
-    Args:
-        bounds: The parameter bounds.
-        raw_value: The raw, unconstrained value on the real number line.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        return Bounded(bounds=bounds, raw_value=x)
-
-    field_kwargs = {"converter": converter}
-    if raw_value is not dataclasses.MISSING:
-        field_kwargs["default"] = raw_value
-        
-    return eqx.field(**field_kwargs)
-
-
-def constrained(
-    constraint: AbstractConstraint | None = None,
-    value: Array = dataclasses.MISSING,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `parax.Constrained` variable.
-
-    Args:
-        constraint: The abstract constraint defining base bounds and mappings.
-        value: The default constrained value. If omitted, this field becomes required.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        return Constrained(constraint=constraint, value=x)
-
-    field_kwargs = {"converter": converter}
-    if value is not dataclasses.MISSING:
-        field_kwargs["default"] = value
-        
-    return eqx.field(**field_kwargs)
-
-
-def random(
-    distribution: AbstractDistribution | None = None,
-    constraint: AbstractConstraint | None = None,
-    value: Array = dataclasses.MISSING,
-) -> Any:
-    """
-    Specifies a dataclass field for a Parax `parax.Random` variable.
-
-    Args:
-        distribution: The distribution defining base bounds and mappings.
-        value: The default value. If omitted, this field becomes required.
-        
-    Returns:
-        An `equinox.field` properly configured for the field type.
-    """
-    def converter(x: Any) -> AbstractVariable:
-        return Random(distribution=distribution, constraint=constraint, value=x)
-
-    field_kwargs = {"converter": converter}
-    if value is not dataclasses.MISSING:
-        field_kwargs["default"] = value
-        
-    return eqx.field(**field_kwargs)
+    leaves_with_path, _ = jax.tree.flatten_with_path(tree, is_leaf=is_param)
+    
+    return {jax.tree_util.keystr(path): leaf for path, leaf in leaves_with_path if is_param(leaf)}

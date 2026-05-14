@@ -6,7 +6,7 @@ This example demonstrates Bayesian sampling of a linear regression model with in
 
 Let's define a simple linear regression model: $y = w \cdot x + b$. Instead of regular parameters, we will assign probability distributions to our variables using `prx.Random` variables to establish our priors.
 
-We'll define the model class, assign a normal and uniform prior to our weight and bias respectively, and initialize the model with our initial guesses.
+We'll define the model class and assign a normal and uniform prior to our weight and bias respectively.
 
 ```python
 import equinox as eqx
@@ -14,13 +14,13 @@ import parax as prx
 from distreqx.distributions import Uniform, Normal
 
 class BayesianLinearModel(eqx.Module):
-    weight: prx.Param = prx.random(Normal(0.0, 5.0))
-    bias: prx.Param = prx.random(Uniform(0.0, 2.0))
+    weight: prx.Param = prx.Random(Normal(0.0, 5.0))
+    bias: prx.Param = prx.Random(Uniform(0.0, 2.0))
 
     def __call__(self, x):
         return self.weight * x + self.bias
 
-initial_model = BayesianLinearModel(weight=1.0, bias=1.0)
+initial_model = BayesianLinearModel()
 ```
 
 ## 2. Setting up the log posterior

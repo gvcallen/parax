@@ -14,8 +14,8 @@ from parax.constraints import Positive
 
 class DecayCurve(eqx.Module):
     rate: prx.Param
-    baseline: prx.Param
-    amplitude: prx.Param = prx.constrained(Positive())
+    baseline: prx.Param = eqx.field(converter=jnp.asarray)
+    amplitude: prx.Param = eqx.field(converter=lambda x: prx.Constrained(Positive(), x))
 
     def __call__(self, t):
         return self.amplitude * jnp.exp(-self.rate * t) + self.baseline
@@ -23,11 +23,11 @@ class DecayCurve(eqx.Module):
 model = DecayCurve(
     amplitude=5.0, 
     rate=prx.Tagged(0.5, metadata={'desc': 'Decay constant'}), 
-    baseline=1.2
+    baseline=1.2,
 )
 ```
 
-Note that `5.0` is automatically converted to `prx.Constrained` by the dataclass field.
+Notice how we can specifier converters using `equinox.field` to enforce constraint or automatically converter fields to arrays.
 
 For demonstration purposes, we fix the baseline in this example:
 

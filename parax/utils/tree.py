@@ -161,4 +161,3 @@ def path_to_pseudoname(tree: PyTree, path: list, separator: str = '_') -> str:
             raise Exception(f"Unsupported key type in path: {type(item)}")
             
     return separator.join(name_fields)
-    

@@ -3,19 +3,19 @@
 **Parax** is a library for parametric modeling in [JAX](https://github.com/jax-ml/jax). Features include:
 
 - Parameters with metadata
-- Computed PyTrees and callable parameterizations
-- Derived, constrained, fixed, and random variables
+- PyTrees parameterizations via unwrapping
+- Derived, constrained, fixed, and random array-like variables
 - Abstract interfaces and associated tree manipulation tools
 
 This makes Parax great for:
 
-- Parameterizations for machine learning
+- Constraints for machine learning
 - Bounded optimization for scientific modeling
 - Probabilistic modeling and Bayesian inference
 - Deep, nested PyTrees
 - Combinations of the above
 
-Note that Parax is *not a framework*, though it can be used to make one. Rather, it is focused on extendability and interoperability with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
+Note that Parax is *not a framework*, though it can be used to make one. Rather, it is focused on extensibility and interoperability with other JAX libraries (especially [Equinox](https://github.com/patrick-kidger/equinox)).
 
 ## Installation
 Parax can be installed using pip:
@@ -24,7 +24,7 @@ Parax can be installed using pip:
 pip install parax
 ``
 
-For some constraints and probabilistic features, you may need this `distreqx` branch:
+For some built-in constraints and probabilistic features, you may need this `distreqx` branch:
 
 ``
 pip install git+https://github.com/gvcallen/distreqx.git
@@ -52,7 +52,7 @@ jnp.sin(p1) + (2 * p2)
 # Array(16.84147)
 ```
 
-You can also apply arbitrary computations to PyTrees and parameters using unwrapping:
+You can also apply arbitrary computations to PyTrees and parameters using explicit unwrapping:
 ```python
 pytree = {'a': 1.0, 'b': {'x': 2.0, 'y': prx.Derived(jnp.log, 3.0)}}
 wrapped = prx.Apply(jnp.exp, pytree)
@@ -63,6 +63,14 @@ prx.unwrap(wrapped)
 #        'y': Array(3.0)}}
 ```
 In the above example, `prx.Apply` operates on the whole PyTree's array-like nodes, while `prx.Derived` is an array-like `prx.AbstractVariable`.
+
+## Motivation
+
+Usually, PyTrees are just "dumb" data containers. However, it is very convenient (in both machine learning and scientific modeling) to attach some metadata/parameterization alongside a given PyTree node. By utilizing the concept of "unwrapping", it is easy to extract metadata or enforce constraints during model preparation or computation.
+
+Compared to other approaches, the above provides a nice middle ground between purity and rigidity:
+- The "purist" approach is using *shadow PyTrees* i.e. parallel PyTrees that hold the relevant metadata or constraints. However, these are tedious to define for any non-trivial, nested model, and also require the entire library to manage the same parallel structures.
+- The "standard" approach is using property and attributes i.e. defining the metadata or parameterization implicitly within the model. This provides a straight-forward approach, but tightly couples the metadata/parameterization to the model; results in additional model state and computations; and does not nest well.
 
 ## Next steps
 

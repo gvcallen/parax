@@ -66,11 +66,11 @@ In the above example, `prx.Apply` operates on the whole PyTree's array-like node
 
 ## Motivation
 
-Usually, PyTrees are just "dumb" data containers. However, it is very convenient (in both machine learning and scientific modeling) to attach some metadata/parameterization alongside a given PyTree node. By utilizing the concept of "unwrapping", it is easy to extract metadata or enforce constraints during model preparation or computation.
+Usually, PyTrees are just "dumb" containers. However, it is often desirable to attach some metadata/parameterization alongside a given tree node. This can easily be done using "unwrapping", allowing extracting metadata or enforcing constraints during model preparation or computation.
 
-Compared to other approaches, the above provides a nice middle ground between purity and rigidity:
-- The "purist" approach is using *shadow PyTrees* i.e. parallel PyTrees that hold the relevant metadata or constraints. However, these are tedious to define for any non-trivial, nested model, and also require the entire library to manage the same parallel structures.
-- The "standard" approach is using property and attributes i.e. defining the metadata or parameterization implicitly within the model. This provides a straight-forward approach, but tightly couples the metadata/parameterization to the model; results in additional model state and computations; and does not nest well.
+Compared to other approaches, this provides a middle ground between purity and rigidity:
+- The "purist" approach is using *shadow PyTrees* i.e. parallel trees that hold the relevant metadata/parameterization. However, these are tedious to define for nested models, and require the entire library to manage parallel structures.
+- The "standard" approach is using properties and attributes i.e. defining the metadata/parameterization implicitly within the model. This is straight-forward, but tightly couples the data/computation to the model; and also results in unnecessary state/computations.
 
 ## Next steps
 

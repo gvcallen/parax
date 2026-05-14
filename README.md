@@ -66,11 +66,11 @@ In the above example, `prx.Apply` operates on the whole PyTree's array-like node
 
 ## Motivation
 
-Usually, PyTrees are just "dumb" containers. However, it is often desirable to attach some metadata/parameterization alongside a given tree node. This can easily be done using "unwrapping", allowing extracting metadata or enforcing constraints during model preparation or computation.
+Usually, PyTrees are just "dumb" containers. However, it is often desirable to attach some metadata/parameterization alongside a given tree node. This can be done by "unwrapping" the metadata or constraint during model preparation or computation.
 
 Compared to other approaches, this provides a middle ground between purity and rigidity:
 - The "purist" approach is using *shadow PyTrees* i.e. parallel trees that hold the relevant metadata/parameterization. However, these are tedious to define for nested models, and require the entire library to manage parallel structures.
-- The "standard" approach is using properties and attributes i.e. defining the metadata/parameterization implicitly within the model. This is straight-forward, but tightly couples the data/computation to the model; and also results in unnecessary state/computations.
+- The "standard" approach is using properties and attributes i.e. defining the metadata/parameterization implicitly within the model. This is straight-forward, but tightly couples the extra state with the model, resulting in unnecessary fields and computations.
 
 ## Next steps
 

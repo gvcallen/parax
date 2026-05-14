@@ -43,6 +43,28 @@ class AbstractConstraint(eqx.Module):
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
+    
+    def clip(self, value: PyTree) -> PyTree:
+        """
+        Clip a value to lie within this constraint.
+        """
+        return jax.tree.map(jnp.clip, value, self.bounds[0], self.bounds[1])
+    
+    def is_outside(self, value: PyTree) -> PyTree:
+        """
+        Returns if another value is outside the constraint.
+        """
+        lower, upper = self.bounds
+        return jax.tree.map(lambda x, l, u: jnp.logical_or(x < l, x > u), value, lower, upper)
+    
+    def midpoint(self) -> PyTree:
+        """
+        Returns the midpoint of the constraint.
+        
+        Note that non-finite constraints may return infinity.
+        """
+        return jax.tree.map(lambda a, b: (a + b) / 2.0, self.bounds[0], self.bounds[1])
+        
 
 
 def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
@@ -595,3 +617,44 @@ def tree_constrain(tree: PyTree, constraints: PyTree) -> PyTree:
     return jax.tree_util.tree_map(
         _apply_constraint, tree, constraints, is_leaf=is_constrainable
     )
+    
+    
+def intersect(a: AbstractConstraint, b: AbstractConstraint) -> AbstractConstraint:
+    """
+    Calculates the intersection of two constraints.
+    Returns the most specific constraint class possible.
+    """
+    a_lower, a_upper = a.bounds
+    b_lower, b_upper = b.bounds
+
+    lower = jnp.maximum(a_lower, b_lower)
+    upper = jnp.minimum(a_upper, b_upper)
+
+    # Convert to concrete numpy arrays for boolean checks during init
+    np_lower = jnp.asarray(lower)
+    np_upper = jnp.asarray(upper)
+
+    np_lower, np_upper = eqx.error_if(
+        (np_lower, np_upper),
+        jnp.any(jnp.greater_equal(np_lower, np_upper)),
+        f"Constraint intersection is empty or invalid."
+    )
+    
+    is_neginf_lower = jnp.all(jnp.isneginf(np_lower))
+    is_posinf_upper = jnp.all(jnp.isposinf(np_upper))
+    is_zero_lower = jnp.all(jnp.equal(np_lower, 0.0))
+    is_zero_upper = jnp.all(jnp.equal(np_upper, 0.0))
+
+    # Resolve to the most specific constraint class
+    if is_neginf_lower and is_posinf_upper:
+        return RealLine()
+    elif is_zero_lower and is_posinf_upper:
+        return Positive()
+    elif is_neginf_lower and is_zero_upper:
+        return Negative()
+    elif is_posinf_upper:
+        return GreaterThan(lower)
+    elif is_neginf_lower:
+        return LessThan(upper)
+    else:
+        return Interval(lower, upper)

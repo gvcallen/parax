@@ -5,9 +5,9 @@ This module provides the core variable types for Parax. They act as
 array-like objects that can be directly injected into JAX computations 
 or unwrapped prior to execution.
 """
+from functools import reduce
 from abc import abstractmethod
 from typing import Any, Iterator, Callable, TypeGuard, Self
-import dataclasses
 
 import jax
 import jax.numpy as jnp
@@ -16,12 +16,12 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector, Chain
 
-from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution
+from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution, is_constrainable, Transformed as TransformedConstraint, intersect as intersect_constraints
 from parax.constants import AbstractConstant
-from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque, is_wrappable
+from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque
 from parax.annotation import AbstractAnnotated
 from parax.bounds import AbstractBounded
-from parax.probability import AbstractProbabilistic
+from parax.probability import AbstractProbabilistic, truncate_distribution
 
 
 class AbstractVariable(AbstractUnwrappable[Array]):
@@ -545,7 +545,26 @@ class Random(
         return lower, upper
     
     def constrain(self, constraint: AbstractConstraint) -> Self:
-        return Random(distribution=self.distribution, constraint=constraint, value=self.value)
+        orig_lower, orig_upper = as_unwrapped(self.constraint).bounds
+        new_lower, new_upper = as_unwrapped(constraint).bounds
+        has_shrunk = jnp.any(new_lower > orig_lower) or jnp.any(new_upper < orig_upper)
+
+        distribution = self.distribution
+        value = self.value
+        if has_shrunk:
+            try:
+                distribution = truncate_distribution(as_unwrapped(distribution), new_lower, new_upper)
+            except Exception:
+                import warnings
+                dist_name = type(as_unwrapped(distribution)).__name__
+                warnings.warn(
+                    f"A constraint was applied, but the distribution ({dist_name}) "
+                    f"could not be automatically truncated and will therefore be warped. "
+                    f"It is recommended to use a distribution that aligns with the constraints.",
+                    UserWarning, stacklevel=2
+                )
+                
+        return Random(distribution=distribution, constraint=constraint, value=value)
     
     def wrap(self, value: Array) -> Self:
         new_raw = as_unwrapped(self.constraint).bijector.inverse(value)
@@ -575,5 +594,45 @@ def tree_named_params(tree: Any) -> dict[str, Any]:
         themselves.
     """
     leaves_with_path, _ = jax.tree.flatten_with_path(tree, is_leaf=is_param)
-    
     return {jax.tree_util.keystr(path): leaf for path, leaf in leaves_with_path if is_param(leaf)}
+
+
+def constrain_param(variable: Param, *constraints: AbstractConstraint) -> Param:
+    """Intelligently applies a constraint to a parameter (variable or array).
+
+    This function acts as a smart router for applying physical bounds to variables,
+    regardless of how heavily wrapped they are. It safely drills through non-constrainable
+    wrappers (like `Fixed` or `Tagged`), promotes unconstrained bases (like `Real` or
+    raw JAX arrays), and correctly propagates constraints backwards through bijective
+    transformations.
+
+    Args:
+        variable (Param): The target variable or standard JAX inexact array.
+        constraint (AbstractConstraint): The physical constraint to apply.
+
+    Returns:
+        Param: A new instance of the variable with the constraint applied.
+
+    Raises:
+        TypeError: If the variable type is not supported for dynamic constraining.
+    """
+    constraint = reduce(intersect_constraints, constraints)
+    
+    if is_constrainable(variable):
+        return variable.constrain(constraint)
+    elif isinstance(variable, Transformed):
+        from distreqx.bijectors import Inverse
+        inverse_bij = Inverse(as_unwrapped(variable.bijector))
+        transformed_constraint = TransformedConstraint(constraint, inverse_bij)
+        new_inner = constrain_param(variable.raw_value, transformed_constraint)
+        return Transformed(variable.bijector, new_inner)
+    elif isinstance(variable, (Fixed, Tagged)):
+        new_raw = constrain_param(variable.raw_value, constraint)
+        return eqx.tree_at(lambda x: x.raw_value, variable, new_raw)
+    elif isinstance(variable, Real) or eqx.is_inexact_array(variable):
+        return Constrained(constraint, value=jnp.array(variable))
+    else:
+        raise TypeError(
+            f"Cannot dynamically inject a constraint into type {type(variable)}. "
+            "Ensure the target is a valid Parax variable or JAX inexact array."
+        )

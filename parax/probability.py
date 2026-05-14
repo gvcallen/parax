@@ -1,8 +1,7 @@
 """
 An abstract interface for PyTrees that have an associated probability distribution.
 """
-from abc import abstractmethod
-from typing import TypeVar, Any, TypeGuard, Self
+from typing import TypeVar, Any, TypeGuard
 
 from jaxtyping import PyTree
 import jax
@@ -10,7 +9,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 
-from distreqx.distributions import AbstractDistribution, Transformed
+from distreqx.distributions import AbstractDistribution, Transformed, Normal, Uniform
 from parax.constraints import AbstractConstraint, AbstractConstrained
 
 
@@ -121,3 +120,21 @@ def tree_unconstrained_distribution(tree: PyTree) -> AbstractDistribution:
     
     from distreqx.bijectors import Inverse
     return Transformed(joint, Inverse(bijector))
+
+
+def truncate_distribution(
+    dist: AbstractDistribution, 
+    new_lower: Any, 
+    new_upper: Any
+) -> AbstractDistribution:
+    """
+    Attempts to return a truncated version of the distribution.
+    Raise an exception if unavailable.
+    """
+    if isinstance(dist, Normal):
+        from distreqx.distributions import TruncatedNormal
+        return TruncatedNormal(loc=dist.loc, scale=dist.scale, low=new_lower, high=new_upper)
+    elif isinstance(dist, Uniform):
+        return Uniform(new_lower, new_upper)
+    else:
+        raise ValueError(f"Distribution of type {type(dist)} cannot be truncated")

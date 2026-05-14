@@ -14,7 +14,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Inexact
 import equinox as eqx
 from distreqx.distributions import AbstractDistribution
-from distreqx.bijectors import AbstractBijector
+from distreqx.bijectors import AbstractBijector, Chain
 
 from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution
 from parax.constants import AbstractConstant
@@ -283,6 +283,10 @@ class Transformed(AbstractVariable, AbstractWrappable[Array]):
     A variable transformed by a bijector.
      
     The parameter's value is dynamically derived via a bijective transform.
+    
+    Note that this simply applies forward/inverse passes during unwrapping,
+    and does NOT apply any special treatment to any other variable types
+    (e.g. `parax.Constrained` or `parax.Random` variables).
 
     Attributes:
         bijector: The bijector used to transform the raw value.
@@ -290,6 +294,19 @@ class Transformed(AbstractVariable, AbstractWrappable[Array]):
     """
     bijector: AbstractBijector = eqx.field(converter=as_opaque)
     raw_value: Param = eqx.field(converter=as_param)
+    
+    def __init__(self, bijector: AbstractBijector, raw_value: Param):
+        """
+        Args:
+            bijector: The bijector used to transform the raw value.
+            raw_value: The underlying value to be fixed.
+        """
+        if isinstance(raw_value, Transformed):
+            bijector = Chain([bijector, as_unwrapped(raw_value.bijector)])
+            raw_value = raw_value.raw_value
+        
+        self.bijector = bijector
+        self.raw_value = raw_value
 
     @property
     def value(self) -> Array:

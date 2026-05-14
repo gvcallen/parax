@@ -245,8 +245,8 @@ class Transformed(AbstractConstraint):
         base_constraint: The underlying physical constraint applied first.
         custom_bijector: The bijector applied on top of the base constraint.
     """
-    base_constraint: AbstractConstraint
-    custom_bijector: AbstractBijector
+    bijector: AbstractBijector
+    bounds: tuple[PyTree, PyTree]
 
     def __init__(
         self, 
@@ -258,36 +258,16 @@ class Transformed(AbstractConstraint):
             constraint: The base physical constraint (e.g., Positive, Interval).
             bijector: The bijector to apply on top of the base constraint.
         """
-        self.base_constraint = constraint
-        self.custom_bijector = bijector
-
-    @property
-    def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
-        """
-        Calculates the new topological bounds by passing the base extrema 
-        through the custom bijector.
-
-        **Corner Case Note:** Uses `jnp.minimum` and `jnp.maximum` to gracefully 
-        handle monotonically decreasing bijectors that might invert the order 
-        of the lower and upper bounds.
-        """
-        lower, upper = self.base_constraint.bounds
         
-        # Pass boundaries through
-        l_transformed = self.custom_bijector.forward(lower)
-        u_transformed = self.custom_bijector.forward(upper)
+        # Bijector
+        self.bijector = Chain([bijector, constraint.bijector])
         
-        # Cater for monotonically decreasing bijectors
-        return jnp.minimum(l_transformed, u_transformed), jnp.maximum(l_transformed, u_transformed)
+        # Bounds
+        lower, upper = constraint.bounds
+        l_transformed = bijector.forward(lower)
+        u_transformed = bijector.forward(upper)
+        self.bounds = jax.tree.map(jnp.minimum, l_transformed, u_transformed), jax.tree.map(jnp.maximum, l_transformed, u_transformed)
 
-    @property
-    def bijector(self) -> AbstractBijector:
-        """
-        The composed bijector mapping from the unconstrained optimizer space 
-        to the fully transformed physical space.
-        """
-        return Chain([self.custom_bijector, self.base_constraint.bijector])
-  
 
 class Leafwise(AbstractConstraint):
     """

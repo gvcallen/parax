@@ -11,9 +11,6 @@ import equinox as eqx
 
 from distreqx.distributions import AbstractDistribution, Transformed, Normal, Uniform
 from parax.constraints import AbstractConstraint, AbstractConstrained
-from parax.wrappers import is_unwrappable
-from parax.constants import is_constant
-
 
 T = TypeVar("T")
 
@@ -143,6 +140,7 @@ def truncate_distribution(
     
 
 def _is_unwrappable_probabilistic(x):
+    from parax.wrappers import is_unwrappable
     return is_probabilistic(x) and is_unwrappable(x) 
 
 def is_leaf(x):
@@ -165,6 +163,7 @@ def is_leaf(x):
             1. Unwrappable probabilistic nodes (preserves their wrapper structure).
             2. Constant nodes (protects static configuration objects).
     """
+    from parax.constants import is_constant
     return _is_unwrappable_probabilistic(x) or is_constant(x)
 
 def is_dynamic(x):
@@ -191,6 +190,7 @@ def is_dynamic(x):
         Note: Explicitly returns False for `parax.constant` nodes, forcing 
         them into the static tree.
     """    
+    from parax.constants import is_constant
     if is_constant(x): 
         return False
     if _is_unwrappable_probabilistic(x): 

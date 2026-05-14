@@ -8,9 +8,6 @@ import jax.numpy as jnp
 import equinox as eqx
 from jaxtyping import PyTree
 
-from parax.wrappers import is_unwrappable
-from parax.constants import is_constant
-
 
 T = TypeVar("Value")
 
@@ -111,6 +108,7 @@ def tree_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
 
 
 def _is_unwrappable_bounded(x):
+    from parax.wrappers import is_unwrappable
     return is_bounded(x) and is_unwrappable(x) 
 
 def is_leaf(x):
@@ -133,6 +131,7 @@ def is_leaf(x):
             1. Unwrappable bounded nodes (preserves their wrapper structure).
             2. Constant nodes (protects static configuration objects).
     """
+    from parax.constants import is_constant
     return _is_unwrappable_bounded(x) or is_constant(x)
 
 def is_dynamic(x):
@@ -159,6 +158,7 @@ def is_dynamic(x):
         Note: Explicitly returns False for `parax.constant` nodes, forcing 
         them into the static tree.
     """    
+    from parax.constants import is_constant
     if is_constant(x): 
         return False
     if _is_unwrappable_bounded(x): 

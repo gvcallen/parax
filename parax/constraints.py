@@ -348,8 +348,8 @@ class Custom(AbstractConstraint):
         _custom_bijector: The internal, user-defined distreqx bijector.
         _custom_bounds: The manually defined physical boundaries `(lower, upper)`.
     """
-    _custom_bijector: AbstractBijector
-    _custom_bounds: tuple[Array, Array]
+    bijector: AbstractBijector
+    bounds: tuple[Array, Array]
 
     def __init__(
         self, 
@@ -362,17 +362,9 @@ class Custom(AbstractConstraint):
             bounds: A tuple of `(lower, upper)` defining the physical 
                 boundaries of the constrained space. Defaults to `(-inf, inf)`.
         """
-        self._custom_bijector = bijector
-        self._custom_bounds = tuple(jnp.asarray(b) for b in bounds)
+        self.bijector = bijector
+        self.bounds = tuple(jnp.asarray(b) for b in bounds)
 
-    @property
-    def bounds(self) -> tuple[Array, Array]:
-        return self._custom_bounds
-
-    @property
-    def bijector(self) -> AbstractBijector:
-        return self._custom_bijector
-    
 
 def get_constraint_for_distribution(dist: dists.AbstractDistribution) -> AbstractConstraint:
     """

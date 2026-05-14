@@ -18,8 +18,6 @@
 
 ::: parax.is_constraint
 
-::: parax.is_transform
-
 ::: parax.is_distribution
 
 ::: parax.is_bijector

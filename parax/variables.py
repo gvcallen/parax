@@ -621,7 +621,10 @@ def constrain_param(variable: Param, *constraints: AbstractConstraint) -> Param:
     if is_constrainable(variable):
         return variable.constrain(constraint)
     elif isinstance(variable, Transformed):
-        from distreqx.bijectors import Inverse
+        try:
+            from distreqx.bijectors import Inverse
+        except:
+            from parax._bijectors import Inverse
         inverse_bij = Inverse(as_unwrapped(variable.bijector))
         transformed_constraint = TransformedConstraint(constraint, inverse_bij)
         new_inner = constrain_param(variable.raw_value, transformed_constraint)

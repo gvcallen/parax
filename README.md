@@ -4,7 +4,7 @@
 
 - Parameters with metadata
 - PyTrees parameterization via unwrapping
-- Built-in higher-level bijective constraints via `distreqx`
+- Built-in higher-level bijective constraints via [distreqx](https://github.com/lockwo/distreqx)
 - Derived, constrained, fixed, and random array-like variables
 - Abstract interfaces and associated tree manipulation tools
 

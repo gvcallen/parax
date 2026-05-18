@@ -46,11 +46,13 @@ def log_posterior_fn(unconstrained_params, bijector_to_constrained, unconstraine
     params = bijector_to_constrained.forward(unconstrained_params)
     
     log_prior = unconstrained_prior.log_prob(unconstrained_params)
-    y_pred = jax.vmap(predict, in_axes=(None, 0))(params, x_data)
+    y_pred = jax.vmap(predict, in_axes=(None, 0))(prx.unwrap(params), x_data)
     log_likelihood = jnp.sum(Normal(y_pred, 1.0).log_prob(y_true))
 
     return log_prior + log_likelihood
 ```
+
+For completeness, we unwrap our model fully before passing it to our prediction function, since Parax allows nested wrappers, though in this example we didn't strictly need to.
 
 ## 3. Running the sampler
 

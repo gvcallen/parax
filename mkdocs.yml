@@ -50,8 +50,8 @@ markdown_extensions:
 nav:
   - Getting started: index.md
   - Overview: overview.md
-  - Examples (Dictionaries):
-    - 
+  - Examples (JAX):
+    - examples/jax/bayesian_sampling_blackjax.md
   - Examples (Equinox):
     - Regular optimization (Optimistix): examples/equinox/regular_optimization_optimistix.md
     - Bounded optimization (JAXopt): examples/equinox/bounded_optimization_jaxopt.md

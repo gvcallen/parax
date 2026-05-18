@@ -575,22 +575,45 @@ class Probabilize(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabil
 
     Attributes:
         distribution: The tree's associated probability distribution.
-        constraint: The tree and probability distribution's constraint.
+        constraint: The tree and probability distribution's constraint. If not explicitly 
+            provided during initialization, this is automatically inferred from the 
+            distribution using `parax.constraints.infer_distribution_constraint`.
         tree: The wrapped tree.
     """
     distribution: AbstractDistribution
     constraint: AbstractConstraint
-    
     tree: T
-    
+
+    def __init__(
+        self, 
+        distribution: AbstractDistribution, 
+        tree: T, 
+        constraint: AbstractConstraint | None = None
+    ):
+        """
+        Args:
+            distribution: The probability distribution to associate with the tree.
+            tree: The PyTree to be wrapped.
+            constraint: An optional explicit constraint. If `None`, it is attempted
+                to automatically infer the constraint from the `distribution`.
+        """
+        self.distribution = distribution
+        self.tree = tree
+        
+        if constraint is None:
+            from parax.constraints import infer_distribution_constraint
+            self.constraint = infer_distribution_constraint(distribution)
+        else:
+            self.constraint = constraint
+
     def bounds(self) -> tuple[T, T]:
         return self.constraint.bounds
     
     def constrain(self, constraint: AbstractConstraint) -> Self:
-        return Probabilize(distribution=self.distribution, constraint=constraint, tree=self.tree)
+        return Probabilize(distribution=self.distribution, tree=self.tree, constraint=constraint)
     
     def unwrap(self) -> T:
         return self.tree
     
     def wrap(self, other: T) -> Self:
-        return Probabilize(distribution=self.distribution, constraint=self.constraint, tree=other)
+        return Probabilize(distribution=self.distribution, tree=other, constraint=self.constraint)

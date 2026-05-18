@@ -366,16 +366,34 @@ class Custom(AbstractConstraint):
         self.bounds = tuple(jnp.asarray(b) for b in bounds)
 
 
-def get_constraint_for_distribution(dist: dists.AbstractDistribution) -> AbstractConstraint:
+def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractConstraint:
     """
     Infers the physical support of a distreqx distribution and returns 
     the corresponding constraint mapping.
 
     Resolution Strategy:
-    1. Exact type matching for common `distreqx` distributions.
-    2. Fallback to `icdf(0.0)` and `icdf(1.0)` evaluation.
-    3. Last resort: Unconstrained `RealLine`.
+    1. Recursive unwrapping of meta-distributions (Joint, Transformed).
+    2. Exact type matching for common `distreqx` distributions.
+    3. Fallback to `icdf(0.0)` and `icdf(1.0)` evaluation.
+    4. Last resort: Unconstrained `RealLine`.
     """
+    # Recursive early return for Joint and Transformed wrappers
+    if hasattr(dists, 'Joint') and isinstance(dist, dists.Joint):
+        sub_distributions = dist.distributions 
+        constraints_tree = jax.tree.map(
+            infer_distribution_constraint, 
+            sub_distributions,
+            is_leaf=lambda x: isinstance(x, dists.AbstractDistribution)
+        )
+        return Leafwise(tree=constraints_tree)
+    elif isinstance(dist, dists.Transformed):
+        base_constraint = infer_distribution_constraint(dist.distribution)
+        return Transformed(
+            constraint=base_constraint, 
+            bijector=dist.bijector
+        )
+
+    # Hard-coded supports for common distributions
     if isinstance(dist, (dists.Normal, dists.Logistic)):
         return RealLine(shape=dist.event_shape)
         
@@ -384,7 +402,7 @@ def get_constraint_for_distribution(dist: dists.AbstractDistribution) -> Abstrac
                            dists.MultivariateNormalTri)):
         return RealLine(shape=dist.event_shape)
 
-    elif isinstance(dist, (dists.LogNormal, dists.Gamma)):
+    elif (hasattr(dists, 'LogNormal') and isinstance(dist, (dists.LogNormal)) or isinstance(dist, dists.Gamma)):
         return Positive(shape=dist.event_shape)
 
     elif isinstance(dist, dists.Beta):

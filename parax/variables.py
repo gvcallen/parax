@@ -16,7 +16,7 @@ import equinox as eqx
 from distreqx.distributions import AbstractDistribution
 from distreqx.bijectors import AbstractBijector, Chain
 
-from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, get_constraint_for_distribution, is_constrainable, Transformed as TransformedConstraint, intersect as intersect_constraints
+from parax.constraints import AbstractConstraint, AbstractConstrainable, RealLine, infer_distribution_constraint, is_constrainable, Transformed as TransformedConstraint, intersect as intersect_constraints
 from parax.constants import AbstractConstant
 from parax.wrappers import AbstractUnwrappable, AbstractWrappable, as_unwrapped, as_opaque
 from parax.annotation import AbstractAnnotated
@@ -519,7 +519,7 @@ class Random(
             
         # Constraint resolution
         if constraint is None:
-            constraint = get_constraint_for_distribution(distribution)
+            constraint = infer_distribution_constraint(distribution)
 
         # Calculate unconstrained raw_value
         if value is not None:

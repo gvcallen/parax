@@ -61,6 +61,9 @@ class AbstractVariable(AbstractUnwrappable[Array]):
     
     @property
     def dtype(self) -> Any: return self.value.dtype
+    
+    @property
+    def ndim(self) -> Any: return self.value.ndim
 
     # Experimental __jax_array__ protocol
     def __jax_array__(self) -> Array: return self.value

@@ -74,11 +74,7 @@ Compared to other approaches, this provides a middle ground between purity and r
 
 ## Next steps
 
-Several tutorials are available in the documentation, for example:
-
-- [Regular optimization](https://gvcallen.github.io/parax/examples/regular_optimization_optimistix/) (Optimistix)
-- [Bounded optimization](https://gvcallen.github.io/parax/examples/bounded_optimization_jaxopt/) (JAXopt)
-- [Bayesian sampling](https://gvcallen.github.io/parax/examples/bayesian_sampling_blackjax/) (BlackJAX)
+Several more involved examples are available in the [documentation](https://gvcallen.github.io/parax/), for example on bounded optimization and Bayesian sampling.
 
 ## Related
 

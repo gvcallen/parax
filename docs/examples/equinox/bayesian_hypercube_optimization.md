@@ -1,6 +1,6 @@
 # Overview
 
-In this example, we perform Bayesian optimization (*maximum a posteriori estimation*) on a correlated probabilistic model within the unit hypercube. Optimizing in the hypercube provides numerous benefits when parameters are correlated (for example, it allows the optimizer to directly explore the prior in a bounded, regularized space and without custom bijectors).
+In this example, we perform Bayesian optimization (*maximum a posteriori estimation*) on a correlated probabilistic model defined in Equinox within the unit hypercube. Optimizing in the hypercube provides numerous benefits when parameters are correlated (for example, it allows the optimizer to directly explore the prior in a bounded, regularized space and without custom bijectors).
 
 This is an advanced example building on previous examples. It demonstrates several concepts at once:
 

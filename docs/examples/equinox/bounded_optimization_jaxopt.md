@@ -1,6 +1,6 @@
 # Overview
 
-In this example, we optimize a bounded dummy model using `jaxopt`.
+In this example, we optimize a bounded dummy model using `jaxopt` and `equinox`.
 
 ## 1. Defining the model
 

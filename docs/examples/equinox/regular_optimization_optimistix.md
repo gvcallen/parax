@@ -1,6 +1,6 @@
 # Overview
 
-In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix`.
+In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` and `equinox`.
 
 ## 1. Defining the model
 

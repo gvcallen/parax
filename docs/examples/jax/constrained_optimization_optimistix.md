@@ -1,10 +1,10 @@
 # Overview
 
-In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` and `equinox` while specifying constraints.
+In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` while specifying constraints.
 
 ## 1. Defining the model
 
-First, we define a simple exponential decay model $y = A e^{-kt} + C$ using `eqx.Module`:
+First, we define a simple exponential decay model $y = A e^{-kt} + C$:
 
 ```python
 import jax.numpy as jnp
@@ -21,13 +21,9 @@ def predict(model, t):
     return model['amplitude'] * jnp.exp(-model['rate'] * t) + model['baseline']
 ```
 
-Notice how we can specifier converters using `equinox.field` to enforce constraint or automatically converter fields to arrays.
-
 ## 2. Setting up the loss
 
-Optimization libraries like `optimistix` expect standard JAX arrays. We need to split our model into trainable parameters and static metadata, and then re-combine during our forward pass.
-
-By passing `is_leaf=prx.is_constant` to `eqx.partition`, we can also separate out all `prx.Fixed` variables (and nested `prx.Freeze` models) into the static half of the tree.
+Although `prx.Fixed` does implement stopping gradients, we can also explicitly split our model into free and fixed parameters:
 
 <!-- pytest-codeblocks:cont -->
 ```python

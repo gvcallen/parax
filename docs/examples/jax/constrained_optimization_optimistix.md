@@ -1,6 +1,6 @@
 # Overview
 
-In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` and `equinox`.
+In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` and `equinox` while specifying constraints.
 
 ## 1. Defining the model
 
@@ -8,34 +8,20 @@ First, we define a simple exponential decay model $y = A e^{-kt} + C$ using `eqx
 
 ```python
 import jax.numpy as jnp
-import equinox as eqx
 import parax as prx
 from parax.constraints import Positive
 
-class DecayCurve(eqx.Module):
-    rate: prx.Param
-    baseline: prx.Param = eqx.field(converter=jnp.asarray)
-    amplitude: prx.Param = eqx.field(converter=lambda x: prx.Constrained(Positive(), x))
+model = {
+    'amplitude': prx.Constrained(Positive(), value=5.0),
+    'rate': prx.Tagged(0.5, metadata={'desc': 'Decay constant'}),
+    'baseline': prx.Fixed(jnp.array(1.2)),
+}
 
-    def __call__(self, t):
-        return self.amplitude * jnp.exp(-self.rate * t) + self.baseline
-
-model = DecayCurve(
-    amplitude=5.0, 
-    rate=prx.Tagged(0.5, metadata={'desc': 'Decay constant'}), 
-    baseline=1.2,
-)
+def predict(model, t):
+    return model['amplitude'] * jnp.exp(-model['rate'] * t) + model['baseline']
 ```
 
 Notice how we can specifier converters using `equinox.field` to enforce constraint or automatically converter fields to arrays.
-
-For demonstration purposes, we fix the baseline in this example:
-
-<!-- pytest-codeblocks:cont -->
-```python
-import dataclasses
-model = dataclasses.replace(model, baseline=prx.Fixed(model.baseline))
-```
 
 ## 2. Setting up the loss
 
@@ -47,11 +33,15 @@ By passing `is_leaf=prx.is_constant` to `eqx.partition`, we can also separate ou
 ```python
 import jax
 
-params, static = eqx.partition(model, eqx.is_inexact_array, is_leaf=prx.is_constant)
+params = {k: v for k, v in model.items() if not prx.is_constant(v)}
+fixed = {k: v for k, v in model.items() if prx.is_constant(v)}
+
 def loss_fn(params, args):
+    model = params | fixed
+
     t, y_true = args
-    current_model = prx.unwrap(eqx.combine(params, static))
-    y_pred = jax.vmap(current_model)(t)
+    unwrapped_model = prx.unwrap(model)
+    y_pred = jax.vmap(predict, in_axes=(None, 0))(unwrapped_model, t)
     return jnp.mean((y_pred - y_true)**2)
 ```
 
@@ -70,16 +60,16 @@ y_data = 2.0 * jnp.exp(-1.0 * t_data) + 1.2
 
 solver = optx.BFGS(rtol=1e-5, atol=1e-5)
 results = optx.minimise(loss_fn, solver, y0=params, args=(t_data, y_data))
-final_model = prx.unwrap(eqx.combine(results.value, static))
+final_model = prx.unwrap(results.value | fixed)
 ```
 
 Our optimized model matches our initial parameters:
 
 <!-- pytest-codeblocks:cont -->
 ```python
-final_model.amplitude
+final_model["amplitude"]
 # 2.000002
 
-final_model.rate
+final_model["rate"]
 # 1.0000012
 ```

@@ -51,7 +51,7 @@ nav:
   - Getting started: index.md
   - Overview: overview.md
   - Examples:
-    - JAX:
+    - Vanilla JAX:
       - Constrained optimization (Optimistix): examples/jax/constrained_optimization_optimistix.md
       - Bayesian sampling (BlackJAX): examples/jax/bayesian_sampling_blackjax.md
     - Equinox:

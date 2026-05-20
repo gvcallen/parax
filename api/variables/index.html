@@ -1,0 +1,3176 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../wrappers/">
+      
+      
+        <link rel="next" href="../constants/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Variables - parax</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#parax.AbstractVariable" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="parax" class="md-header__button md-logo" aria-label="parax" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            parax
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Variables
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/parax/parax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="parax" class="md-nav__button md-logo" aria-label="parax" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    parax
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/parax/parax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vanilla JAX
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vanilla JAX
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/jax/constrained_optimization_optimistix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constrained optimization (Optimistix)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/jax/bayesian_sampling_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian sampling (BlackJAX)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Equinox
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Equinox
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/equinox/constrained_optimization_optimistix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constrained optimization (Optimistix)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/equinox/bounded_optimization_jaxopt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bounded optimization (JAXopt)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/equinox/bayesian_sampling_blackjax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian sampling (BlackJAX)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/equinox/bayesian_hypercube_optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bayesian hypercube optimization (advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrappers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variables
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#parax.AbstractVariable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AbstractVariable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Param" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Param
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Real" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Tagged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagged
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Derived" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Transformed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Bounded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Constrained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constrained
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.Random" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Random
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.as_param" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_param
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.as_variable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_variable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.as_fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parax.variables.constrain_param" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        constrain_param
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../constants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../annotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bounds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bounds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../constraints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Constraints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>Variables</h1>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.AbstractVariable" class="doc doc-heading">
+            <code>parax.AbstractVariable</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractUnwrappable (parax.wrappers.AbstractUnwrappable)" href="../wrappers/#parax.AbstractUnwrappable">AbstractUnwrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>The abstract interface for all model variables.</p>
+<p>Derive from this class and override <code>value</code> to implement
+custom variable unwrapping behaviour.</p>
+<p>All parameters in Parax, such as <code>parax.Random</code>,
+<code>parax.Constrained</code> etc., derive from this class.</p>
+<p><strong>Corner Case Note (Math &amp; Dunders):</strong> Because this class implements the 
+<code>__jax_array__</code> protocol and all standard math dunder methods, variables 
+can be used directly in JAX expressions <em>without</em> explicitly calling 
+<code>unwrap()</code>. However, applying any math operation (e.g., <code>var + 1</code>) instantly 
+evaluates the value and returns a standard <code>jax.Array</code>, stripping away 
+the metadata and constraint wrappers.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="parax.AbstractVariable.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Returns the underlying, fully computed value of the variable.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="parax.Param" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Param</span> <span class="o">=</span> <span class="n">AbstractVariable</span> <span class="o">|</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>A type alias representing a JAX parameter.</p>
+<p>This includes any Parax variables (like <code>Tagged</code>, <code>Constrained</code>, <code>Derived</code>) 
+as well as standard JAX inexact arrays.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Real" class="doc doc-heading">
+            <code>parax.Real</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A plane real variable.</p>
+<p>Useful as a placeholder, e.g. for frameworks that only want to allow
+<code>parax.AbstractVariable</code> instances to be trainable.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Real.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw value used by optimizers and samplers.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Tagged" class="doc doc-heading">
+            <code>parax.Tagged</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.annotation.AbstractAnnotated" href="../annotation/#parax.annotation.AbstractAnnotated">AbstractAnnotated</a>[<span title="dict">dict</span>]</code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A variable with dictionary metadata.</p>
+<p>Represents a simple, trainable variable
+with a single underlying <code>raw_value</code> and metadata.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Tagged.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw value used by optimizers and samplers.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Tagged.metadata">metadata</span></code></td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional arbitrary metadata.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Fixed" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Fixed</span><span class="p">(</span><span class="n">raw_value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.constants.AbstractConstant" href="../constants/#parax.constants.AbstractConstant">AbstractConstant</a>[<a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a>]</code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A fixed variable.</p>
+<p>Implements <code>AbstractConstant</code> for filtering during partitioning.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Fixed.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The underlying variable that is being fixed.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_value</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The underlying value to be fixed.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>parax/variables.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">raw_value</span><span class="p">:</span> <span class="n">Param</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        raw_value: The underlying value to be fixed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Error checking</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw_value</span><span class="p">,</span> <span class="n">Fixed</span><span class="p">):</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span><span class="o">.</span><span class="n">raw_value</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span>    
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Derived" class="doc doc-heading">
+            <code>parax.Derived</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code></p>
+
+
+
+        <p>A derived variable.</p>
+<p>The parameter's value is dynamically derived via an arbitrary callable.</p>
+<p>This is ideal for one-way transformations, projections, or normalizations 
+where a strict bijector (with an inverse) is not required or mathematically 
+possible (e.g., applying <code>jax.nn.softmax</code> to raw logits).</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Derived.fn">fn</span></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The callable used to transform the raw value.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Derived.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw value used by optimizers and samplers.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="parax.Derived.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The derived value.</p>
+<p>Returns the raw state transformed by the derivation function.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Transformed" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Transformed</span><span class="p">(</span><span class="n">bijector</span><span class="p">,</span> <span class="n">raw_value</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A variable transformed by a bijector.</p>
+<p>The parameter's value is dynamically derived via a bijective transform.</p>
+<p>Note that this simply applies forward/inverse passes during unwrapping,
+and does NOT apply any special treatment to any other variable types
+(e.g. <code>parax.Constrained</code> or <code>parax.Random</code> variables).</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Transformed.bijector">bijector</span></code></td>
+            <td>
+                  <code><span title="distreqx.bijectors.AbstractBijector">AbstractBijector</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The bijector used to transform the raw value.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Transformed.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw value used by optimizers and samplers.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>bijector</code>
+            </td>
+            <td>
+                  <code><span title="distreqx.bijectors.AbstractBijector">AbstractBijector</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The bijector used to transform the raw value.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_value</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The underlying value to be fixed.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>parax/variables.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bijector</span><span class="p">:</span> <span class="n">AbstractBijector</span><span class="p">,</span> <span class="n">raw_value</span><span class="p">:</span> <span class="n">Param</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        bijector: The bijector used to transform the raw value.</span>
+<span class="sd">        raw_value: The underlying value to be fixed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw_value</span><span class="p">,</span> <span class="n">Transformed</span><span class="p">):</span>
+        <span class="n">bijector</span> <span class="o">=</span> <span class="n">Chain</span><span class="p">([</span><span class="n">bijector</span><span class="p">,</span> <span class="n">as_unwrapped</span><span class="p">(</span><span class="n">raw_value</span><span class="o">.</span><span class="n">bijector</span><span class="p">)])</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span><span class="o">.</span><span class="n">raw_value</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">bijector</span> <span class="o">=</span> <span class="n">bijector</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="parax.Transformed.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The derived value.</p>
+<p>Returns the raw state transformed by the derivation function.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Bounded" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Bounded</span><span class="p">(</span><span class="n">bounds</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.bounds.AbstractBounded" href="../bounds/#parax.bounds.AbstractBounded">AbstractBounded</a>[<span title="jaxtyping.Array">Array</span>]</code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A bounded variable.</p>
+<p>This simply attaches bounds to an existing variable or an array,
+and does not apply any bijective constraints. For enforcing
+constraints on an array, use <code>parax.variables.Constrained</code>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Bounded.bounds">bounds</span></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="jaxtyping.Array">Array</span>, <span title="jaxtyping.Array">Array</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The parameter bounds.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Bounded.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw, unconstrained value on the real number line.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>bounds</code>
+            </td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="jaxtyping.Array">Array</span>, <span title="jaxtyping.Array">Array</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The parameter bounds.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_value</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The underlying value. Must lie within <code>bounds</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>parax/variables.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">bounds</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="n">Array</span><span class="p">],</span>
+    <span class="n">raw_value</span><span class="p">:</span> <span class="n">Param</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        bounds: The parameter bounds.</span>
+<span class="sd">        raw_value: The underlying value. Must lie within `bounds`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_array</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">raw_value</span><span class="p">)</span>
+        <span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">bounds</span><span class="p">)</span>
+
+        <span class="n">is_out_of_bounds</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">any</span><span class="p">((</span><span class="n">raw_array</span> <span class="o">&lt;</span> <span class="n">lower</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">raw_array</span> <span class="o">&gt;</span> <span class="n">upper</span><span class="p">))</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">error_if</span><span class="p">(</span>
+            <span class="n">raw_value</span><span class="p">,</span>
+            <span class="n">is_out_of_bounds</span><span class="p">,</span>
+            <span class="s2">&quot;Bounded variable initialized with a value outside of its specified bounds.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">bounds</span> <span class="o">=</span> <span class="n">bounds</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Constrained" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Constrained</span><span class="p">(</span><span class="n">constraint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstrainable" href="../constraints/#parax.constraints.AbstractConstrainable">AbstractConstrainable</a>[<span title="jaxtyping.Array">Array</span>]</code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A constrained variable.</p>
+<p>The constraint is specified via a <code>parax.AbstractConstraint</code>.</p>
+<p>The constraint is automatically applied as a bijection mapping during 
+evaluation. Implements the <code>parax.bounds.AbstractBounded</code> interface
+for integration with bounded optimizers.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Constrained.constraint">constraint</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstraint" href="../constraints/#parax.constraints.AbstractConstraint">AbstractConstraint</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The parameter constraint defining bounds and bijector mappings.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Constrained.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw, unconstrained value on the real number line.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>constraint</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstraint" href="../constraints/#parax.constraints.AbstractConstraint">AbstractConstraint</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Parax constraint. If None, defaults to <code>parax.RealLine</code> (unconstrained).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>value</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The desired output (constrained) value. If provided, the internal 
+<code>raw_value</code> is computed dynamically via the constraint's inverse bijector. 
+Mutually exclusive with <code>raw_value</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_value</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The unconstrained underlying value. Mutually exclusive with <code>value</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>parax/variables.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">constraint</span><span class="p">:</span> <span class="n">AbstractConstraint</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">raw_value</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        constraint: A Parax constraint. If None, defaults to `parax.RealLine` (unconstrained).</span>
+<span class="sd">        value: The desired output (constrained) value. If provided, the internal </span>
+<span class="sd">            `raw_value` is computed dynamically via the constraint&#39;s inverse bijector. </span>
+<span class="sd">            Mutually exclusive with `raw_value`.</span>
+<span class="sd">        raw_value: The unconstrained underlying value. Mutually exclusive with `value`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Error checking</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must provide either `value` or `raw_value`.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot provide both `value` and `raw_value`.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Array standardization</span>
+    <span class="k">if</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">raw_value</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">raw_value</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># Constraint and distribution standardization</span>
+    <span class="k">if</span> <span class="n">constraint</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">constraint</span> <span class="o">=</span> <span class="n">RealLine</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="c1"># Raw value standardization</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">bijector</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">error_if</span><span class="p">(</span>
+            <span class="n">raw_value</span><span class="p">,</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">raw_value</span><span class="p">)),</span>
+            <span class="s2">&quot;Constraint violated for variable upon initialization (produced NaNs).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">constraint</span> <span class="o">=</span> <span class="n">constraint</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="parax.Random" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">Random</span><span class="p">(</span><span class="n">distribution</span><span class="p">,</span> <span class="n">constraint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">raw_value</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="parax.AbstractVariable (parax.variables.AbstractVariable)" href="#parax.AbstractVariable">AbstractVariable</a></code>, <code><a class="autorefs autorefs-internal" title="parax.probability.AbstractProbabilistic" href="../probability/#parax.probability.AbstractProbabilistic">AbstractProbabilistic</a>[<span title="jaxtyping.Array">Array</span>]</code>, <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstrainable" href="../constraints/#parax.constraints.AbstractConstrainable">AbstractConstrainable</a>[<span title="jaxtyping.Array">Array</span>]</code>, <code><a class="autorefs autorefs-internal" title="parax.AbstractWrappable (parax.wrappers.AbstractWrappable)" href="../wrappers/#parax.AbstractWrappable">AbstractWrappable</a>[<span title="jaxtyping.Array">Array</span>]</code></p>
+
+
+
+        <p>A random variable with an optional constraint.</p>
+<p>The distribution is specified via a <code>distreqx.distributions.AbstractDistribution</code>.
+The constraint is specified via a <code>parax.constraint.AbstractConstraint</code>.</p>
+<p>The variable implements the <code>parax.probability.AbstractProbabilistic</code> interface
+to integrate with stochastic samplers and other algorithms.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Random.distribution">distribution</span></code></td>
+            <td>
+                  <code><span title="distreqx.distributions.AbstractDistribution">AbstractDistribution</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The probability distribution of <code>raw_value</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Random.constraint">constraint</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstraint" href="../constraints/#parax.constraints.AbstractConstraint">AbstractConstraint</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The constraint that defines the support of <code>distribution</code>.
+        Can be None, in which case this function will attempt
+        to automatically infer the constraint from the distribution's
+        using <code>parax.constraints.get_constraint_for_distribution</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="parax.Random.raw_value">raw_value</span></code></td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The raw un-probabilistic value on the real number line. 
+       Can be None, in which case the mean of the distribution is used.
+       If the mean is not supported, an exception is thrown.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw_value</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Array">Array</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The un-probabilistic raw value.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>distribution</code>
+            </td>
+            <td>
+                  <code><span title="distreqx.distributions.AbstractDistribution">AbstractDistribution</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The probability distribution.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>constraint</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstraint" href="../constraints/#parax.constraints.AbstractConstraint">AbstractConstraint</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The distribution's constraint. If <code>None</code>, then a</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>parax/variables.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">distribution</span><span class="p">:</span> <span class="n">AbstractDistribution</span><span class="p">,</span>
+    <span class="n">constraint</span><span class="p">:</span> <span class="n">AbstractConstraint</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">raw_value</span><span class="p">:</span> <span class="n">Array</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Args:</span>
+<span class="sd">        raw_value: The un-probabilistic raw value.</span>
+<span class="sd">        distribution: The probability distribution.</span>
+<span class="sd">        constraint: The distribution&#39;s constraint. If `None`, then a </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot provide both `value` and `raw_value`.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Derive physical value if both are missing</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">raw_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">distribution</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;`value` or `raw_value` must be provided if the &quot;</span>
+                <span class="s2">&quot;distribution does not support `mean()`.&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Constraint resolution</span>
+    <span class="k">if</span> <span class="n">constraint</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">constraint</span> <span class="o">=</span> <span class="n">infer_distribution_constraint</span><span class="p">(</span><span class="n">distribution</span><span class="p">)</span>
+
+    <span class="c1"># Calculate unconstrained raw_value</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">bijector</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">error_if</span><span class="p">(</span>
+            <span class="n">raw_value</span><span class="p">,</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">raw_value</span><span class="p">)),</span>
+            <span class="s2">&quot;Constraint violated for variable upon initialization (produced NaNs).&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">raw_value</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">raw_value</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">distribution</span> <span class="o">=</span> <span class="n">distribution</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">constraint</span> <span class="o">=</span> <span class="n">constraint</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">raw_value</span> <span class="o">=</span> <span class="n">raw_value</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="parax.as_param" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">as_param</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Returns <code>value</code> as a <code>parax.Param</code>, wrapping it if necessary.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>value</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An arbitrary value or array.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The instantiated parameter.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>parax/variables.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_param</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns `value` as a `parax.Param`, wrapping it if necessary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value: An arbitrary value or array.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The instantiated parameter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>    
+    <span class="k">if</span> <span class="n">is_param</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="parax.as_variable" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">as_variable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Returns <code>value</code> as a <code>parax.AbstractVariable</code>, wrapping it if necessary.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>value</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An arbitrary value or array.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The instantiated parameter.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>parax/variables.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_variable</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns `value` as a `parax.AbstractVariable`, wrapping it if necessary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value: An arbitrary value or array.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The instantiated parameter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>    
+    <span class="k">if</span> <span class="n">is_variable</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">Real</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="parax.as_fixed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">as_fixed</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Returns <code>value</code> as a <code>parax.Fixed</code> variable, wrapping it if necessary.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>value</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An arbitrary variable or array-like object.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Fixed(raw_value=None) (parax.variables.Fixed)" href="#parax.Fixed">Fixed</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A fixed version of the variable.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>parax/variables.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_fixed</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Param</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Fixed</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns `value` as a `parax.Fixed` variable, wrapping it if necessary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value: An arbitrary variable or array-like object.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A fixed version of the variable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>    
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Fixed</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">Fixed</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="parax.variables.constrain_param" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parax</span><span class="o">.</span><span class="n">variables</span><span class="o">.</span><span class="n">constrain_param</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="o">*</span><span class="n">constraints</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Intelligently applies a constraint to a parameter (variable or array).</p>
+<p>This function acts as a smart router for applying physical bounds to variables,
+regardless of how heavily wrapped they are. It safely drills through non-constrainable
+wrappers (like <code>Fixed</code> or <code>Tagged</code>), promotes unconstrained bases (like <code>Real</code> or
+raw JAX arrays), and correctly propagates constraints backwards through bijective
+transformations.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>variable</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The target variable or standard JAX inexact array.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>*constraints</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.constraints.AbstractConstraint" href="../constraints/#parax.constraints.AbstractConstraint">AbstractConstraint</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The physical constraints to apply.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>Param</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="parax.Param = AbstractVariable | Inexact[Array, '...']
+
+  
+      module-attribute
+   (parax.variables.Param)" href="#parax.Param">Param</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new instance of the variable with the constraint applied.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If the variable type is not supported for dynamic constraining.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>parax/variables.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span>
+<span class="normal">641</span>
+<span class="normal">642</span>
+<span class="normal">643</span>
+<span class="normal">644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">constrain_param</span><span class="p">(</span><span class="n">variable</span><span class="p">:</span> <span class="n">Param</span><span class="p">,</span> <span class="o">*</span><span class="n">constraints</span><span class="p">:</span> <span class="n">AbstractConstraint</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Param</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Intelligently applies a constraint to a parameter (variable or array).</span>
+
+<span class="sd">    This function acts as a smart router for applying physical bounds to variables,</span>
+<span class="sd">    regardless of how heavily wrapped they are. It safely drills through non-constrainable</span>
+<span class="sd">    wrappers (like `Fixed` or `Tagged`), promotes unconstrained bases (like `Real` or</span>
+<span class="sd">    raw JAX arrays), and correctly propagates constraints backwards through bijective</span>
+<span class="sd">    transformations.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        variable (Param): The target variable or standard JAX inexact array.</span>
+<span class="sd">        *constraints (AbstractConstraint): The physical constraints to apply.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Param: A new instance of the variable with the constraint applied.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If the variable type is not supported for dynamic constraining.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">constraint</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">intersect_constraints</span><span class="p">,</span> <span class="n">constraints</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">is_constrainable</span><span class="p">(</span><span class="n">variable</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">variable</span><span class="o">.</span><span class="n">constrain</span><span class="p">(</span><span class="n">constraint</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="n">Transformed</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">distreqx.bijectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">Inverse</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">parax._bijectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">Inverse</span>
+        <span class="n">inverse_bij</span> <span class="o">=</span> <span class="n">Inverse</span><span class="p">(</span><span class="n">as_unwrapped</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">bijector</span><span class="p">))</span>
+        <span class="n">transformed_constraint</span> <span class="o">=</span> <span class="n">TransformedConstraint</span><span class="p">(</span><span class="n">constraint</span><span class="p">,</span> <span class="n">inverse_bij</span><span class="p">)</span>
+        <span class="n">new_inner</span> <span class="o">=</span> <span class="n">constrain_param</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">raw_value</span><span class="p">,</span> <span class="n">transformed_constraint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Transformed</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">bijector</span><span class="p">,</span> <span class="n">new_inner</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="p">(</span><span class="n">Fixed</span><span class="p">,</span> <span class="n">Tagged</span><span class="p">)):</span>
+        <span class="n">new_raw</span> <span class="o">=</span> <span class="n">constrain_param</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">raw_value</span><span class="p">,</span> <span class="n">constraint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">eqx</span><span class="o">.</span><span class="n">tree_at</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">raw_value</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">new_raw</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="n">Real</span><span class="p">)</span> <span class="ow">or</span> <span class="n">eqx</span><span class="o">.</span><span class="n">is_inexact_array</span><span class="p">(</span><span class="n">variable</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Constrained</span><span class="p">(</span><span class="n">constraint</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">variable</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Cannot dynamically inject a constraint into type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;Ensure the target is a valid Parax variable or JAX inexact array.&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "toc.integrate", "header.autohide", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

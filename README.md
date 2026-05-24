@@ -3,7 +3,7 @@
 **Parax** is a library for parametric modeling in [JAX](https://github.com/jax-ml/jax). Features include:
 
 - Composable, array-like variables with metadata (`Constrained`, `Random`, `Derived`, etc.),
-- Unwrappable PyTrees parameterizations
+- Unwrappable PyTree parameterizations
 - Built-in higher-level bijective constraints (via [distreqx](https://github.com/lockwo/distreqx))
 - Abstract interfaces and associated tree manipulation tools
 

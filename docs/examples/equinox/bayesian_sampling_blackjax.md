@@ -38,9 +38,9 @@ unconstrained_prior = prx.probability.tree_unconstrained_distribution(dynamic)
 bijector_to_constrained = prx.constraints.tree_leafwise_bijector(dynamic)
 ```
 
-Note that we need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.
+We need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler. Note the elegance of the above code. `prx.probability.is_dynamic` and `prx.probability.is_leaf` work together to remove any constant values and static data in a way that ensure the unwrapped `params` matches the shapes expected by `unconstrained_prior` and `bijector_to_constrained`, meaning we only need to perform a single partition. We also unwrap only the probabilistic nodes, so that they are replaced with their initial probabilistic values for optimization. We delay any additional unwrapping on top of the constraining (though there is none in this example) for inside the objective function, so that sampler only sees the unconstrained probabilistic variable.
 
-Finally, we project our constrained parameters to the unconstrained space, and define the log posterior to be Gaussian likelihood with a standard deviation of `1.0`.
+Finally, we project our initial constrained parameters to the unconstrained space, and define the log posterior to be Gaussian likelihood with a standard deviation of `1.0`.
 <!-- pytest-codeblocks:cont -->
 ```python
 import jax

@@ -58,7 +58,7 @@ nav:
       - Constrained optimization (Optimistix): examples/equinox/constrained_optimization_optimistix.md
       - Bounded optimization (JAXopt): examples/equinox/bounded_optimization_jaxopt.md
       - Bayesian sampling (BlackJAX): examples/equinox/bayesian_sampling_blackjax.md
-      - Bayesian hypercube optimization (advanced): examples/equinox/bayesian_hypercube_optimization.md
+      - Bayesian hypercube optimization (JAXopt, advanced): examples/equinox/bayesian_hypercube_optimization.md
   - API:
     - Wrappers: api/wrappers.md
     - Variables: api/variables.md

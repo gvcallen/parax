@@ -1,6 +1,6 @@
 # Overview
 
-In this example, we optimize an exponential decay model defined in *Equinox* using `optimistix` and `equinox` while specifying constraints.
+In this example, we optimize a constrained exponential decay model defining using `equinox` using `optimistix`.
 
 ## 1. Defining the model
 
@@ -27,7 +27,7 @@ model = DecayCurve(
 )
 ```
 
-Notice how we can specifier converters using `equinox.field` to enforce constraint or automatically converter fields to arrays.
+`prx.Param` is simply a type-hint for JAX arrays or built-in Parax variables. Notice also how we can specifier converters using `equinox.field` to enforce constraint or automatically converter fields to arrays. Since all constraints in `parax.constraints` are bijective, `prx.Constrained` accepts the constrained value for construction.
 
 For demonstration purposes, we fix the baseline in this example:
 

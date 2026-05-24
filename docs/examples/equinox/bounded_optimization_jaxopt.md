@@ -37,7 +37,7 @@ params = prx.unwrap(dynamic, only_if=prx.is_bounded)
 lower, upper = prx.bounds.tree_bounds(dynamic)
 ```
 
-Note the elegance of the above code. `prx.bounds.is_dynamic` and `prx.bounds.is_leaf` work together to remove any constant values and static data in a way that ensure the unwrapped `params` matches `lower` and `upper`, meaning we only need to perform a single partition.
+Note the elegance of the above code. `prx.bounds.is_dynamic` and `prx.bounds.is_leaf` work together to remove any constant values and static data in a way that ensure the unwrapped `params` matches `lower` and `upper`, meaning we only need to perform a single partition. We also unwrap only the bounded nodes, so that they are replaced with their bounded values for optimization. We delay any additional unwrapping (such as the scaling for the derived variable) for inside the objective function, so that optimizer only sees the unscaled latent variable.
 
 Now we can define our objective:
 <!-- pytest-codeblocks:cont -->

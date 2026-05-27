@@ -42,6 +42,7 @@ Note that we use `Equinox` to mark specific fields as static.
 
 Now we can easily create a parameter instance:
 
+<!-- pytest-codeblocks:cont -->
 ```python
 from parax.constraints import Positive
 
@@ -59,6 +60,7 @@ my_param.name
 
 We can than perform tree mapping just as usually. For example, to extract the bounds:
 
+<!-- pytest-codeblocks:cont -->
 ```python
 bounds = prx.bounds.tree_bounds(my_param)
 

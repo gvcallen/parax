@@ -59,6 +59,8 @@ nav:
       - Bounded optimization (JAXopt): examples/equinox/bounded_optimization_jaxopt.md
       - Bayesian sampling (BlackJAX): examples/equinox/bayesian_sampling_blackjax.md
       - Bayesian hypercube optimization (JAXopt, advanced): examples/equinox/bayesian_hypercube_optimization.md
+    - General:
+      - Building a framework on top of Parax: examples/general/building_a_framework.md
   - API:
     - Wrappers: api/wrappers.md
     - Variables: api/variables.md

@@ -13,12 +13,12 @@ from typing import Any, Self
 
 from equinox import field
 import jax
-from jaxtyping import Array
+import jax.numpy as jnp
 import equinox as eqx
 import parax as prx
 from parax.annotation import AbstractAnnotated
 
-class Param(prx.AbstractVariable, prx.AbstractWrappable[Array], AbstractAnnotated[Any]):
+class Param(prx.AbstractVariable, prx.AbstractWrappable[jax.Array], AbstractAnnotated[Any]):
     raw_value: prx.AbstractVariable
     scale: float = eqx.field(default=1.0, static=True)
     name: str | None = field(default=None, kw_only=True, static=True)
@@ -26,7 +26,7 @@ class Param(prx.AbstractVariable, prx.AbstractWrappable[Array], AbstractAnnotate
 
     @property
     def value(self) -> jax.Array:
-        base_value = self.raw_value.value
+        base_value = jnp.array(self.raw_value)
         if self.scale != 1.0:
             return base_value * self.scale
         return base_value

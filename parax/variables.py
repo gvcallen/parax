@@ -600,7 +600,7 @@ def tree_named_params(tree: Any) -> dict[str, Any]:
     return {jax.tree_util.keystr(path): leaf for path, leaf in leaves_with_path if is_param(leaf)}
 
 
-def constrain_param(variable: Param, *constraints: AbstractConstraint) -> Param:
+def constrain_param(variable: Param, *constraints: AbstractConstraint) -> AbstractConstrainable:
     """Intelligently applies a constraint to a parameter (variable or array).
 
     This function acts as a smart router for applying physical bounds to variables,

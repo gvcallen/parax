@@ -31,7 +31,7 @@ class Param(prx.AbstractVariable, prx.AbstractWrappable[jax.Array], AbstractAnno
             return base_value * self.scale
         return base_value
 
-    def wrap(self, value: Array) -> Self:
+    def wrap(self, value: jax.Array) -> Self:
         new_raw_value = self.raw_value.wrap(value / self.scale)
         return eqx.tree_at(lambda x: x.raw_value, self, new_raw_value)
 ```

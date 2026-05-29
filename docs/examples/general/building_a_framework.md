@@ -4,7 +4,7 @@ Parax was originally designed to be used as a lower-level library for other fram
 
 ## 1. Defining the Param class
 
-Parax makes use of composable, nested wrappers for variable definitions. While we could make use of `parax.Tagged` and `parax.Transformed` variables to implement a name and scale in our framework, these wrappers are *wrapper*. Instead, this is an ideal use-case to implement a custom `parax.AbstractVariable` class, providing the users of our framework with domain-specific properties and added type safety, while inheriting all of Parax's unwrapping and metadata features.
+Parax makes use of composable, nested wrappers for variable definitions. While we could make use of `parax.Tagged` and `parax.Transformed` variables to implement a name and scale in our framework, these wrappers are *general*. Instead, this is an ideal use-case to implement a custom `parax.AbstractVariable` class, providing the users of our framework with domain-specific properties and added type safety, while inheriting all of Parax's unwrapping and metadata features.
 
 Below we create a `Param` class that wraps another arbitrary variable, allowing all of Parax's built-in variables (e.g. `parax.Constrained`, `parax.Random` etc.) while providing easy access to a `.name` and `.scale` property:
 

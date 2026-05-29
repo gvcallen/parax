@@ -14,13 +14,15 @@ class DummyModel(eqx.Module):
     a: jax.Array
     b: jax.Array
     c: jax.Array
+    d: jax.Array
 
 @pytest.fixture
 def base_model():
     return DummyModel(
         a=jnp.array(2.0),
         b=jnp.array(3.0),
-        c=jnp.array(4.0)
+        c=jnp.array(4.0),
+        d=jnp.array(5.0),
     )
 
 # ==========================================
@@ -59,6 +61,21 @@ def test_tied_unwrap_basic(base_model):
     # 'a' and 'c' should be unchanged
     assert active_model.a == jnp.array(2.0)
     assert active_model.c == jnp.array(4.0)
+    
+    
+def test_tied_multiple(base_model):
+    """Tests that we can tie multiple values at once."""
+    # Tie b to a and d to c
+    tied_model = Tie(
+        tree=base_model,
+        target=lambda m: (m.b, m.d),
+        source=lambda m: (m.a, m.c),
+    )
+    
+    active_model = unwrap(tied_model)
+    
+    assert active_model.b == active_model.a
+    assert active_model.d == active_model.c
 
 
 def test_tied_chaining(base_model):
@@ -97,9 +114,9 @@ def test_optimizer_invisibility(base_model):
     # Filter for trainable arrays
     trainable_params, _ = eqx.partition(tied_model, eqx.is_inexact_array)
     
-    # Tree leaves of trainable params should only contain 'a' and 'c'
+    # Tree leaves of trainable params should only contain 'a', 'c' and 'd'
     leaves = jax.tree_util.tree_leaves(trainable_params)
-    assert len(leaves) == 2  
+    assert len(leaves) == 3
     
     assert isinstance(trainable_params.tree.b, _TiePlaceholder)
 

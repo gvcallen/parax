@@ -89,3 +89,58 @@ def test_freeze_as_free():
     
     freed = f.free()
     assert freed is tree
+
+
+def test_unwrap_cascade_true_matches_outer():
+    """Test that cascade=True unwraps the matched node and all of its descendants."""
+    inner = Parameterize(lambda: 42.0)
+    # The outer node is just an identity function that returns whatever is inside it
+    outer = Parameterize(lambda x: x, inner)
+    
+    # Condition: Match ONLY the outer node
+    condition = lambda node: node is outer
+    
+    # Because cascade=True (default), hitting the outer node forces the 
+    # inner node to unwrap as well.
+    result = unwrap(outer, only_if=condition, cascade=True)
+    
+    # Both unwrapped: outer(inner()) -> 42.0
+    assert result == 42.0
+
+def test_unwrap_cascade_false_matches_outer():
+    """Test that cascade=False strictly unwraps ONLY the matched node."""
+    inner = Parameterize(lambda: 42.0)
+    outer = Parameterize(lambda x: x, inner)
+    
+    # Condition: Match ONLY the outer node
+    condition = lambda node: node is outer
+    
+    # Because cascade=False, the inner node is spared from unwrapping.
+    # The outer node unwraps and evaluates its lambda, returning the still-wrapped inner node.
+    result = unwrap(outer, only_if=condition, cascade=False)
+    
+    assert isinstance(result, Parameterize)
+    
+    # We can verify it still holds its latent value
+    assert result.unwrap() == 42.0
+
+def test_unwrap_cascade_false_matches_inner():
+    """Test bottom-up reconstruction when an inner node matches but an outer node does not."""
+    inner = Parameterize(lambda: 42.0)
+    outer = Parameterize(lambda x: x, inner)
+    
+    # Condition: Match ONLY the inner node
+    condition = lambda node: node is inner
+    
+    # cascade=False means the tree is traversed bottom-up. 
+    # The inner node unwraps into 42.0, and the outer node stays wrapped.
+    result = unwrap(outer, only_if=condition, cascade=False)
+    
+    # The outer node itself is still wrapped
+    assert isinstance(result, Parameterize)
+    assert result is not outer  # It's a newly reconstructed PyTree node
+    
+    # Because JAX reconstructs the PyTree bottom-up, the new outer node 
+    # now contains the fully unwrapped `42.0` instead of the `inner` node.
+    # Calling unwrap() on this new outer node should yield the raw number.
+    assert result.unwrap() == 42.0

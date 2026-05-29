@@ -56,7 +56,11 @@ def is_unwrappable(x: Any) -> TypeGuard[AbstractUnwrappable]:
     return isinstance(x, AbstractUnwrappable)
 
 
-def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], bool] = None) -> T:
+def unwrap(
+    tree: Union[AbstractUnwrappable[T] | T],
+    only_if: Callable[[Any], bool] = None,
+    cascade: bool = True,
+) -> T:
     """Recursively resolves `AbstractUnwrappable` nodes within a PyTree.
 
     By default, unwrapping is performed inside-out (bottom-up) across the entire 
@@ -64,29 +68,31 @@ def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], boo
     `unwrap()` method.
 
     If the `only_if` predicate is provided, unwrapping is conditionally gated. 
-    The tree is searched top-down, and unwrapping only triggers for subtrees 
-    that satisfy the condition. Once a node satisfies `only_if`, that entire 
-    subtree is fully unwrapped. 
+    The `cascade` parameter controls how descendants of matching nodes are handled.
 
     Behavior with `only_if`:
-        1. If `only_if(node)` is True: The node and all of its `AbstractUnwrappable` 
+        1. If `cascade=True` (default): The tree is searched top-down. Once a 
+           node satisfies `only_if`, that node and ALL of its `AbstractUnwrappable` 
            descendants are fully resolved.
-        2. If `only_if(node)` is False: The node is left wrapped, but the search 
-           continues recursively into its children.
+        2. If `cascade=False`: The tree is traversed bottom-up. Unwrapping ONLY 
+           triggers for specific nodes that satisfy the condition. Unmatching 
+           descendants are left wrapped.
 
     Args:
         tree: The PyTree to unwrap.
-        only_if: An optional predicate function `Callable[[Any], bool]`. If provided, 
-            only subtrees evaluating to True (and their descendants) are unwrapped.
+        only_if: An optional predicate function `Callable[[Any], bool]`.
+        cascade: If True, unwrapping cascades to all descendants of a matched node. 
+                 If False, only nodes strictly evaluating to True are unwrapped.
+
 
     Returns:
         A new PyTree with the appropriate `AbstractUnwrappable` nodes resolved.
     """
     def _do_unwrap(node, *, include_self: bool):
+        """Unconditionally unwraps the node and all unwrappable descendants."""
         def _map_fn(leaf):
             if not is_unwrappable(leaf):
                 return leaf
-            # Recursively unwrap the children first (bottom-up)
             resolved_node = _do_unwrap(leaf, include_self=False)
             return resolved_node.unwrap()
 
@@ -97,16 +103,15 @@ def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], boo
         return jax.tree.map(_map_fn, node, is_leaf=is_leaf)
     
     def _search_and_unwrap(node, *, include_self: bool):
+        """Top-down search: cascades an unconditional unwrap upon first match."""
         if include_self and only_if(node):
             return _do_unwrap(node, include_self=True)
             
         def _map_fn(leaf):
             if only_if(leaf):
                 return _do_unwrap(leaf, include_self=True)
-            
             if is_unwrappable(leaf):
                 return _search_and_unwrap(leaf, include_self=False)
-            
             return leaf
 
         def is_leaf(x):
@@ -114,10 +119,38 @@ def unwrap(tree: Union[AbstractUnwrappable[T] | T], only_if: Callable[[Any], boo
             return (is_unwrappable(x) or only_if(x)) and included
 
         return jax.tree.map(_map_fn, node, is_leaf=is_leaf)
-    
-    if only_if is None:  # fast path
+
+    def _targeted_unwrap(node, *, include_self: bool):
+        """Bottom-up search: strictly unwraps ONLY nodes matching the condition."""
+        def _map_fn(leaf):
+            if not is_unwrappable(leaf):
+                return leaf
+            
+            # Recursively resolve children first (bottom-up)
+            resolved_node = _targeted_unwrap(leaf, include_self=False)
+            
+            # Conditionally unwrap this specific node
+            if only_if(leaf):
+                return resolved_node.unwrap()
+            
+            return resolved_node
+
+        def is_leaf(x):
+            included = True if x is not node else include_self
+            return is_unwrappable(x) and included
+
+        return jax.tree.map(_map_fn, node, is_leaf=is_leaf)
+
+    # Fast path: no condition
+    if only_if is None:  
         return _do_unwrap(tree, include_self=True)    
-    return _search_and_unwrap(tree, include_self=True)
+    
+    # Condition with cascading unwrap
+    if cascade:
+        return _search_and_unwrap(tree, include_self=True)
+        
+    # Condition strictly applied per-node
+    return _targeted_unwrap(tree, include_self=True)
 
 
 def unwrap_self(method):

@@ -363,6 +363,9 @@ class Tie(AbstractUnwrappable):
     Upon initialization, any tied sources are replaced with placeholders.
     Then, during unwrap, values are fetched from the target tree and injected
     into the source tree.
+    
+    Note that if when tieing and existing Tie, the paths referring
+    to the underlying, untied model.
 
     Attributes:
         tree: The underlying Equinox module or PyTree.
@@ -414,7 +417,7 @@ class Tie(AbstractUnwrappable):
                 identity function.
         """
         base_tree = tree.tree if isinstance(tree, Tie) else tree
-        stripped_tree = eqx.tree_at(target, base_tree, _TiePlaceholder())
+        stripped_tree = eqx.tree_at(target, base_tree, replace_fn=lambda _x: _TiePlaceholder())
         new_tie = (target, source, tie_fn)
         if isinstance(tree, Tie):
             self.ties = tree.ties + (new_tie,)
@@ -434,11 +437,11 @@ class Tie(AbstractUnwrappable):
             The fully unwrapped PyTree with all target parameters resolved.
         """
         current_tree = self.tree
-        for target_ext, source_ext, tie_fn in self.ties:
-            source_val = unwrap(source_ext(current_tree))
+        for get_target, get_source, tie_fn in self.ties:
+            source_val = get_source(current_tree)
             tied_val = tie_fn(source_val)
-            current_tree = eqx.tree_at(target_ext, current_tree, tied_val)
-        return unwrap(current_tree)
+            current_tree = eqx.tree_at(get_target, current_tree, tied_val)
+        return current_tree
     
 
 class Static(AbstractUnwrappable[T], AbstractWrappable[T]):

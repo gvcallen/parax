@@ -58,7 +58,7 @@ my_param.name
 # 'my_param'
 ```
 
-We can than perform tree mapping just as usually. For example, to extract the bounds:
+We can than perform tree mapping just as usual. For example, we could extract the bounds:
 
 <!-- pytest-codeblocks:cont -->
 ```python
@@ -70,3 +70,5 @@ bounds[0].raw_value
 bounds[1].raw_value
 # Array(inf, dtype=float32)
 ```
+
+Refer to the other examples in the documentation for more specific applications.

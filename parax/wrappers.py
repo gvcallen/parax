@@ -460,15 +460,6 @@ class Tie(AbstractUnwrappable):
         self.tree = stripped_tree
 
     def unwrap(self) -> Any:
-        """Evaluates and resolves all parameter ties.
-
-        Iterates through all registered ties, extracts the source values, applies 
-        their respective transformation functions, and re-injects them into the 
-        active PyTree before passing the tree to the standard `unwrap` function.
-
-        Returns:
-            The fully unwrapped PyTree with all target parameters resolved.
-        """
         current_tree = self.tree
         for get_target, get_source, tie_fn in self.ties:
             source_val = get_source(current_tree)

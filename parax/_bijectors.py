@@ -5,6 +5,16 @@ import jax
 from jaxtyping import PyTree, Array
 import jax.numpy as jnp
 import jax.nn as jnn
+import jax.scipy.special as jss
+import jax.scipy.stats as jstats
+
+from distreqx.distributions import AbstractDistribution
+from distreqx.bijectors import (
+    AbstractForwardInverseBijector, 
+    AbstractInvLogDetJacBijector, 
+    AbstractFwdLogDetJacBijector, 
+    AbstractBijector
+)
 
 import equinox as eqx
 
@@ -110,3 +120,73 @@ class Softplus(
     def same_as(self, other: AbstractBijector) -> bool:
         """Returns True if this bijector is guaranteed to be the same as `other`."""
         return type(other) is Softplus
+
+
+class NormalCDF(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """
+    Transforms the unconstrained real line to the (0, 1) interval 
+    using the Standard Normal Cumulative Distribution Function.
+    """
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def forward_and_log_det(self, x: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes y = CDF(x) and element-wise log|det J(f)(x)|."""
+        y = jss.ndtr(x)
+        # The derivative of the CDF is the PDF.
+        log_det = jstats.norm.logpdf(x)
+        return y, log_det
+
+    def inverse_and_log_det(self, y: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes x = ICDF(y) and element-wise log|det J(f^{-1})(y)|."""
+        eps = jnp.finfo(jnp.float32).eps
+        y_safe = jnp.clip(y, eps, 1.0 - eps)
+        
+        x = jss.ndtri(y_safe)
+        # The derivative of the ICDF is 1 / PDF(ICDF(y)).
+        log_det = -jstats.norm.logpdf(x)
+        return x, log_det
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        return type(other) is NormalCDF
+    
+
+class Quantile(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """
+    Transforms the (0, 1) interval to a target distribution's physical 
+    domain using its Inverse Cumulative Distribution Function.
+    """
+    distribution: AbstractDistribution
+
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def forward_and_log_det(self, u: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes y = ICDF(u) and log|det J(f)(u)|."""
+        eps = jnp.finfo(jnp.float32).eps
+        u_safe = jnp.clip(u, eps, 1.0 - eps)
+        
+        y = self.distribution.icdf(u_safe)
+        # Derivative of ICDF w.r.t u is 1 / PDF(y)
+        log_det = -self.distribution.log_prob(y)
+        return y, log_det
+
+    def inverse_and_log_det(self, y: PyTree) -> tuple[PyTree, PyTree]:
+        """Computes u = CDF(y) and log|det J(f^{-1})(y)|."""
+        u = self.distribution.cdf(y)
+        # Derivative of CDF w.r.t y is PDF(y)
+        log_det = self.distribution.log_prob(y)
+        return u, log_det
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        return type(other) is Quantile and self.distribution == other.distribution

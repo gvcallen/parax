@@ -24,6 +24,7 @@ from distreqx.bijectors import (
 )
 
 from parax.bounds import AbstractBounded
+from parax._bijectors import NormalCDF, Quantile
 
 T = TypeVar("Value")
 
@@ -368,16 +369,10 @@ class Custom(AbstractConstraint):
 
 def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractConstraint:
     """
-    Infers the physical support of a distreqx distribution and returns 
-    the corresponding constraint mapping.
-
-    Resolution Strategy:
-    1. Recursive unwrapping of meta-distributions (Joint, Transformed).
-    2. Exact type matching for common `distreqx` distributions.
-    3. Fallback to `icdf(0.0)` and `icdf(1.0)` evaluation.
-    4. Last resort: Unconstrained `RealLine`.
+    Infers the physical support AND the optimal whitening bijector of a 
+    distreqx distribution, returning the corresponding constraint mapping.
     """
-    # Recursive early return for Joint and Transformed wrappers
+    # Recursive unwrapping for Joint Distributions
     if hasattr(dists, 'Joint') and isinstance(dist, dists.Joint):
         sub_distributions = dist.distributions 
         constraints_tree = jax.tree.map(
@@ -386,6 +381,8 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
             is_leaf=lambda x: isinstance(x, dists.AbstractDistribution)
         )
         return Leafwise(tree=constraints_tree)
+        
+    # Native Flow Whitening for Transformed Distributions
     elif isinstance(dist, dists.Transformed):
         base_constraint = infer_distribution_constraint(dist.distribution)
         return Transformed(
@@ -393,7 +390,8 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
             bijector=dist.bijector
         )
 
-    # Hard-coded supports for common distributions
+    # 3. Fast-Path for natively unconstrained isotropic distributions.
+    # We skip the Copula for these to avoid expensive erf/erfinv cycles.
     if isinstance(dist, (dists.Normal, dists.Logistic)):
         return RealLine(shape=dist.event_shape)
         
@@ -402,7 +400,25 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
                            dists.MultivariateNormalTri)):
         return RealLine(shape=dist.event_shape)
 
-    elif (hasattr(dists, 'LogNormal') and isinstance(dist, (dists.LogNormal)) or isinstance(dist, dists.Gamma)):
+    # The TFP-Standard Copula Whitening (NormalCDF -> Quantile)
+    # Automatically intercepts bounded/skewed distributions (Gamma, Beta, Uniform) 
+    # and custom distributions to map them to an isotropic Standard Normal space.
+    try:
+        lower_bound = dist.icdf(0.0)
+        upper_bound = dist.icdf(1.0)
+        
+        # Explicit right-to-left Copula transformation
+        whitening_bijector = Chain([Quantile(dist), NormalCDF()])
+        
+        return Custom(
+            bijector=whitening_bijector,
+            bounds=(lower_bound, upper_bound)
+        )
+    except (NotImplementedError, AttributeError, ValueError, TypeError):
+        pass
+
+    # Fallback: Hard-coded physical bounds for distributions lacking an ICDF
+    if (hasattr(dists, 'LogNormal') and isinstance(dist, (dists.LogNormal)) or isinstance(dist, dists.Gamma)):
         return Positive(shape=dist.event_shape)
 
     elif isinstance(dist, dists.Beta):
@@ -413,29 +429,6 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
 
     elif isinstance(dist, dists.Uniform):
         return Interval(lower=dist.low, upper=dist.high)
-
-    try:
-        lower_bound = dist.icdf(0.0)
-        upper_bound = dist.icdf(1.0)
-        
-        is_lower_bounded = not jnp.all(jnp.isneginf(lower_bound))
-        is_upper_bounded = not jnp.all(jnp.isposinf(upper_bound))
-
-        if is_lower_bounded and not is_upper_bounded:
-            if jnp.all(lower_bound == 0.0):
-                return Positive(shape=dist.event_shape, dtype=lower_bound.dtype)
-            return GreaterThan(lower=lower_bound)
-
-        elif not is_lower_bounded and is_upper_bounded:
-            if jnp.all(upper_bound == 0.0):
-                return Negative(shape=dist.event_shape, dtype=upper_bound.dtype)
-            return LessThan(upper=upper_bound)
-
-        elif is_lower_bounded and is_upper_bounded:
-            return Interval(lower=lower_bound, upper=upper_bound)
-
-    except (NotImplementedError, AttributeError, ValueError, TypeError):
-        pass
 
     return RealLine(shape=dist.event_shape)
 

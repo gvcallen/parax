@@ -641,3 +641,22 @@ def intersect(a: AbstractConstraint, b: AbstractConstraint) -> AbstractConstrain
         return LessThan(upper)
     else:
         return Interval(lower, upper)
+    
+
+def _is_unwrappable_constrained(x):
+    from parax.wrappers import is_unwrappable
+    return is_constrained(x) and is_unwrappable(x) 
+
+def is_leaf(x):
+    """Defines the tree traversal boundaries for constrained partitioning."""
+    from parax.constants import is_constant
+    return _is_unwrappable_constrained(x) or is_constant(x)
+
+def is_dynamic(x):
+    """Identifies parameters that should be updated during constrained inference."""    
+    from parax.constants import is_constant
+    if is_constant(x): 
+        return False
+    if _is_unwrappable_constrained(x): 
+        return True
+    return eqx.is_inexact_array(x)

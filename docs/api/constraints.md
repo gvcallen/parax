@@ -24,8 +24,6 @@
 
 ::: parax.constraints.tree_leafwise_constraint
 
-::: parax.constraints.tree_leafwise_bijector
-
 ::: parax.constraints.tree_constrain
 
 ::: parax.constraints.intersect

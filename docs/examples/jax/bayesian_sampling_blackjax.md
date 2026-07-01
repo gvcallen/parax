@@ -30,7 +30,7 @@ In this tutorial, we will use `blackjax` for Bayesian sampling. Since we will be
 ```python
 params = prx.unwrap(model, only_if=prx.is_probabilistic)
 unconstrained_prior = prx.probability.tree_unconstrained_distribution(model)
-bijector_to_constrained = prx.constraints.tree_leafwise_bijector(model)
+bijector_to_constrained = prx.constraints.tree_leafwise_constraint(model).bijector
 ```
 
 Note how we "unwrap" our model to get the parameter values. Also note that we need to use the log prior that corresponds to the *unconstrained space*, since it must accurately represent the geometry explored by the sampler.

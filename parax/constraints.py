@@ -39,14 +39,19 @@ class AbstractConstraint(eqx.Module):
     lower and upper bounds directly).
 
     Attributes:
-        bounds: A tuple containing the lower and upper bounds of the constrained space.
-        bijector: A `distreqx.bijectors.AbstractBijector` mapping from the unconstrained real line to the constrained space.
+        bounds: A tuple containing the physical lower and upper bounds of the constrained space.
+        bijector: A `distreqx.bijectors.AbstractBijector` mapping from the unconstrained real line to the physical space.
+        base_bounds: A tuple containing the foundational, un-skewed orthogonal bounds. For primitive 
+            constraints, this equals `bounds`. For transformed constraints, this isolates the safe 
+            topological box before any dense correlations or skews are applied.
+        base_bijector: A `distreqx.bijectors.AbstractBijector` mapping from the orthogonal `base_bounds` 
+            space into the physical `bounds` space. Defaults to `Identity` unless geometric skews are present.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
 
     base_bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
-    base_transform: eqx.AbstractVar[AbstractBijector]
+    base_bijector: eqx.AbstractVar[AbstractBijector]
     
     def clip(self, value: PyTree) -> PyTree:
         """
@@ -77,7 +82,7 @@ def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
     return isinstance(x, AbstractConstraint)    
     
 
-class AbstractSimpleConstraint(AbstractConstraint):
+class AbstractUncorrelatedConstraint(AbstractConstraint):
     """
     A mixin for base constraints (like Interval, RealLine, Positive) 
     whose physical bounds perfectly match their orthogonal base bounds.
@@ -90,7 +95,7 @@ class AbstractSimpleConstraint(AbstractConstraint):
         return self.bounds
 
     @property
-    def base_transform(self) -> AbstractBijector:
+    def base_bijector(self) -> AbstractBijector:
         try:
             from distreqx.bijectors import Identity
         except ImportError:
@@ -98,7 +103,7 @@ class AbstractSimpleConstraint(AbstractConstraint):
         return Identity()        
 
 
-class RealLine(AbstractSimpleConstraint):
+class RealLine(AbstractUncorrelatedConstraint):
     """
     Represents a value that can span the entire real number line.
     
@@ -133,7 +138,7 @@ class RealLine(AbstractSimpleConstraint):
         return Identity()
 
 
-class GreaterThan(AbstractSimpleConstraint):
+class GreaterThan(AbstractUncorrelatedConstraint):
     """
     Represents a value strictly greater than a lower bound.
     
@@ -164,7 +169,7 @@ class GreaterThan(AbstractSimpleConstraint):
         return Chain([Shift(self.lower), Softplus()])
 
 
-class LessThan(AbstractSimpleConstraint):
+class LessThan(AbstractUncorrelatedConstraint):
     """
     Represents a value strictly less than an upper bound.
     
@@ -202,7 +207,7 @@ class LessThan(AbstractSimpleConstraint):
         ])
 
 
-class Interval(AbstractSimpleConstraint):
+class Interval(AbstractUncorrelatedConstraint):
     """
     Represents a value strictly bounded between a lower and upper value.
     
@@ -297,8 +302,8 @@ class Transformed(AbstractConstraint):
         return self.base_constraint.base_bounds
 
     @property
-    def base_transform(self) -> AbstractBijector:
-        return Chain([self.transform_bijector, self.base_constraint.base_transform])
+    def base_bijector(self) -> AbstractBijector:
+        return Chain([self.transform_bijector, self.base_constraint.base_bijector])
 
 
 class Leafwise(AbstractConstraint):
@@ -347,9 +352,9 @@ class Leafwise(AbstractConstraint):
         return lower, upper
 
     @property
-    def base_transform(self) -> AbstractBijector:
+    def base_bijector(self) -> AbstractBijector:
         from distreqx.bijectors import Leafwise as LeafwiseBijector
-        def get_bijector(node: Any) -> Any: return node.base_transform
+        def get_bijector(node: Any) -> Any: return node.base_bijector
         
         bijectors = jax.tree.map(get_bijector, self.tree, is_leaf=is_constraint)
         return LeafwiseBijector(bijectors)
@@ -365,20 +370,20 @@ class Custom(AbstractConstraint):
             unconstrained real line to the physical space.
         bounds: The manually defined physical boundaries `(lower, upper)`.
         base_bounds: The orthogonal base boundaries. Defaults to `bounds` if omitted.
-        base_transform: The bijector mapping from `base_bounds` to `bounds`. 
+        base_bijector: The bijector mapping from `base_bounds` to `bounds`. 
             Defaults to `Identity` if omitted.
     """
     bijector: AbstractBijector
     bounds: tuple[Array, Array]
     base_bounds: tuple[Array, Array]
-    base_transform: AbstractBijector
+    base_bijector: AbstractBijector
 
     def __init__(
         self, 
         bijector: AbstractBijector, 
         bounds: tuple[Array, Array] = (jnp.array(-jnp.inf), jnp.array(jnp.inf)),
         base_bounds: tuple[Array, Array] | None = None,
-        base_transform: AbstractBijector | None = None
+        base_bijector: AbstractBijector | None = None
     ):
         """
         Args:
@@ -387,7 +392,7 @@ class Custom(AbstractConstraint):
                 boundaries of the constrained space. Defaults to `(-inf, inf)`.
             base_bounds: Optional. A tuple of `(lower, upper)` defining the orthogonal 
                 base boundaries. If None, defaults to `bounds`.
-            base_transform: Optional. The bijector handling spatial skew/correlation. 
+            base_bijector: Optional. The bijector handling spatial skew/correlation. 
                 If None, defaults to `distreqx.bijectors.Identity`.
         """
         self.bijector = bijector
@@ -399,15 +404,15 @@ class Custom(AbstractConstraint):
         else:
             self.base_bounds = tuple(jnp.asarray(b) for b in base_bounds)
             
-        # Default base_transform to Identity if not provided
-        if base_transform is None:
+        # Default base_bijector to Identity if not provided
+        if base_bijector is None:
             try:
                 from distreqx.bijectors import Identity
             except ImportError:
                 from parax._bijectors import Identity
-            self.base_transform = Identity()
+            self.base_bijector = Identity()
         else:
-            self.base_transform = base_transform
+            self.base_bijector = base_bijector
 
 
 def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractConstraint:
@@ -552,51 +557,7 @@ def tree_leafwise_constraint(tree: PyTree) -> Leafwise:
     Returns:
         A single constraint whose shape matches the structure of `tree`.
     """
-    return Leafwise(tree_constraints(tree))
-
-
-def tree_leafwise_bijector(tree: PyTree) -> AbstractBijector:
-    """
-    Extracts the constraint bijector of a PyTree.
-    
-    Returns the bijector of `parax.probability.tree_leafwise_constraint`,
-    which transforms unconstrained values to constrained values.
-
-    Args:
-        tree: The PyTree model containing probabilistic nodes or standard arrays.
-
-    Returns:
-        A single bijector whose shape matches the structure of `tree`.
-    """
-    return tree_leafwise_constraint(tree).bijector    
-
-
-def tree_base_bounds(tree: PyTree) -> tuple[PyTree, PyTree]:
-    """
-    Extracts two PyTrees (lower and upper) representing the orthogonal 
-    base bounds of the constraints.
-    
-    Args:
-        tree: The PyTree model containing probabilistic nodes or standard arrays.
-        
-    Returns:
-        A tuple of two PyTrees `(lower_bounds, upper_bounds)`.
-    """
-    return tree_leafwise_constraint(tree).base_bounds
-
-
-def tree_base_transform(tree: PyTree) -> AbstractBijector:
-    """
-    Extracts the bijector mapping from the orthogonal base bounds 
-    to the physical space.
-    
-    Args:
-        tree: The PyTree model containing probabilistic nodes or standard arrays.
-        
-    Returns:
-        A single bijector whose shape matches the structure of `tree`.
-    """
-    return tree_leafwise_constraint(tree).base_transform
+    return Leafwise(tree_constraints(tree)) 
 
 
 class AbstractConstrainable(AbstractConstrained[T]):

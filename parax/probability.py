@@ -112,10 +112,10 @@ def tree_unconstrained_distribution(tree: PyTree) -> AbstractDistribution:
     Returns:
         A single joint distribution for the unconstrained event space of `tree`.
     """
-    from parax.constraints import tree_leafwise_bijector
+    from parax.constraints import tree_leafwise_constraint
     
     joint = tree_joint_distribution(tree)
-    bijector = tree_leafwise_bijector(tree)
+    bijector = tree_leafwise_constraint(tree).bijector
     
     from distreqx.bijectors import Inverse
     return Transformed(joint, Inverse(bijector))

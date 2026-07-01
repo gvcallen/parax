@@ -21,6 +21,7 @@ from distreqx.bijectors import (
     Chain, 
     Shift, 
     ScalarAffine,
+    TriangularLinear,
 )
 
 from parax.bounds import AbstractBounded
@@ -429,15 +430,28 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
             bijector=dist.bijector
         )
 
-    # 3. Fast-Path for natively unconstrained isotropic distributions.
-    # We skip the Copula for these to avoid expensive erf/erfinv cycles.
+    # Explicit Whitening for Standard / Multivariate Normals
+    # Maps an isotropic N(0, I) latent space to the physical correlated space
     if isinstance(dist, (dists.Normal, dists.Logistic)):
-        return RealLine(shape=dist.event_shape)
+        base_constraint = RealLine(shape=dist.event_shape)
+        bijector = Chain([Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale)])
+        return Transformed(constraint=base_constraint, bijector=bijector)
         
-    elif isinstance(dist, (dists.MultivariateNormalDiag, 
-                           dists.MultivariateNormalFullCovariance, 
-                           dists.MultivariateNormalTri)):
-        return RealLine(shape=dist.event_shape)
+    elif isinstance(dist, dists.MultivariateNormalDiag):
+        base_constraint = RealLine(shape=dist.event_shape)
+        bijector = Chain([Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale_diag)])
+        return Transformed(constraint=base_constraint, bijector=bijector)
+
+    elif isinstance(dist, dists.MultivariateNormalTri):
+        base_constraint = RealLine(shape=dist.event_shape)
+        bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=dist.scale_tri)])
+        return Transformed(constraint=base_constraint, bijector=bijector)
+
+    elif isinstance(dist, dists.MultivariateNormalFullCovariance):
+        base_constraint = RealLine(shape=dist.event_shape)
+        L = jnp.linalg.cholesky(dist.covariance_matrix)
+        bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=L)])
+        return Transformed(constraint=base_constraint, bijector=bijector)
 
     # The TFP-Standard Copula Whitening (NormalCDF -> Quantile)
     # Automatically intercepts bounded/skewed distributions (Gamma, Beta, Uniform) 
@@ -457,7 +471,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
         pass
 
     # Fallback: Hard-coded physical bounds for distributions lacking an ICDF
-    if (hasattr(dists, 'LogNormal') and isinstance(dist, (dists.LogNormal)) or isinstance(dist, dists.Gamma)):
+    if (hasattr(dists, 'LogNormal') and isinstance(dist, dists.LogNormal)) or isinstance(dist, dists.Gamma):
         return Positive(shape=dist.event_shape)
 
     elif isinstance(dist, dists.Beta):

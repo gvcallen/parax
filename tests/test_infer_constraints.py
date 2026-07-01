@@ -46,17 +46,22 @@ class BrokenDist:
 # Test Suites
 # ==========================================
 
-@pytest.mark.parametrize("dist_factory, expected_type", [
-    (lambda: dists.Normal(loc=0., scale=1.), RealLine),
-    (lambda: dists.Logistic(loc=0., scale=1.), RealLine),
-    (lambda: dists.MultivariateNormalDiag(loc=jnp.zeros(2), scale_diag=jnp.ones(2)), RealLine),
+@pytest.mark.parametrize("dist_factory", [
+    (lambda: dists.Normal(loc=0., scale=1.)),
+    (lambda: dists.Logistic(loc=0., scale=1.)),
+    (lambda: dists.MultivariateNormalDiag(loc=jnp.zeros(2), scale_diag=jnp.ones(2))),
 ])
-def test_fast_path_unconstrained(dist_factory, expected_type):
-    """Test that natively isotropic distributions bypass the Copula to save computation."""
+def test_explicit_whitening_unconstrained(dist_factory):
+    """Test that natively isotropic/multivariate distributions are explicitly whitened."""
     dist = dist_factory()
     constraint = infer_distribution_constraint(dist)
-    assert isinstance(constraint, expected_type)
-    assert constraint.shape == dist.event_shape
+    
+    # These are now Transformed constraints because we explicitly project 
+    # them from a standard N(0, I) space using Shift/Scale/TriangularLinear.
+    assert isinstance(constraint, Transformed)
+    assert isinstance(constraint.base_constraint, RealLine)
+    assert constraint.base_constraint.shape == dist.event_shape
+    assert isinstance(constraint.transform_bijector, bij.Chain)
 
 
 def test_meta_distribution_joint():
@@ -69,7 +74,11 @@ def test_meta_distribution_joint():
     constraint = infer_distribution_constraint(dist)
     
     assert isinstance(constraint, Leafwise)
-    assert isinstance(constraint.tree["a"], RealLine)
+    # "a" is now perfectly whitened via a Transformed mapping
+    assert isinstance(constraint.tree["a"], Transformed)
+    assert isinstance(constraint.tree["a"].base_constraint, RealLine)
+    
+    # "b" fell back to a raw RealLine because it failed ICDF extraction
     assert isinstance(constraint.tree["b"], RealLine)
 
 

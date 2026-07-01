@@ -28,6 +28,20 @@ from parax._bijectors import NormalCDF, Quantile
 
 T = TypeVar("Value")
 
+try:
+    from distreqx.bijectors import Leafwise as LeafwiseBijector
+except:
+    from parax._bijectors import Leafwise as LeafwiseBijector
+
+try:
+    from distreqx.bijectors import Identity
+except ImportError:
+    from parax._bijectors import Identity    
+
+try:
+    from distreqx.bijectors import Softplus
+except ImportError:
+    from parax._bijectors import Softplus
 
 class AbstractConstraint(eqx.Module):
     """
@@ -96,10 +110,6 @@ class AbstractUncorrelatedConstraint(AbstractConstraint):
 
     @property
     def base_bijector(self) -> AbstractBijector:
-        try:
-            from distreqx.bijectors import Identity
-        except ImportError:
-            from parax._bijectors import Identity
         return Identity()        
 
 
@@ -131,10 +141,6 @@ class RealLine(AbstractUncorrelatedConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
-        try:
-            from distreqx.bijectors import Identity
-        except:
-            from parax._bijectors import Identity
         return Identity()
 
 
@@ -160,10 +166,6 @@ class GreaterThan(AbstractUncorrelatedConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
-        try:
-            from distreqx.bijectors import Softplus
-        except ImportError:
-            from parax._bijectors import Softplus
         from distreqx.bijectors import Chain, Shift
 
         return Chain([Shift(self.lower), Softplus()])
@@ -191,11 +193,6 @@ class LessThan(AbstractUncorrelatedConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
-        try:
-            from distreqx.bijectors import Softplus
-        except:
-            from parax._bijectors import Softplus
-
         # Corner Case Note: To implement a LessThan constraint using Softplus 
         # (which inherently bounds > 0), we apply a double affine flip:
         # invert -> softplus -> invert -> shift.
@@ -337,7 +334,6 @@ class Leafwise(AbstractConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
-        from distreqx.bijectors import Leafwise as LeafwiseBijector
         def get_bijector(node: Any) -> Any: return node.bijector
         bijectors = jax.tree.map(get_bijector, self.tree, is_leaf=is_constraint)
         return LeafwiseBijector(bijectors)
@@ -353,7 +349,6 @@ class Leafwise(AbstractConstraint):
 
     @property
     def base_bijector(self) -> AbstractBijector:
-        from distreqx.bijectors import Leafwise as LeafwiseBijector
         def get_bijector(node: Any) -> Any: return node.base_bijector
         
         bijectors = jax.tree.map(get_bijector, self.tree, is_leaf=is_constraint)
@@ -406,10 +401,6 @@ class Custom(AbstractConstraint):
             
         # Default base_bijector to Identity if not provided
         if base_bijector is None:
-            try:
-                from distreqx.bijectors import Identity
-            except ImportError:
-                from parax._bijectors import Identity
             self.base_bijector = Identity()
         else:
             self.base_bijector = base_bijector

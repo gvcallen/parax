@@ -61,11 +61,11 @@ def tree_distributions(tree: PyTree) -> PyTree:
         probability distributions.
     """
     from distreqx.distributions import ImproperUniform
-    from parax.wrappers import unwrap
+    from parax.wrappers import as_unwrapped
 
     def _get_distribution(path, x):
         if is_probabilistic(x):
-            return unwrap(x.distribution)
+            return as_unwrapped(x.distribution)
         if eqx.is_inexact_array(x):
             return ImproperUniform(shape=jnp.shape(x))
         raise ValueError(f"Found a leaf node of type {type(x)} that is neither probabilistic nor an array in `parax.probability.tree_distributions`. Value: {x}, path: {path}")

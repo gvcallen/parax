@@ -533,11 +533,11 @@ def tree_constraints(tree: PyTree) -> PyTree:
     Returns:
         A PyTree representing the active constraints.
     """
-    from parax.wrappers import unwrap
+    from parax.wrappers import as_unwrapped
     
     def _get_constraint(x):
         if is_constrained(x):
-            return unwrap(x.constraint)
+            return as_unwrapped(x.constraint)
         if eqx.is_inexact_array(x):
             return RealLine(shape=x.shape)
         raise ValueError(

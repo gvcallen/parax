@@ -6,6 +6,7 @@ This module provides the tools to map unconstrained optimizer spaces
 to mark a PyTree as constrainable.
 """
 
+from functools import singledispatch
 from abc import abstractmethod
 from typing import TypeVar, Union, Any, TypeGuard, Self
 
@@ -407,83 +408,138 @@ class Custom(AbstractConstraint):
             self.base_bijector = base_bijector
 
 
+@singledispatch
 def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractConstraint:
     """
-    Infers the physical support AND the optimal whitening bijector of a 
+    Infers the physical support AND the optimal whitening bijector of a
     distreqx distribution, returning the corresponding constraint mapping.
+
+    This is the *default* (leaf) handler: it assumes `dist` is a terminal
+    distribution and whitens it via the copula transform, falling back to
+    hard-coded physical bounds when no ICDF is available.
+
+    Container / structural distributions (Joint, Transformed, Embedded, ...)
+    are handled by the registered overloads below. To support a new
+    distribution, register a handler with
+    `@infer_distribution_constraint.register(...)` rather than editing this body.
     """
-    # Recursive unwrapping for Joint Distributions
-    if hasattr(dists, 'Joint') and isinstance(dist, dists.Joint):
-        sub_distributions = dist.distributions 
-        constraints_tree = jax.tree.map(
-            infer_distribution_constraint, 
-            sub_distributions,
-            is_leaf=lambda x: isinstance(x, dists.AbstractDistribution)
-        )
-        return Leafwise(tree=constraints_tree)
-        
-    # Native Flow Whitening for Transformed Distributions
-    elif isinstance(dist, dists.Transformed):
-        base_constraint = infer_distribution_constraint(dist.distribution)
-        return Transformed(
-            constraint=base_constraint, 
-            bijector=dist.bijector
-        )
-
-    # Explicit Whitening for Standard / Multivariate Normals
-    # Maps an isotropic N(0, I) latent space to the physical correlated space
-    if isinstance(dist, (dists.Normal, dists.Logistic)):
-        base_constraint = RealLine(shape=dist.event_shape)
-        bijector = Chain([Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale)])
-        return Transformed(constraint=base_constraint, bijector=bijector)
-        
-    elif isinstance(dist, dists.MultivariateNormalDiag):
-        base_constraint = RealLine(shape=dist.event_shape)
-        bijector = Chain([Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale_diag)])
-        return Transformed(constraint=base_constraint, bijector=bijector)
-
-    elif isinstance(dist, dists.MultivariateNormalTri):
-        base_constraint = RealLine(shape=dist.event_shape)
-        bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=dist.scale_tri)])
-        return Transformed(constraint=base_constraint, bijector=bijector)
-
-    elif isinstance(dist, dists.MultivariateNormalFullCovariance):
-        base_constraint = RealLine(shape=dist.event_shape)
-        L = jnp.linalg.cholesky(dist.covariance_matrix)
-        bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=L)])
-        return Transformed(constraint=base_constraint, bijector=bijector)
-
-    # The TFP-Standard Copula Whitening (NormalCDF -> Quantile)
-    # Automatically intercepts bounded/skewed distributions (Gamma, Beta, Uniform) 
-    # and custom distributions to map them to an isotropic Standard Normal space.
+    # The TFP-Standard Copula Whitening (NormalCDF -> Quantile).
+    # Automatically intercepts bounded/skewed distributions (Gamma, Beta,
+    # Uniform, LogNormal, ...) and custom distributions, mapping them to an
+    # isotropic Standard Normal space.
     try:
         lower_bound = dist.icdf(0.0)
         upper_bound = dist.icdf(1.0)
-        
-        # Explicit right-to-left Copula transformation
+
         whitening_bijector = Chain([Quantile(dist), NormalCDF()])
-        
         return Custom(
             bijector=whitening_bijector,
-            bounds=(lower_bound, upper_bound)
+            bounds=(lower_bound, upper_bound),
         )
     except (NotImplementedError, AttributeError, ValueError, TypeError):
         pass
 
-    # Fallback: Hard-coded physical bounds for distributions lacking an ICDF
-    if (hasattr(dists, 'LogNormal') and isinstance(dist, dists.LogNormal)) or isinstance(dist, dists.Gamma):
+    # Fallback: hard-coded physical bounds for distributions lacking an ICDF.
+    if (hasattr(dists, "LogNormal") and isinstance(dist, dists.LogNormal)) or isinstance(
+        dist, dists.Gamma
+    ):
         return Positive(shape=dist.event_shape)
-
     elif isinstance(dist, dists.Beta):
         return Interval(
-            lower=jnp.zeros(dist.event_shape), 
-            upper=jnp.ones(dist.event_shape)
+            lower=jnp.zeros(dist.event_shape),
+            upper=jnp.ones(dist.event_shape),
         )
-
     elif isinstance(dist, dists.Uniform):
         return Interval(lower=dist.low, upper=dist.high)
 
     return RealLine(shape=dist.event_shape)
+
+
+# --- Native flow whitening -----------------------------------------------
+
+
+@infer_distribution_constraint.register(dists.Transformed)
+def _infer_transformed(dist) -> AbstractConstraint:
+    """Whiten the base distribution, then apply the flow bijector on top."""
+    base_constraint = infer_distribution_constraint(dist.distribution)
+    return Transformed(constraint=base_constraint, bijector=dist.bijector)
+
+
+# --- Explicit Gaussian whitening -----------------------------------------
+# Maps an isotropic N(0, I) latent space to the physical (correlated) space.
+
+
+@infer_distribution_constraint.register(dists.Normal)
+@infer_distribution_constraint.register(dists.Logistic)
+def _infer_loc_scale(dist) -> AbstractConstraint:
+    base_constraint = RealLine(shape=dist.event_shape)
+    bijector = Chain(
+        [Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale)]
+    )
+    return Transformed(constraint=base_constraint, bijector=bijector)
+
+
+@infer_distribution_constraint.register(dists.MultivariateNormalDiag)
+def _infer_mvn_diag(dist) -> AbstractConstraint:
+    base_constraint = RealLine(shape=dist.event_shape)
+    bijector = Chain(
+        [Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale_diag)]
+    )
+    return Transformed(constraint=base_constraint, bijector=bijector)
+
+
+@infer_distribution_constraint.register(dists.MultivariateNormalTri)
+def _infer_mvn_tri(dist) -> AbstractConstraint:
+    base_constraint = RealLine(shape=dist.event_shape)
+    bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=dist.scale_tri)])
+    return Transformed(constraint=base_constraint, bijector=bijector)
+
+
+@infer_distribution_constraint.register(dists.MultivariateNormalFullCovariance)
+def _infer_mvn_full(dist) -> AbstractConstraint:
+    base_constraint = RealLine(shape=dist.event_shape)
+    L = jnp.linalg.cholesky(dist.covariance_matrix)
+    bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=L)])
+    return Transformed(constraint=base_constraint, bijector=bijector)
+
+
+# --- Recursive container handlers (version-guarded) -----------------------
+
+
+def _infer_joint(dist) -> AbstractConstraint:
+    """Recursively unwrap a Joint into a Leafwise tree of constraints."""
+    constraints_tree = jax.tree.map(
+        infer_distribution_constraint,
+        dist.distributions,
+        is_leaf=lambda x: isinstance(x, dists.AbstractDistribution),
+    )
+    return Leafwise(tree=constraints_tree)
+
+
+def _infer_embedded(dist) -> AbstractConstraint:
+    """
+    An Embedded distribution only *varies* over its base distribution's leaves;
+    the fixed leaves are constants with zero latent degrees of freedom, so they
+    contribute nothing to whiten. We therefore infer the constraint of the base
+    distribution alone. The fixed constants are re-slotted at sample time by
+    `Embedded._embed`, which is not the constraint's concern.
+
+    This mirrors the Joint handler: a typical Embedded's base is a Joint holding
+    `None` at each fixed leaf, so this returns a Leafwise tree with `None` holes
+    exactly where the fixed constants live -- the same shape the rest of the
+    pipeline already consumes from the Joint path.
+    """
+    return infer_distribution_constraint(dist.distribution)
+
+
+# Register the container handlers only if the classes exist in the installed
+# distreqx (mirroring the original `hasattr` guards).
+for _name, _handler in (("Joint", _infer_joint), ("Embedded", _infer_embedded)):
+    _cls = getattr(dists, _name, None)
+    if _cls is not None:
+        infer_distribution_constraint.register(_cls)(_handler)
+
+del _name, _handler, _cls
 
 
 class AbstractConstrained(AbstractBounded[T]):

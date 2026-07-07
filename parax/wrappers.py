@@ -528,7 +528,7 @@ class Annotate(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[d
         metadata: The underlying metadata.
     """
     tree: T
-    metadata: dict
+    metadata: dict = eqx.field(converter=as_opaque)
     
     def unwrap(self) -> T:
         return self.tree
@@ -550,7 +550,7 @@ class Bound(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
         tree: The wrapped tree.
         bounds: The tree's bounds as a tuple matching its structure.
     """
-    bounds: tuple[T, T]
+    bounds: tuple[T, T] = eqx.field(converter=as_opaque)
     tree: T
     
     def unwrap(self) -> T:
@@ -577,8 +577,7 @@ class Constrain(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstraina
         tree: The wrapped tree.
         constraint: The tree's constraint.
     """
-    constraint: AbstractConstraint
-    
+    constraint: AbstractConstraint = eqx.field(converter=as_opaque)
     tree: T
     
     def bounds(self) -> tuple[T, T]:
@@ -607,8 +606,8 @@ class Probabilize(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabil
             distribution using `parax.constraints.infer_distribution_constraint`.
         tree: The wrapped tree.
     """
-    distribution: AbstractDistribution
-    constraint: AbstractConstraint
+    distribution: AbstractDistribution = eqx.field(converter=as_opaque)
+    constraint: AbstractConstraint = eqx.field(converter=as_opaque)
     tree: T
 
     def __init__(

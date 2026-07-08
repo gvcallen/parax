@@ -420,7 +420,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
     distribution and whitens it via the copula transform, falling back to
     hard-coded physical bounds when no ICDF is available.
 
-    Container / structural distributions (Joint, Transformed, Embedded, ...)
+    Container / structural distributions (Joint, Transformed, Combined, ...)
     are handled by the registered overloads below. To support a new
     distribution, register a handler with
     `@infer_distribution_constraint.register(...)` rather than editing this body.
@@ -518,30 +518,43 @@ def _infer_joint(dist) -> AbstractConstraint:
     return Leafwise(tree=constraints_tree)
 
 
-def _infer_embedded(dist) -> AbstractConstraint:
+def _infer_combined(dist) -> AbstractConstraint:
     """
-    Embedded only varies over its base distribution's leaves; the fixed
-    leaves contribute no latent degrees of freedom, so we infer the
-    constraint of the base distribution alone.
+    Each part of `Combined` owns a disjoint subset of leaves of the shared
+    event pytree (`None` elsewhere), mirroring how `Combined` itself merges
+    samples and values. We infer each part's own constraint the same way,
+    then merge the resulting (`None`-holed) constraint trees together,
+    exactly as `Combined` merges values.
     """
-    return infer_distribution_constraint(dist.distribution)
+    def _pick(*leaves):
+        for leaf in leaves:
+            if leaf is not None:
+                return leaf
+        return None
 
+    def _tree_of(part) -> PyTree:
+        constraint = infer_distribution_constraint(part)
+        return constraint.tree if isinstance(constraint, Leafwise) else constraint
 
-def _infer_partitioned(dist) -> AbstractConstraint:
-    """
-    Partitioned's `other` side is always held fixed by the caller, so it
-    contributes no optimizable degrees of freedom. We infer the constraint
-    of `distribution` alone, mirroring `_infer_embedded`.
-    """
-    return infer_distribution_constraint(dist.distribution)
+    def _is_leaf(x: Any) -> bool:
+        # `None` must also stop recursion here: `jax.tree.map`'s structural
+        # matching across multiple trees is driven only by the first tree's
+        # `is_leaf`, so a `None` hole in one part's constraint tree must be
+        # recognized as a (terminal) leaf position too, or JAX tries to
+        # match it against the *internal* structure of another part's real
+        # (non-`None`) constraint object at the same position.
+        return is_constraint(x) or x is None
+
+    trees = [_tree_of(part) for part in dist.distributions]
+    merged = jax.tree.map(_pick, *trees, is_leaf=_is_leaf)
+    return Leafwise(tree=merged)
 
 
 # Register the container handlers only if the classes exist in the installed
 # distreqx (mirroring the original `hasattr` guards).
 for _name, _handler in (
     ("Joint", _infer_joint),
-    ("Embedded", _infer_embedded),
-    ("Partitioned", _infer_partitioned),
+    ("Combined", _infer_combined),
 ):
     _cls = getattr(dists, _name, None)
     if _cls is not None:

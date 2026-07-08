@@ -29,6 +29,7 @@ from parax.wrappers import (
     Parameterize as Parameterize,
     Apply as Apply,
     Static as Static,
+    Combine as Combine,
     Tie as Tie,
     Bound as Bound,
     Constrain as Constrain,

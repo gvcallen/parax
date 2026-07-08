@@ -12,6 +12,8 @@ from typing import Generic, TypeVar, TypeGuard, Callable, Any, Union, Self
 
 import equinox as eqx
 import jax
+import jax.numpy as jnp
+import jax.flatten_util
 from jaxtyping import PyTree
 from distreqx.distributions import AbstractDistribution
 
@@ -485,10 +487,10 @@ class Static(AbstractUnwrappable[T], AbstractWrappable[T]):
 
     def unwrap(self) -> T:
         return self.tree
-    
+
     def wrap(self, tree: T) -> Self:
         return Static(tree)
-    
+
 
 def as_opaque(tree: Union[T | Static[T]]) -> Union[Freeze, Static]:
     """
@@ -515,6 +517,35 @@ def as_opaque(tree: Union[T | Static[T]]) -> Union[Freeze, Static]:
     if is_opaque_leaf and not eqx.is_array(tree):
         return Static(tree)
     return Freeze(tree)
+
+
+class Combine(AbstractUnwrappable[T]):
+    """
+    Recombines complementary pytrees into one upon unwrapping, equivalent
+    to `eqx.combine` as a wrapper node.
+
+    Not itself a boundary for `is_leaf`-style traversal (e.g.
+    `parax.constraints.is_leaf`); generic tree traversal passes straight
+    through to `pytrees`, as if they were siblings directly.
+
+    Attributes:
+        pytrees: The complementary pytrees to recombine.
+        is_leaf: Passed through to `eqx.combine`.
+    """
+    pytrees: tuple[T, ...]
+    is_leaf: Callable[[Any], bool] | None = eqx.field(converter=as_opaque)
+
+    def __init__(self, *pytrees: T, is_leaf: Callable[[Any], bool] | None = None):
+        """
+        Args:
+            *pytrees: The complementary pytrees to recombine.
+            is_leaf: Passed through to `eqx.combine`.
+        """
+        self.pytrees = pytrees
+        self.is_leaf = is_leaf
+
+    def unwrap(self) -> T:
+        return eqx.combine(*self.pytrees, is_leaf=as_unwrapped(self.is_leaf))
 
 
 class Annotate(AbstractUnwrappable[T], AbstractWrappable[T], AbstractAnnotated[dict]):
@@ -562,84 +593,145 @@ class Bound(AbstractUnwrappable[T], AbstractWrappable[T], AbstractBounded[T]):
     
 class Constrain(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstrainable[T]):
     """
-    A wrapper to attach a `parax.constraints.AbstractConstraint` to an arbitrary PyTree.
-    
-    Assumes the original PyTree is unconstrained
-    i.e. has array-like leaf nodes that are defined
-    over the entire real number line.
-    
+    Attaches a `parax.constraints.AbstractConstraint` to an arbitrary PyTree.
+
+    Stores the raw/unconstrained representation, mirroring `parax.Random`:
+    the physical value (`tree`) is computed on demand via
+    `constraint.bijector.forward(raw_value)`, so `wrap`/`unwrap` are simple
+    field replacements with nothing nested left to re-transform.
+
     Implements `parax.constrainable.AbstractConstrainable`.
-    
-    Currently this wrapper does not check to ensure the leaf nodes
-    lie within the constraints.
 
     Attributes:
-        tree: The wrapped tree.
         constraint: The tree's constraint.
+        raw_value: The raw, unconstrained representation.
     """
     constraint: AbstractConstraint = eqx.field(converter=as_opaque)
-    tree: T
-    
+    raw_value: T
+
+    def __init__(
+        self,
+        constraint: AbstractConstraint,
+        tree: T | None = None,
+        *,
+        raw_value: T | None = None,
+    ):
+        """
+        Args:
+            constraint: The constraint to attach.
+            tree: The physical value. Exactly one of `tree`/`raw_value` must
+                be given; nested wrappable structure is resolved first, then
+                inverted through `constraint`'s bijector.
+            raw_value: The raw representation directly, if already known.
+        """
+        if (tree is None) == (raw_value is None):
+            raise ValueError("Exactly one of `tree` or `raw_value` must be given.")
+
+        self.constraint = constraint
+        if tree is not None:
+            physical = unwrap(tree)
+            new_raw = as_unwrapped(self.constraint).bijector.inverse(physical)
+            self.raw_value = eqx.error_if(
+                new_raw,
+                jnp.any(jnp.isnan(jax.flatten_util.ravel_pytree(new_raw)[0])),
+                "Constraint violated for `Constrain` upon initialization (produced NaNs).",
+            )
+        else:
+            self.raw_value = raw_value
+
+    @property
+    def tree(self) -> T:
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+
+    @property
     def bounds(self) -> tuple[T, T]:
-        return self.constraint.bounds
-    
+        return as_unwrapped(self.constraint).bounds
+
     def constrain(self, constraint: AbstractConstraint) -> Self:
         return Constrain(constraint=constraint, tree=self.tree)
-    
+
     def unwrap(self) -> T:
         return self.tree
-    
+
     def wrap(self, other: T) -> Self:
-        return Constrain(constraint=self.constraint, tree=other)
-    
-    
+        new_raw = as_unwrapped(self.constraint).bijector.inverse(other)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)
+
+
 class Probabilize(AbstractUnwrappable[T], AbstractWrappable[T], AbstractProbabilistic[T]):
     """
-    A wrapper to add a probability distribution to an arbitrary PyTree.
-    
+    Attaches a probability distribution to an arbitrary PyTree.
+
+    Stores the raw/unconstrained representation, mirroring `parax.Random`:
+    the physical value (`tree`) is computed on demand via
+    `constraint.bijector.forward(raw_value)`, so `wrap`/`unwrap` are simple
+    field replacements with nothing nested left to re-transform.
+
     Implements `parax.probability.AbstractProbabilistic`.
 
     Attributes:
         distribution: The tree's associated probability distribution.
-        constraint: The tree and probability distribution's constraint. If not explicitly 
-            provided during initialization, this is automatically inferred from the 
-            distribution using `parax.constraints.infer_distribution_constraint`.
-        tree: The wrapped tree.
+        constraint: The tree's constraint. Inferred from `distribution` via
+            `parax.constraints.infer_distribution_constraint` if omitted.
+        raw_value: The raw, unconstrained representation.
     """
     distribution: AbstractDistribution = eqx.field(converter=as_opaque)
     constraint: AbstractConstraint = eqx.field(converter=as_opaque)
-    tree: T
+    raw_value: T
 
     def __init__(
-        self, 
-        distribution: AbstractDistribution, 
-        tree: T, 
-        constraint: AbstractConstraint | None = None
+        self,
+        distribution: AbstractDistribution,
+        tree: T | None = None,
+        constraint: AbstractConstraint | None = None,
+        *,
+        raw_value: T | None = None,
     ):
         """
         Args:
-            distribution: The probability distribution to associate with the tree.
-            tree: The PyTree to be wrapped.
-            constraint: An optional explicit constraint. If `None`, it is attempted
-                to automatically infer the constraint from the `distribution`.
+            distribution: The probability distribution to attach.
+            tree: The physical value. Exactly one of `tree`/`raw_value` must
+                be given; nested wrappable structure is resolved first, then
+                inverted through the constraint's bijector.
+            constraint: Optional explicit constraint, inferred from
+                `distribution` if omitted.
+            raw_value: The raw representation directly, if already known.
         """
+        if (tree is None) == (raw_value is None):
+            raise ValueError("Exactly one of `tree` or `raw_value` must be given.")
+
         self.distribution = distribution
-        self.tree = tree
-        
         if constraint is None:
             from parax.constraints import infer_distribution_constraint
             self.constraint = infer_distribution_constraint(distribution)
         else:
             self.constraint = constraint
 
+        if tree is not None:
+            physical = unwrap(tree)
+            new_raw = as_unwrapped(self.constraint).bijector.inverse(physical)
+            self.raw_value = eqx.error_if(
+                new_raw,
+                jnp.any(jnp.isnan(jax.flatten_util.ravel_pytree(new_raw)[0])),
+                "Constraint violated for `Probabilize` upon initialization (produced NaNs).",
+            )
+        else:
+            self.raw_value = raw_value
+
+    @property
+    def tree(self) -> T:
+        return as_unwrapped(self.constraint).bijector.forward(self.raw_value)
+
+    @property
     def bounds(self) -> tuple[T, T]:
-        return self.constraint.bounds
-    
+        return as_unwrapped(self.constraint).bounds
+
     def constrain(self, constraint: AbstractConstraint) -> Self:
         return Probabilize(distribution=self.distribution, tree=self.tree, constraint=constraint)
-    
+
     def unwrap(self) -> T:
         return self.tree
-    
+
     def wrap(self, other: T) -> Self:
-        return Probabilize(distribution=self.distribution, tree=other, constraint=self.constraint)
+        new_raw = as_unwrapped(self.constraint).bijector.inverse(other)
+        return eqx.tree_at(lambda x: x.raw_value, self, new_raw)

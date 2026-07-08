@@ -363,43 +363,45 @@ class Custom(AbstractConstraint):
     mapping with predefined physical bounds.
 
     Attributes:
-        bijector: The internal, user-defined distreqx bijector mapping from the 
+        bijector: The internal, user-defined distreqx bijector mapping from the
             unconstrained real line to the physical space.
-        bounds: The manually defined physical boundaries `(lower, upper)`.
+        bounds: The manually defined physical boundaries `(lower, upper)`,
+            each a PyTree matching the constrained value's structure.
         base_bounds: The orthogonal base boundaries. Defaults to `bounds` if omitted.
-        base_bijector: The bijector mapping from `base_bounds` to `bounds`. 
+        base_bijector: The bijector mapping from `base_bounds` to `bounds`.
             Defaults to `Identity` if omitted.
     """
     bijector: AbstractBijector
-    bounds: tuple[Array, Array]
-    base_bounds: tuple[Array, Array]
+    bounds: tuple[PyTree, PyTree]
+    base_bounds: tuple[PyTree, PyTree]
     base_bijector: AbstractBijector
 
     def __init__(
-        self, 
-        bijector: AbstractBijector, 
-        bounds: tuple[Array, Array] = (jnp.array(-jnp.inf), jnp.array(jnp.inf)),
-        base_bounds: tuple[Array, Array] | None = None,
+        self,
+        bijector: AbstractBijector,
+        bounds: tuple[PyTree, PyTree] = (jnp.array(-jnp.inf), jnp.array(jnp.inf)),
+        base_bounds: tuple[PyTree, PyTree] | None = None,
         base_bijector: AbstractBijector | None = None
     ):
         """
         Args:
             bijector: The custom `distreqx` bijector.
-            bounds: A tuple of `(lower, upper)` defining the physical 
-                boundaries of the constrained space. Defaults to `(-inf, inf)`.
-            base_bounds: Optional. A tuple of `(lower, upper)` defining the orthogonal 
+            bounds: A tuple of `(lower, upper)` defining the physical
+                boundaries of the constrained space, each a PyTree matching
+                the constrained value's structure. Defaults to `(-inf, inf)`.
+            base_bounds: Optional. A tuple of `(lower, upper)` defining the orthogonal
                 base boundaries. If None, defaults to `bounds`.
-            base_bijector: Optional. The bijector handling spatial skew/correlation. 
+            base_bijector: Optional. The bijector handling spatial skew/correlation.
                 If None, defaults to `distreqx.bijectors.Identity`.
         """
         self.bijector = bijector
-        self.bounds = tuple(jnp.asarray(b) for b in bounds)
-        
+        self.bounds = tuple(jax.tree.map(jnp.asarray, b) for b in bounds)
+
         # Default base_bounds to physical bounds if not provided
         if base_bounds is None:
             self.base_bounds = self.bounds
         else:
-            self.base_bounds = tuple(jnp.asarray(b) for b in base_bounds)
+            self.base_bounds = tuple(jax.tree.map(jnp.asarray, b) for b in base_bounds)
             
         # Default base_bijector to Identity if not provided
         if base_bijector is None:
@@ -518,23 +520,29 @@ def _infer_joint(dist) -> AbstractConstraint:
 
 def _infer_embedded(dist) -> AbstractConstraint:
     """
-    An Embedded distribution only *varies* over its base distribution's leaves;
-    the fixed leaves are constants with zero latent degrees of freedom, so they
-    contribute nothing to whiten. We therefore infer the constraint of the base
-    distribution alone. The fixed constants are re-slotted at sample time by
-    `Embedded._embed`, which is not the constraint's concern.
+    Embedded only varies over its base distribution's leaves; the fixed
+    leaves contribute no latent degrees of freedom, so we infer the
+    constraint of the base distribution alone.
+    """
+    return infer_distribution_constraint(dist.distribution)
 
-    This mirrors the Joint handler: a typical Embedded's base is a Joint holding
-    `None` at each fixed leaf, so this returns a Leafwise tree with `None` holes
-    exactly where the fixed constants live -- the same shape the rest of the
-    pipeline already consumes from the Joint path.
+
+def _infer_partitioned(dist) -> AbstractConstraint:
+    """
+    Partitioned's `other` side is always held fixed by the caller, so it
+    contributes no optimizable degrees of freedom. We infer the constraint
+    of `distribution` alone, mirroring `_infer_embedded`.
     """
     return infer_distribution_constraint(dist.distribution)
 
 
 # Register the container handlers only if the classes exist in the installed
 # distreqx (mirroring the original `hasattr` guards).
-for _name, _handler in (("Joint", _infer_joint), ("Embedded", _infer_embedded)):
+for _name, _handler in (
+    ("Joint", _infer_joint),
+    ("Embedded", _infer_embedded),
+    ("Partitioned", _infer_partitioned),
+):
     _cls = getattr(dists, _name, None)
     if _cls is not None:
         infer_distribution_constraint.register(_cls)(_handler)

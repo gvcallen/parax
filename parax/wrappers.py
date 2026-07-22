@@ -464,7 +464,11 @@ class Tie(AbstractUnwrappable):
     def unwrap(self) -> Any:
         current_tree = self.tree
         for get_target, get_source, tie_fn in self.ties:
-            source_val = get_source(current_tree)
+            # The source is unwrapped before it is tied, so the target receives a value
+            # rather than a copy of whatever produced it. Copying the node across would
+            # present the tied position as a second independent node to anything walking
+            # the result, when it is a derived value.
+            source_val = unwrap(get_source(current_tree))
             tied_val = tie_fn(source_val)
             current_tree = eqx.tree_at(get_target, current_tree, tied_val)
         return current_tree

@@ -57,10 +57,14 @@ class AbstractConstraint(eqx.Module):
     Attributes:
         bounds: A tuple containing the physical lower and upper bounds of the constrained space.
         bijector: A `distreqx.bijectors.AbstractBijector` mapping from the unconstrained real line to the physical space.
-        base_bounds: A tuple containing the foundational, un-skewed orthogonal bounds. For primitive 
-            constraints, this equals `bounds`. For transformed constraints, this isolates the safe 
-            topological box before any dense correlations or skews are applied.
-        base_bijector: A `distreqx.bijectors.AbstractBijector` mapping from the orthogonal `base_bounds` 
+        base_bounds: A tuple containing the foundational, un-skewed orthogonal bounds. Where a
+            whitened base space exists this is the normalised box the optimizer works in, so that
+            a step of a given size carries the same meaning along every axis: the unit box for an
+            `Interval`, and the probability-integral-transform space for a constraint inferred
+            from a distribution. For transformed constraints, this isolates the safe topological
+            box before any dense correlations or skews are applied. It falls back to `bounds` only
+            where no such normalisation exists, such as an unbounded or half-bounded domain.
+        base_bijector: A `distreqx.bijectors.AbstractBijector` mapping from the orthogonal `base_bounds`
             space into the physical `bounds` space. Defaults to `Identity` unless geometric skews are present.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
@@ -100,8 +104,14 @@ def is_constraint(x: Any) -> TypeGuard[AbstractConstraint]:
 
 class AbstractUncorrelatedConstraint(AbstractConstraint):
     """
-    A mixin for base constraints (like Interval, RealLine, Positive) 
-    whose physical bounds perfectly match their orthogonal base bounds.
+    A mixin for base constraints (like Interval, RealLine, Positive)
+    carrying no dense correlation between axes.
+
+    The default is for the base space to coincide with the physical one, which suits an
+    unbounded or half-bounded domain where there is no finite extent to normalise
+    against. A subclass with a bounded domain should override `base_bounds` and
+    `base_bijector` to expose a whitened base instead, since a bounded optimizer works
+    in that space directly and would otherwise inherit the physical units.
     """
     bounds: eqx.AbstractVar[tuple[PyTree, PyTree]]
     bijector: eqx.AbstractVar[AbstractBijector]
@@ -231,13 +241,34 @@ class Interval(AbstractUncorrelatedConstraint):
         return (self.lower, self.upper)
 
     @property
-    def bijector(self) -> AbstractBijector:
-        scale_val = self.upper - self.lower
+    def base_bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+        """
+        The unit box.
+
+        Overrides the `Identity` default from `AbstractUncorrelatedConstraint`, which
+        would hand a bounded optimizer the physical box. Normalising to `[0, 1]`
+        is generally numerically better during optimization.
+        """
+        return (jnp.zeros_like(self.lower), jnp.ones_like(self.upper))
+
+    @property
+    def base_bijector(self) -> AbstractBijector:
+        """
+        Maps the unit box onto the physical interval.
+        """
         return Chain([
-            Shift(self.lower), 
-            ScalarAffine(shift=jnp.array(0.0), scale=scale_val),
-            Sigmoid()
+            Shift(self.lower),
+            ScalarAffine(shift=jnp.array(0.0), scale=self.upper - self.lower),
         ])
+
+    @property
+    def bijector(self) -> AbstractBijector:
+        # Squashes the real line into the unit box, then reuses `base_bijector` to
+        # reach physical units, so the bounded and unconstrained spaces cannot drift
+        # apart. The two then differ only by the sigmoid: comparable step sizes through
+        # the bulk of the interval, with the unconstrained side damping towards the
+        # bounds rather than meeting them.
+        return Chain([self.base_bijector, Sigmoid()])
 
 
 class Positive(GreaterThan):
@@ -433,10 +464,18 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
         lower_bound = dist.icdf(0.0)
         upper_bound = dist.icdf(1.0)
 
-        whitening_bijector = Chain([Quantile(dist), NormalCDF()])
+        # The quantile alone maps the probability-integral-transform space onto the
+        # physical one, so `[0, 1]` serves as a base that is both bounded and already
+        # whitened: under the transform the prior is uniform there by construction.
+        # Without it a bounded solver falls back to `Identity` over the physical box
+        # and gets no whitening at all, however wide that box happens to be.
+        quantile = Quantile(dist)
+        whitening_bijector = Chain([quantile, NormalCDF()])
         return Custom(
             bijector=whitening_bijector,
             bounds=(lower_bound, upper_bound),
+            base_bounds=(jnp.zeros_like(lower_bound), jnp.ones_like(upper_bound)),
+            base_bijector=quantile,
         )
     except (NotImplementedError, AttributeError, ValueError, TypeError):
         pass

@@ -125,3 +125,69 @@ def test_last_resort_fallback():
     # Since BrokenDist fails the ICDF try/except, it falls through to the end
     assert isinstance(constraint, RealLine)
     assert constraint.shape == (2, 2)
+
+def test_icdf_constraint_exposes_a_whitened_base():
+    """
+    An inferred constraint carries a base that is bounded *and* already whitened.
+
+    The quantile alone maps the probability-integral-transform space onto the physical
+    one, so `[0, 1]` serves as the base: under that transform the prior is uniform
+    there by construction, whatever the physical extent happens to be. Without it a
+    bounded solver falls back to the physical box and gets no whitening at all.
+    """
+    dist = DummyICDFDist(lower=1e-9, upper=10.0)
+    constraint = infer_distribution_constraint(dist)
+
+    np.testing.assert_allclose(constraint.base_bounds[0], 0.0)
+    np.testing.assert_allclose(constraint.base_bounds[1], 1.0)
+
+    # The base map is the quantile on its own -- the whitening step without the
+    # normal-space squashing that the full bijector adds on top.
+    assert isinstance(constraint.base_bijector, Quantile)
+    assert constraint.base_bijector.distribution == dist
+    assert constraint.bijector.bijectors[0] is constraint.base_bijector
+
+
+def test_icdf_base_is_invariant_to_physical_scale():
+    """
+    Two distributions differing only in units present the optimizer with one geometry.
+
+    This is what stops a parameter measured in millimetres from dominating one
+    measured in metres purely through its numerical extent.
+    """
+    wide = infer_distribution_constraint(dists.Uniform(low=jnp.array(70.0), high=jnp.array(80.0)))
+    narrow = infer_distribution_constraint(dists.Uniform(low=jnp.array(0.07), high=jnp.array(0.08)))
+
+    for constraint in (wide, narrow):
+        np.testing.assert_allclose(np.asarray(constraint.base_bounds[0]).ravel()[0], 0.0)
+        np.testing.assert_allclose(np.asarray(constraint.base_bounds[1]).ravel()[0], 1.0)
+
+    # The same base coordinate maps to the same fraction of each physical range.
+    for fraction in (0.25, 0.5, 0.75):
+        for constraint in (wide, narrow):
+            lower = np.asarray(constraint.bounds[0]).ravel()[0]
+            upper = np.asarray(constraint.bounds[1]).ravel()[0]
+            physical = np.asarray(
+                constraint.base_bijector.forward(jnp.array(fraction))).ravel()[0]
+            np.testing.assert_allclose(
+                (physical - lower) / (upper - lower), fraction, rtol=1e-5)
+
+
+def test_wide_prior_does_not_dominate_the_base_geometry():
+    """
+    A regression guard for the failure this whitening exists to prevent.
+
+    An unjustifiably wide prior used to cost nothing, because the optimizer never saw
+    the prior's extent -- it worked in physical units and a wide box simply went
+    unnoticed. Every base box must now be unit width, so no single parameter can set
+    the scale of the search for all the others.
+    """
+    constraints = [
+        infer_distribution_constraint(dists.Uniform(low=jnp.array(lo), high=jnp.array(hi)))
+        for lo, hi in [(70.0, 80.0), (0.0, 0.05), (2.5e-9, 2.5e-1), (1e-9, 10.0)]
+    ]
+    widths = [
+        np.asarray(c.base_bounds[1]).ravel()[0] - np.asarray(c.base_bounds[0]).ravel()[0]
+        for c in constraints
+    ]
+    np.testing.assert_allclose(widths, np.ones(len(widths)))

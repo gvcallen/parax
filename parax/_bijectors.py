@@ -149,7 +149,7 @@ class NormalCDF(
 
     def inverse_and_log_det(self, y: PyTree) -> tuple[PyTree, PyTree]:
         """Computes x = ICDF(y) and element-wise log|det J(f^{-1})(y)|."""
-        eps = jnp.finfo(jnp.float32).eps
+        eps = jnp.finfo(jnp.result_type(y, float)).eps
         y_safe = jnp.clip(y, eps, 1.0 - eps)
         
         x = jss.ndtri(y_safe)
@@ -178,7 +178,7 @@ class Quantile(
 
     def forward_and_log_det(self, u: PyTree) -> tuple[PyTree, PyTree]:
         """Computes y = ICDF(u) and log|det J(f)(u)|."""
-        eps = jnp.finfo(jnp.float32).eps
+        eps = jnp.finfo(jnp.result_type(u, float)).eps
         u_safe = jnp.clip(u, eps, 1.0 - eps)
         
         y = self.distribution.icdf(u_safe)

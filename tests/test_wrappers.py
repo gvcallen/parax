@@ -72,6 +72,17 @@ def test_freeze_stops_gradients():
     
     assert jnp.allclose(gradient, 0.0)
 
+def test_freeze_leaves_python_scalars_concrete_under_jit():
+    """Test that Freeze does not turn Python scalars into traced arrays."""
+    @jax.jit
+    def fn(x):
+        val = unwrap(Freeze({"x": x, "flag": True, "n": 2}))
+        assert val["flag"] is True
+        assert val["n"] == 2 and isinstance(val["n"], int)
+        return val["x"]
+
+    assert jnp.allclose(fn(jnp.array(3.0)), 3.0)
+
 def test_freeze_double_wrap_prevention():
     """Test the init safeguard against Freeze(Freeze(x))."""
     base_array = jnp.array([1.0, 2.0])

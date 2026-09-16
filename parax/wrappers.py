@@ -356,7 +356,10 @@ class Apply(AbstractUnwrappable[T]):
 
 class Freeze(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
     """
-    Applies `jax.lax.stop_gradient` to all array-like leaves before unwrapping.
+    Applies `jax.lax.stop_gradient` to all array leaves before unwrapping.
+
+    Python scalars (such as boolean flags on a bijector) are returned unchanged,
+    so they stay concrete under `jax.jit`.
 
     Implements the `AbstractConstant` interface so it can be filtered out 
     during optimization partitioning.
@@ -380,7 +383,7 @@ class Freeze(AbstractUnwrappable[T], AbstractWrappable[T], AbstractConstant[T]):
         return self.tree
 
     def unwrap(self) -> T:
-        differentiable, static = eqx.partition(self.tree, eqx.is_array_like)
+        differentiable, static = eqx.partition(self.tree, eqx.is_array)
         return eqx.combine(jax.lax.stop_gradient(differentiable), static)
     
     def wrap(self, tree: T) -> Self:

@@ -6,6 +6,7 @@ from parax import (
     Parameterize,
     Apply,
     Freeze,
+    Tie,
 )
 
 def test_standard_pytree_unwrap():
@@ -155,3 +156,42 @@ def test_unwrap_cascade_false_matches_inner():
     # now contains the fully unwrapped `42.0` instead of the `inner` node.
     # Calling unwrap() on this new outer node should yield the raw number.
     assert result.unwrap() == 42.0
+
+def test_tie_resolves_before_a_collapsing_wrapper_below_it():
+    """A tie follows paths through the tree it holds, so that tree must still be
+    wrapped when it resolves. A wrapper that collapses a path on unwrapping, here a
+    node standing in for a value computed from the parameters it holds, would
+    otherwise take the tie's endpoints with it."""
+    import equinox as eqx
+
+    from parax import AbstractUnwrappable
+
+    class Collapsing(AbstractUnwrappable):
+        """Unwraps to a value, so its `parts` disappear from the tree."""
+        parts: dict
+
+        def unwrap(self):
+            return sum(self.parts.values())
+
+    class Holder(eqx.Module):
+        derived: Collapsing
+        other: float
+
+    tree = Holder(Collapsing({'a': 1.0, 'b': 2.0}), other=10.0)
+
+    # Source inside the collapsing node: `other` becomes twice 'a'.
+    tied = Tie(tree, lambda t: t.other, lambda t: t.derived.parts['a'], lambda x: 2 * x)
+    result = unwrap(tied)
+    assert result.other == 2.0
+    assert result.derived == 3.0
+
+    # Target inside it: 'b' is taken from `other`, and the sum follows.
+    tied = Tie(tree, lambda t: t.derived.parts['b'], lambda t: t.other, lambda x: x / 2)
+    result = unwrap(tied)
+    assert result.derived == 6.0
+    assert result.other == 10.0
+
+
+def test_a_wrapper_resolves_descendants_first_by_default():
+    assert Parameterize(lambda: 1.0).unwraps_descendants_first
+    assert not Tie({'a': 1.0}, lambda t: t['a'], lambda t: t['a']).unwraps_descendants_first

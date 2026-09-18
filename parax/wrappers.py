@@ -444,9 +444,9 @@ class Tie(AbstractUnwrappable):
     tree: Any
     ties: tuple = eqx.field(static=True)
 
-    # A tie follows its source and target paths through the tree it holds, so that
-    # tree must still be wrapped: a wrapper that collapses a path on unwrapping (a
-    # derived value, say) would otherwise take the endpoints with it.
+    #: A tie follows its source and target paths through the tree it holds, so that
+    #: tree must still be wrapped: a wrapper that collapses a path on unwrapping (a
+    #: derived value, say) would otherwise take the endpoints with it.
     unwraps_descendants_first: ClassVar[bool] = False
     
     def __init__(

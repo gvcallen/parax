@@ -8,7 +8,7 @@ and more for JAX PyTrees.
 import functools
 
 from abc import abstractmethod
-from typing import Generic, TypeVar, TypeGuard, Callable, Any, Union, Self
+from typing import ClassVar, Generic, TypeVar, TypeGuard, Callable, Any, Union, Self
 
 import equinox as eqx
 import jax
@@ -35,6 +35,11 @@ class AbstractUnwrappable(eqx.Module, Generic[T]):
     computation, parameter injection, or gradient stopping) and replace 
     themselves with their output.
     """
+
+    #: Whether unwrappable descendants are resolved before this node. A node that
+    #: reads its own subtree while still wrapped, such as :class:`Tie` following a
+    #: source path, sets this False and resolves what its result still holds instead.
+    unwraps_descendants_first: ClassVar[bool] = True
 
     @abstractmethod
     def unwrap(self) -> T:
@@ -95,6 +100,10 @@ def unwrap(
         def _map_fn(leaf):
             if not is_unwrappable(leaf):
                 return leaf
+            if not leaf.unwraps_descendants_first:
+                # The node needs its subtree as it stands, so it resolves first and
+                # whatever its result still holds is resolved afterwards.
+                return _do_unwrap(leaf.unwrap(), include_self=True)
             resolved_node = _do_unwrap(leaf, include_self=False)
             return resolved_node.unwrap()
 
@@ -434,6 +443,11 @@ class Tie(AbstractUnwrappable):
     """
     tree: Any
     ties: tuple = eqx.field(static=True)
+
+    # A tie follows its source and target paths through the tree it holds, so that
+    # tree must still be wrapped: a wrapper that collapses a path on unwrapping (a
+    # derived value, say) would otherwise take the endpoints with it.
+    unwraps_descendants_first: ClassVar[bool] = False
     
     def __init__(
         self, 

@@ -7,6 +7,8 @@ it; the rest fall back to parax's own copies, so importing from here always
 works regardless of which distreqx is installed.
 """
 
+import inspect
+
 from distreqx.distributions import (
     AbstractCDFDistribution as AbstractCDFDistribution,
     AbstractDistribution as AbstractDistribution,
@@ -19,7 +21,6 @@ from distreqx.distributions import (
     Beta as Beta,
     Categorical as Categorical,
     Gamma as Gamma,
-    Independent as Independent,
     Logistic as Logistic,
     MixtureSameFamily as MixtureSameFamily,
     MultivariateNormalDiag as MultivariateNormalDiag,
@@ -35,6 +36,15 @@ try:
     from distreqx.distributions import ImproperUniform as ImproperUniform
 except ImportError:
     from parax._vendor._improper_uniform import ImproperUniform as ImproperUniform
+
+# Upstream distreqx's Independent reinterprets every batch dimension and takes no
+# `reinterpreted_batch_ndims`; the fork's does, with 0 meaning the same thing.
+from distreqx.distributions import Independent as _Independent
+if "reinterpreted_batch_ndims" in inspect.signature(_Independent.__init__).parameters:
+    Independent = _Independent
+else:
+    from parax._vendor._independent import Independent as Independent
+del _Independent
 
 try:
     from distreqx.distributions import Joint as Joint

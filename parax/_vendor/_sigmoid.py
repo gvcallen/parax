@@ -53,7 +53,7 @@ class Sigmoid(AbstractForwardInverseBijector, AbstractInvLogDetJacBijector):
 
     def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
         r"""Computes $y = f(x)$ and $\log|\det J(f)(x)|$."""
-        return _more_stable_sigmoid(x), self.forward_log_det_jacobian(x)
+        return jax.nn.sigmoid(x), self.forward_log_det_jacobian(x)
 
     def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
         r"""Computes $x = f^{-1}(y)$ and $\log|\det J(f^{-1})(y)|$."""
@@ -65,24 +65,13 @@ class Sigmoid(AbstractForwardInverseBijector, AbstractInvLogDetJacBijector):
         return type(other) is Sigmoid
 
 
-def _more_stable_sigmoid(x: Array) -> Array:
-    """Where extremely negatively saturated, approximate sigmoid with exp(x)."""
-    # `jnp.where` evaluates both branches, so the unselected `jnp.exp(x)` branch
-    # would overflow to +inf for large positive `x`, and the resulting `0 * inf`
-    # in the backward pass poisons the gradient with NaN (the classic JAX
-    # "double where" trap). Feeding the unselected branch a safe input keeps the
-    # forward value identical while making its gradient finite.
-    safe_x = jnp.where(x < -9, x, 0.0)
-    ret = jnp.where(x < -9, jnp.exp(safe_x), jax.nn.sigmoid(x))
-    if not isinstance(ret, Array):
-        raise TypeError("ret is not an Array")
-    return ret
-
-
 def _more_stable_softplus(x: Array) -> Array:
     """Where extremely saturated, approximate softplus with log1p(exp(x))."""
-    # See `_more_stable_sigmoid`: guard the unselected `log1p(exp(x))` branch
-    # against a +inf-poisoned NaN gradient for large positive `x`.
+    # `jnp.where` evaluates both branches, so the unselected `log1p(exp(x))`
+    # branch would overflow to +inf for large positive `x`, and the resulting
+    # `0 * inf` in the backward pass poisons the gradient with NaN (the classic
+    # JAX "double where" trap). Feeding the unselected branch a safe input keeps
+    # the forward value identical while making its gradient finite.
     safe_x = jnp.where(x < -9, x, 0.0)
     ret = jnp.where(x < -9, jnp.log1p(jnp.exp(safe_x)), jax.nn.softplus(x))
     if not isinstance(ret, Array):

@@ -84,9 +84,16 @@ def test_interval():
     # (Using >= and <= to account for exact float32 boundary rounding at the extremes)
     x = jnp.linspace(-100.0, 100.0, 500)
     mapped = interval.bijector.forward(x)
-    
+
     assert jnp.all(mapped >= -5.0)
     assert jnp.all(mapped <= 5.0)
+
+
+def test_interval_round_trips_values_near_a_bound():
+    """Values deep in the saturated tail of the sigmoid keep their precision."""
+    bijector = Interval(0.0, 1.0).bijector
+    y = jnp.array([1e-3, 1e-5, 1e-7, 1e-12])
+    assert jnp.allclose(bijector.forward(bijector.inverse(y)), y, rtol=1e-6, atol=0.0)
 
 
 def test_transformed_constraint_monotonic_decrease():

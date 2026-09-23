@@ -69,6 +69,21 @@ try:
 except ImportError:
     from parax._vendor._transpose import Transpose as Transpose
 
+try:
+    from distreqx.bijectors import Reshape as Reshape
+except ImportError:
+    from parax._vendor._reshape import Reshape as Reshape
+
+try:
+    from distreqx.bijectors import Restructure as Restructure
+except ImportError:
+    from parax._vendor._restructure import Restructure as Restructure
+
+try:
+    from distreqx.bijectors import Split as Split
+except ImportError:
+    from parax._vendor._split import Split as Split
+
 
 __all__ = [
     "AbstractBijector",
@@ -85,10 +100,13 @@ __all__ = [
     "Leafwise",
     "Permute",
     "R2ToComplex",
+    "Reshape",
+    "Restructure",
     "ScalarAffine",
     "Shift",
     "Sigmoid",
     "Softplus",
+    "Split",
     "Tanh",
     "Transpose",
     "TriangularLinear",

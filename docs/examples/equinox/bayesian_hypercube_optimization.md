@@ -16,7 +16,7 @@ import parax as prx
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from distreqx.distributions import Normal, LogNormal
+from parax.distributions import Normal, LogNormal
 
 class CorrelatedBayesianModel(eqx.Module):
     theta: prx.Param

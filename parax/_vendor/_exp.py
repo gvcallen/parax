@@ -1,0 +1,38 @@
+# Vendored from distreqx (https://github.com/lockwo/distreqx), Apache License 2.0.
+# Source: distreqx/bijectors/_exp.py
+# Used when the installed distreqx does not provide this class.
+
+import jax.numpy as jnp
+from jaxtyping import Array
+
+from distreqx.bijectors import (
+    AbstractBijector,
+    AbstractForwardInverseBijector,
+    AbstractFwdLogDetJacBijector,
+    AbstractInvLogDetJacBijector,
+)
+
+
+class Exp(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+):
+    """Exponential bijector: y = exp(x)."""
+
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
+        """Computes y = exp(x) and log|det J(f)(x)| = x."""
+        return jnp.exp(x), x
+
+    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
+        """Computes x = log(y) and log|det J(f^{-1})(y)| = -log(y)."""
+        x = jnp.log(y)
+        # Optimization: since x = log(y), the log det is simply -x
+        return x, -x
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        """Returns True if this bijector is guaranteed to be the same as `other`."""
+        return type(other) is Exp

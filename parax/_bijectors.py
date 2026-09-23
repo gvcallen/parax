@@ -1,5 +1,7 @@
 """
-Temporary bijector implementations until upstream PR in gvcallen/distreqx.
+Bijectors that are parax's own, plus fallbacks for distreqx names that not every
+distreqx version provides. Import them from `parax.bijectors`, which prefers the
+installed distreqx's implementation where there is one.
 """
 import functools
 

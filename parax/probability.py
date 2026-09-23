@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 
-from distreqx.distributions import AbstractDistribution, Transformed, Normal, Uniform
+from parax.distributions import AbstractDistribution, Transformed, Normal, Uniform
 from parax.constraints import AbstractConstraint, AbstractConstrained
 
 T = TypeVar("T")
@@ -60,7 +60,7 @@ def tree_distributions(tree: PyTree) -> PyTree:
         A PyTree of the exact same structure containing the extracted 
         probability distributions.
     """
-    from distreqx.distributions import ImproperUniform
+    from parax.distributions import ImproperUniform
     from parax.wrappers import as_unwrapped
 
     def _get_distribution(path, x):
@@ -93,7 +93,7 @@ def tree_joint_distribution(tree: PyTree) -> AbstractDistribution:
     Returns:
         A single joint distribution whose event shape matches the structure of `tree`.
     """
-    from distreqx.distributions import Joint
+    from parax.distributions import Joint
     return Joint(tree_distributions(tree))
 
 
@@ -117,7 +117,7 @@ def tree_unconstrained_distribution(tree: PyTree) -> AbstractDistribution:
     joint = tree_joint_distribution(tree)
     bijector = tree_leafwise_constraint(tree).bijector
     
-    from distreqx.bijectors import Inverse
+    from parax.bijectors import Inverse
     return Transformed(joint, Inverse(bijector))
 
 
@@ -131,7 +131,7 @@ def truncate_distribution(
     Raise an exception if unavailable.
     """
     if isinstance(dist, Normal):
-        from distreqx.distributions import TruncatedNormal
+        from parax.distributions import TruncatedNormal
         return TruncatedNormal(loc=dist.loc, scale=dist.scale, low=new_lower, high=new_upper)
     elif isinstance(dist, Uniform):
         return Uniform(new_lower, new_upper)

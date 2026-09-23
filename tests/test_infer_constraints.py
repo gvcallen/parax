@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 import jax.numpy as jnp
-import distreqx.distributions as dists
-import distreqx.bijectors as bij
+import parax.distributions as dists
+import parax.bijectors as bij
 
 from parax.constraints import (
     infer_distribution_constraint,

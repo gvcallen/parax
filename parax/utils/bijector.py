@@ -157,9 +157,14 @@ def deserialize_bijector(dct: dict | None) -> Any | None:
         except (ImportError, AttributeError):
             pass
             
-    # Fallback to distreqx bijectors if dynamic import failed
+    # Fallback to distreqx bijectors if dynamic import failed, then to parax's
+    # own copies, so a bijector serialized against one distreqx still loads
+    # against another that lacks it.
     if cls is None:
         cls = getattr(bijectors, cls_name, None)
+    if cls is None:
+        import parax.bijectors as _parax_bijectors
+        cls = getattr(_parax_bijectors, cls_name, None)
         
     if cls is None:
         raise ValueError(f"Unknown bijector class: {cls_name} in module {mod_name}")

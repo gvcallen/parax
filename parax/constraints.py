@@ -15,35 +15,24 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
-import distreqx.distributions as dists
-from distreqx.bijectors import (
-    AbstractBijector, 
-    Sigmoid, 
-    Chain, 
-    Shift, 
+import parax.distributions as dists
+import distreqx.distributions as distreqx_dists
+from parax.bijectors import (
+    AbstractBijector,
+    Sigmoid,
+    Chain,
+    Shift,
     ScalarAffine,
     TriangularLinear,
+    Identity,
+    Leafwise as LeafwiseBijector,
+    Softplus,
 )
 
 from parax.bounds import AbstractBounded
 from parax._bijectors import NormalCDF, Quantile
 
 T = TypeVar("Value")
-
-try:
-    from distreqx.bijectors import Leafwise as LeafwiseBijector
-except:
-    from parax._bijectors import Leafwise as LeafwiseBijector
-
-try:
-    from distreqx.bijectors import Identity
-except ImportError:
-    from parax._bijectors import Identity    
-
-try:
-    from distreqx.bijectors import Softplus
-except ImportError:
-    from parax._bijectors import Softplus
 
 class AbstractConstraint(eqx.Module):
     """
@@ -178,8 +167,6 @@ class GreaterThan(AbstractUncorrelatedConstraint):
 
     @property
     def bijector(self) -> AbstractBijector:
-        from distreqx.bijectors import Chain, Shift
-
         return Chain([Shift(self.lower), Softplus()])
 
 
@@ -481,9 +468,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
         pass
 
     # Fallback: hard-coded physical bounds for distributions lacking an ICDF.
-    if (hasattr(dists, "LogNormal") and isinstance(dist, dists.LogNormal)) or isinstance(
-        dist, dists.Gamma
-    ):
+    if isinstance(dist, (dists.LogNormal, dists.Gamma)):
         return Positive(shape=dist.event_shape)
     elif isinstance(dist, dists.Beta):
         return Interval(
@@ -589,13 +574,13 @@ def _infer_combined(dist) -> AbstractConstraint:
     return Leafwise(tree=merged)
 
 
-# Register the container handlers only if the classes exist in the installed
-# distreqx (mirroring the original `hasattr` guards).
+# Register the container handlers only for classes that are actually available:
+# `Joint` is always (parax fills it in), `Combined` only with gvcallen's fork.
 for _name, _handler in (
     ("Joint", _infer_joint),
     ("Combined", _infer_combined),
 ):
-    _cls = getattr(dists, _name, None)
+    _cls = getattr(dists, _name, None) or getattr(distreqx_dists, _name, None)
     if _cls is not None:
         infer_distribution_constraint.register(_cls)(_handler)
 

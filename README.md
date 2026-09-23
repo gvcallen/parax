@@ -24,12 +24,6 @@ Parax can be installed using pip:
 pip install parax
 ``
 
-For some built-in constraints and probabilistic features, you may need this `distreqx` branch:
-
-``
-pip install git+https://github.com/gvcallen/distreqx.git
-``
-
 ## Documentation
 
 Documentation is available [here](https://gvcallen.github.io/parax/).

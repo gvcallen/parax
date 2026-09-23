@@ -3,6 +3,7 @@ name: Deploy MkDocs
 on:
   push:
     branches: [main]
+    tags: [ "v*" ]
 
 permissions:
   contents: write

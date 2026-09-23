@@ -1,9 +1,10 @@
 name: Parax Tests
 
-# Run this workflow on all pushes and pull requests to the main branch
+# Run this workflow on pushes to the main branch, release tags, and pull requests
 on:
   push:
     branches: [ "main", "master" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "master" ]
 

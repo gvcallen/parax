@@ -10,6 +10,9 @@ from parax.constraints import (
     Interval,
     Positive,
     Negative,
+    NonNegative,
+    NonPositive,
+    intersect,
     Transformed,
     Leafwise,
     Custom,
@@ -261,3 +264,140 @@ def test_transformed_constraint_composes_the_whitened_base():
     mapped = transformed.base_bijector.forward(jnp.linspace(0.0, 1.0, 25))
     assert jnp.all(mapped >= lower - 1e-6)
     assert jnp.all(mapped <= upper + 1e-6)
+
+
+# ==========================================
+# Open and closed bounds
+# ==========================================
+
+
+def test_interval_is_closed_by_default():
+    interval = Interval(0.0, 1.0)
+
+    assert interval.closed == (True, True)
+    assert not interval.is_outside(jnp.array(0.0))
+    assert not interval.is_outside(jnp.array(1.0))
+    assert interval.is_outside(jnp.array(1.5))
+
+
+def test_interval_closed_per_bound():
+    interval = Interval(0.0, 1.0, closed=(False, True))
+
+    assert interval.closed == (False, True)
+    assert interval.is_outside(jnp.array(0.0))
+    assert not interval.is_outside(jnp.array(1.0))
+
+
+def test_interval_closed_as_a_single_bool():
+    interval = Interval(0.0, 1.0, closed=False)
+
+    assert interval.closed == (False, False)
+    assert interval.is_outside(jnp.array(0.0))
+    assert interval.is_outside(jnp.array(1.0))
+    assert not interval.is_outside(jnp.array(0.5))
+
+
+def test_half_bounded_closedness():
+    assert GreaterThan(5.0).closed == (True, False)
+    assert GreaterThan(5.0, closed=False).closed == (False, False)
+    assert LessThan(5.0).closed == (False, True)
+    assert LessThan(5.0, closed=False).closed == (False, False)
+    assert RealLine().closed == (False, False)
+
+    assert not GreaterThan(5.0).is_outside(jnp.array(5.0))
+    assert GreaterThan(5.0, closed=False).is_outside(jnp.array(5.0))
+    assert not LessThan(5.0).is_outside(jnp.array(5.0))
+    assert LessThan(5.0, closed=False).is_outside(jnp.array(5.0))
+
+
+def test_positive_and_negative_are_open():
+    assert Positive().closed == (False, False)
+    assert Negative().closed == (False, False)
+    assert Positive().is_outside(jnp.array(0.0))
+    assert Negative().is_outside(jnp.array(0.0))
+    assert not Positive().is_outside(jnp.array(1e-30))
+
+
+def test_non_negative_and_non_positive_are_closed():
+    assert NonNegative().closed == (True, False)
+    assert NonPositive().closed == (False, True)
+    assert not NonNegative().is_outside(jnp.array(0.0))
+    assert not NonPositive().is_outside(jnp.array(0.0))
+    assert NonNegative().is_outside(jnp.array(-1e-30))
+    assert NonPositive().is_outside(jnp.array(1e-30))
+
+
+def test_non_negative_and_non_positive_keep_their_shape():
+    assert NonNegative(shape=(3,)).bounds[0].shape == (3,)
+    assert NonPositive(shape=(3,)).bounds[1].shape == (3,)
+
+
+def test_intersection_open_wins_on_a_shared_bound():
+    result = intersect(Interval(0.0, 10.0), Positive())
+
+    assert isinstance(result, Interval)
+    assert result.closed == (False, True)
+    assert jnp.allclose(result.bounds[0], 0.0)
+    assert jnp.allclose(result.bounds[1], 10.0)
+
+
+def test_intersection_keeps_the_tighter_bounds_closedness():
+    result = intersect(Interval(1.0, 10.0, closed=True), Positive())
+    assert result.closed == (True, True)
+
+    result = intersect(Interval(-1.0, 10.0, closed=True), Positive())
+    assert result.closed == (False, True)
+
+
+def test_intersection_resolves_to_the_named_half_bounded_constraints():
+    assert isinstance(intersect(NonNegative(), GreaterThan(0.0)), NonNegative)
+    assert isinstance(intersect(NonNegative(), Positive()), Positive)
+    assert isinstance(intersect(NonPositive(), LessThan(0.0)), NonPositive)
+    assert isinstance(intersect(NonPositive(), Negative()), Negative)
+
+
+def test_transformed_reports_closedness():
+    base = Interval(1.0, 5.0, closed=(True, False))
+
+    increasing = Transformed(base, ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(2.0)))
+    assert increasing.closed == (True, False)
+
+    # A decreasing bijector swaps the bounds, and their closedness with them.
+    decreasing = Transformed(base, ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(-2.0)))
+    assert bool(decreasing.closed[0]) is False
+    assert bool(decreasing.closed[1]) is True
+    assert decreasing.is_outside(jnp.array(-10.0))
+    assert not decreasing.is_outside(jnp.array(-2.0))
+
+
+def test_leafwise_reports_closedness_per_leaf():
+    tree = Leafwise({"a": Positive(), "b": Interval(0.0, 1.0, closed=(True, False))})
+    lower_closed, upper_closed = tree.closed
+
+    assert lower_closed == {"a": False, "b": True}
+    assert upper_closed == {"a": False, "b": False}
+
+    outside = tree.is_outside({"a": jnp.array(0.0), "b": jnp.array(0.0)})
+    assert bool(outside["a"]) and not bool(outside["b"])
+
+
+def test_custom_reports_closedness():
+    bijector = ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(1.0))
+    bounds = (jnp.array(0.0), jnp.array(1.0))
+
+    assert Custom(bijector, bounds).closed == (True, True)
+    assert Custom(bijector, bounds, closed=(False, True)).closed == (False, True)
+
+    tree_bounds = ({"a": jnp.array(0.0)}, {"a": jnp.array(1.0)})
+    assert Custom(bijector, tree_bounds, closed=False).closed == ({"a": False}, {"a": False})
+
+
+def test_custom_defaults_to_closed_only_where_a_bound_is_finite():
+    bijector = ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(1.0))
+
+    lower_closed, upper_closed = Custom(bijector).closed
+    assert not bool(lower_closed) and not bool(upper_closed)
+    assert Custom(bijector).is_outside(jnp.array(jnp.inf))
+
+    lower_closed, upper_closed = Custom(bijector, (jnp.array(0.0), jnp.array(jnp.inf))).closed
+    assert bool(lower_closed) and not bool(upper_closed)

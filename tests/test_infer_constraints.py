@@ -11,7 +11,6 @@ from parax.constraints import (
     Positive,
     Interval,
     Leafwise,
-    Transformed,
 )
 from parax._bijectors import NormalCDF, Quantile
 
@@ -52,16 +51,19 @@ class BrokenDist:
     (lambda: dists.MultivariateNormalDiag(loc=jnp.zeros(2), scale_diag=jnp.ones(2))),
 ])
 def test_explicit_whitening_unconstrained(dist_factory):
-    """Test that natively isotropic/multivariate distributions are explicitly whitened."""
+    """
+    Natively loc-scale distributions whiten raw space explicitly, while their base
+    space is their support: the real line, left as it is.
+    """
     dist = dist_factory()
     constraint = infer_distribution_constraint(dist)
-    
-    # These are now Transformed constraints because we explicitly project 
-    # them from a standard N(0, I) space using Shift/Scale/TriangularLinear.
-    assert isinstance(constraint, Transformed)
-    assert isinstance(constraint.base_constraint, RealLine)
-    assert constraint.base_constraint.shape == dist.event_shape
-    assert isinstance(constraint.transform_bijector, bij.Chain)
+
+    assert isinstance(constraint.bijector, bij.Chain)
+    assert isinstance(constraint.base_bijector, bij.Identity)
+    for bound, sign in zip(constraint.base_bounds, (-1, 1)):
+        assert bound.shape == dist.event_shape
+        assert jnp.all(bound == sign * jnp.inf)
+    assert constraint.closed == (False, False)
 
 
 def test_meta_distribution_joint():
@@ -74,9 +76,8 @@ def test_meta_distribution_joint():
     constraint = infer_distribution_constraint(dist)
     
     assert isinstance(constraint, Leafwise)
-    # "a" is now perfectly whitened via a Transformed mapping
-    assert isinstance(constraint.tree["a"], Transformed)
-    assert isinstance(constraint.tree["a"].base_constraint, RealLine)
+    # "a" is whitened in raw space, with the real line as its base
+    assert isinstance(constraint.tree["a"].base_bijector, bij.Identity)
     
     # "b" fell back to a raw RealLine because it failed ICDF extraction
     assert isinstance(constraint.tree["b"], RealLine)
@@ -89,7 +90,13 @@ def test_meta_distribution_transformed():
     dist = dists.Transformed(distribution=base_dist, bijector=bijector)
     
     constraint = infer_distribution_constraint(dist)
-    assert isinstance(constraint, Transformed)
+
+    # The flow's support is (0, inf): half-bounded, so the base is the support itself.
+    x = jnp.array([0.0, 1.0, 1e6])
+    np.testing.assert_array_equal(constraint.base_bijector.forward(x), x)
+    np.testing.assert_allclose(constraint.base_bounds[0], 0.0)
+    np.testing.assert_array_equal(constraint.base_bounds[1], jnp.inf)
+    assert jnp.allclose(constraint.bijector.forward(jnp.array(0.0)), 1.0)
 
 
 def test_icdf_generates_copula_constraint():
@@ -126,14 +133,10 @@ def test_last_resort_fallback():
     assert isinstance(constraint, RealLine)
     assert constraint.shape == (2, 2)
 
-def test_icdf_constraint_exposes_a_whitened_base():
+def test_icdf_constraint_base_is_the_unit_box_over_a_finite_support():
     """
-    An inferred constraint carries a base that is bounded *and* already whitened.
-
-    The quantile alone maps the probability-integral-transform space onto the physical
-    one, so `[0, 1]` serves as the base: under that transform the prior is uniform
-    there by construction, whatever the physical extent happens to be. Without it a
-    bounded solver falls back to the physical box and gets no whitening at all.
+    A support with two finite bounds gets the unit box as its base, mapped affinely
+    onto the support: the base comes from the support, not the prior.
     """
     dist = DummyICDFDist(lower=1e-9, upper=10.0)
     constraint = infer_distribution_constraint(dist)
@@ -141,11 +144,54 @@ def test_icdf_constraint_exposes_a_whitened_base():
     np.testing.assert_allclose(constraint.base_bounds[0], 0.0)
     np.testing.assert_allclose(constraint.base_bounds[1], 1.0)
 
-    # The base map is the quantile on its own -- the whitening step without the
-    # normal-space squashing that the full bijector adds on top.
-    assert isinstance(constraint.base_bijector, Quantile)
-    assert constraint.base_bijector.distribution == dist
-    assert constraint.bijector.bijectors[0] is constraint.base_bijector
+    base = jnp.linspace(0.0, 1.0, 11)
+    np.testing.assert_allclose(
+        constraint.base_bijector.forward(base), 1e-9 + base * (10.0 - 1e-9), rtol=1e-6)
+
+
+def test_icdf_constraint_base_is_the_support_when_half_bounded():
+    dist = DummyICDFDist(lower=5.0, upper=jnp.inf)
+    constraint = infer_distribution_constraint(dist)
+
+    np.testing.assert_array_equal(constraint.base_bounds[0], 5.0)
+    np.testing.assert_array_equal(constraint.base_bounds[1], jnp.inf)
+    x = jnp.array([5.0, 6.0, 1e6])
+    np.testing.assert_array_equal(constraint.base_bijector.forward(x), x)
+
+
+def test_uniform_support_and_base_are_closed():
+    constraint = infer_distribution_constraint(
+        dists.Uniform(low=jnp.array(0.0), high=jnp.array(10.0)))
+
+    assert bool(constraint.closed[0]) and bool(constraint.closed[1])
+    assert not constraint.is_outside(jnp.array(0.0))
+    assert not constraint.is_outside(jnp.array(10.0))
+
+    np.testing.assert_array_equal(constraint.base_bounds[0], 0.0)
+    np.testing.assert_array_equal(constraint.base_bounds[1], 1.0)
+    # The base edge lands exactly on the support's edge.
+    assert constraint.base_bijector.forward(jnp.array(0.0)) == 0.0
+    np.testing.assert_allclose(constraint.base_bijector.forward(jnp.array(1.0)), 10.0)
+
+
+def test_support_is_open_where_the_density_vanishes():
+    """LogNormal's support reaches 0 but excludes it, and never reaches infinity."""
+    constraint = infer_distribution_constraint(dists.LogNormal(0.0, 1.0))
+
+    assert not bool(constraint.closed[0])
+    assert not bool(constraint.closed[1])
+    assert constraint.is_outside(jnp.array(0.0))
+
+
+def test_random_on_a_bound_has_an_infinite_raw_value():
+    """No silent clip on the way to raw: an on-bound value maps to -inf, like `Bounded`."""
+    from parax.variables import Random
+
+    variable = Random(dists.Uniform(low=jnp.array(0.0), high=jnp.array(10.0)), value=0.0)
+    assert jnp.isneginf(variable.raw_value)
+
+    variable = Random(dists.Uniform(low=jnp.array(0.0), high=jnp.array(10.0)), value=10.0)
+    assert jnp.isposinf(variable.raw_value)
 
 
 def test_icdf_base_is_invariant_to_physical_scale():
@@ -191,3 +237,13 @@ def test_wide_prior_does_not_dominate_the_base_geometry():
         for c in constraints
     ]
     np.testing.assert_allclose(widths, np.ones(len(widths)))
+
+
+@pytest.mark.parametrize("concentration, closed", [(1.0, True), (2.0, False), (0.5, False)])
+def test_beta_support_is_closed_only_where_the_density_is_positive_and_finite(concentration, closed):
+    constraint = infer_distribution_constraint(dists.Beta(concentration, concentration))
+
+    assert bool(constraint.closed[0]) is closed
+    assert bool(constraint.closed[1]) is closed
+    np.testing.assert_array_equal(constraint.base_bounds[0], 0.0)
+    np.testing.assert_array_equal(constraint.base_bounds[1], 1.0)

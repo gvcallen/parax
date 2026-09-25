@@ -138,6 +138,8 @@ class NormalCDF(
     """
     Transforms the unconstrained real line to the (0, 1) interval 
     using the Standard Normal Cumulative Distribution Function.
+
+    The inverse does not clip: 0 and 1 map to -inf and inf.
     """
     _is_constant_jacobian: bool = False
     _is_constant_log_det: bool = False
@@ -151,10 +153,7 @@ class NormalCDF(
 
     def inverse_and_log_det(self, y: PyTree) -> tuple[PyTree, PyTree]:
         """Computes x = ICDF(y) and element-wise log|det J(f^{-1})(y)|."""
-        eps = jnp.finfo(jnp.result_type(y, float)).eps
-        y_safe = jnp.clip(y, eps, 1.0 - eps)
-        
-        x = jss.ndtri(y_safe)
+        x = jss.ndtri(y)
         # The derivative of the ICDF is 1 / PDF(ICDF(y)).
         log_det = -jstats.norm.logpdf(x)
         return x, log_det
@@ -180,6 +179,8 @@ class Quantile(
 
     def forward_and_log_det(self, u: PyTree) -> tuple[PyTree, PyTree]:
         """Computes y = ICDF(u) and log|det J(f)(u)|."""
+        # Guards only raw values beyond about +-38 sigma, where `ndtr` underflows
+        # to exactly 0 or 1 and the ICDF would land on (or past) the support's edge.
         eps = jnp.finfo(jnp.result_type(u, float)).eps
         u_safe = jnp.clip(u, eps, 1.0 - eps)
         

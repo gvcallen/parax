@@ -38,6 +38,8 @@ jobs:
         pytest tests/
 
     - name: Test documentation examples
+      env:
+        MPLBACKEND: Agg # `plt.show()` returns instead of opening a window
       run: |
         # Run the codeblocks inside your markdown files
         pytest --codeblocks docs/

@@ -26,9 +26,9 @@ there are none.
 ## Commands
 
 ```bash
-.venv/bin/python -m pytest tests/test_x.py        # the tests covering a change, while working
-.venv/bin/python -m pytest tests/                 # full suite, once before committing
-.venv/bin/python -m pytest --codeblocks docs/     # the code blocks in the docs, which CI also runs
+.venv/bin/python -m pytest tests/test_x.py                        # the tests covering a change, while working
+.venv/bin/python -m pytest tests/                                 # full suite, once before committing
+MPLBACKEND=Agg .venv/bin/python -m pytest --codeblocks docs/      # the code blocks in the docs, which CI also runs
 ```
 
 No linter or formatter is configured. Match the style of surrounding code.

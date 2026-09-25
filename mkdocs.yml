@@ -1,6 +1,11 @@
 site_name: parax
 repo_url: https://github.com/parax/parax
 
+# Agent and decision docs live under docs/ but are not part of the site.
+exclude_docs: |
+  agents/
+  adr/
+
 theme:
   name: material
   features:

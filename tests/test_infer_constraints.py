@@ -6,7 +6,6 @@ import parax.bijectors as bij
 
 from parax.constraints import (
     infer_distribution_constraint,
-    RealLine,
     Custom,
     Positive,
     Interval,
@@ -70,7 +69,7 @@ def test_meta_distribution_joint():
     """Test that Joint distributions map correctly to a Leafwise constraint tree."""
     dist = dists.Joint({
         "a": dists.Normal(loc=0., scale=1.),
-        "b": BrokenDist() # Will fall back to RealLine
+        "b": BrokenDist() # Will fall back to the real line
     })
     
     constraint = infer_distribution_constraint(dist)
@@ -79,8 +78,9 @@ def test_meta_distribution_joint():
     # "a" is whitened in raw space, with the real line as its base
     assert isinstance(constraint.tree["a"].base_bijector, bij.Identity)
     
-    # "b" fell back to a raw RealLine because it failed ICDF extraction
-    assert isinstance(constraint.tree["b"], RealLine)
+    # "b" fell back to the open real line because it failed ICDF extraction
+    assert constraint.tree["b"].closed == (False, False)
+    assert constraint.tree["b"].is_outside(jnp.array(jnp.inf))
 
 
 def test_meta_distribution_transformed():
@@ -125,13 +125,31 @@ def test_icdf_generates_copula_constraint():
 
 
 def test_last_resort_fallback():
-    """Test that exceptions during ICDF evaluation default safely to RealLine."""
+    """Without an ICDF or a known support, the constraint is the real line, open at ±inf."""
     dist = BrokenDist(shape=(2, 2))
     constraint = infer_distribution_constraint(dist)
-    
-    # Since BrokenDist fails the ICDF try/except, it falls through to the end
-    assert isinstance(constraint, RealLine)
-    assert constraint.shape == (2, 2)
+
+    lower, upper = constraint.bounds
+    assert lower.shape == upper.shape == (2, 2)
+    assert jnp.all(jnp.isneginf(lower)) and jnp.all(jnp.isposinf(upper))
+    assert jnp.all(constraint.is_outside(jnp.full((2, 2), jnp.inf)))
+    assert jnp.all(constraint.is_outside(jnp.full((2, 2), -jnp.inf)))
+    x = jnp.arange(4.0).reshape(2, 2)
+    np.testing.assert_array_equal(constraint.bijector.forward(x), x)
+
+
+@pytest.mark.parametrize("dist", [
+    dists.Normal(0.0, 1.0),
+    dists.LogNormal(0.0, 1.0),
+    dists.Transformed(distribution=dists.Normal(0.0, 1.0), bijector=bij.Exp()),
+    DummyICDFDist(lower=5.0, upper=jnp.inf),
+    BrokenDist(),
+], ids=lambda d: type(d).__name__)
+def test_inferred_constraints_are_open_at_infinity(dist):
+    constraint = infer_distribution_constraint(dist)
+    assert bool(constraint.is_outside(jnp.array(jnp.inf)))
+    assert bool(constraint.is_outside(jnp.array(-jnp.inf)))
+
 
 def test_icdf_constraint_base_is_the_unit_box_over_a_finite_support():
     """

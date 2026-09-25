@@ -201,6 +201,58 @@ class Quantile(
 
 
 
+class Elementwise(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """
+    Applies one of several elementwise bijectors to each element, chosen by a mask
+    per bijector. The masks cover every element exactly once.
+
+    `Leafwise` gives each leaf of a pytree its own bijector; this gives each element
+    of a single array its own, so one array can mix, say, half-line and interval
+    elements. Its log-determinant stays elementwise.
+
+    Every bijector is evaluated everywhere. Where its mask is off, its inverse is fed
+    a value from its own image instead of the real one, so that no NaN from an
+    unused branch reaches a gradient.
+
+    Attributes:
+        masks: One boolean array per bijector, `True` where it applies.
+        bijectors: The elementwise bijectors, one per mask.
+        safe_values: One value per bijector inside its image, used in place of
+            the input to its inverse where its mask is off.
+    """
+    masks: tuple[Array, ...]
+    bijectors: tuple[AbstractBijector, ...]
+    safe_values: tuple[Array, ...]
+
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def _select(self, pairs):
+        (out, log_det), *rest = pairs
+        for mask, (branch_out, branch_log_det) in zip(self.masks[1:], rest):
+            out = jnp.where(mask, branch_out, out)
+            log_det = jnp.where(mask, branch_log_det, log_det)
+        return out, log_det
+
+    def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
+        return self._select([b.forward_and_log_det(x) for b in self.bijectors])
+
+    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
+        return self._select([
+            b.inverse_and_log_det(jnp.where(mask, y, safe))
+            for mask, b, safe in zip(self.masks, self.bijectors, self.safe_values)
+        ])
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        return other is self
+
+
+
 class Leafwise(AbstractFwdLogDetJacBijector, AbstractInvLogDetJacBijector, strict=True):
     """Applies a pytree of bijectors to a pytree of inputs.
 

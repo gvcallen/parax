@@ -565,3 +565,45 @@ def test_transformed_real_line_through_sigmoid_is_closed():
     open_unit = Transformed(Interval(-jnp.inf, jnp.inf, closed=False), Sigmoid())
     assert open_unit.is_outside(jnp.array(0.0))
     assert open_unit.is_outside(jnp.array(1.0))
+
+
+def test_transformed_through_a_mixing_bijector_accepts_its_image():
+    """Bounds pushed through a mixing bijector are unknown, not NaN, so its image is inside."""
+    from parax.bijectors import Chain, Shift, TriangularLinear
+
+    bijector = Chain([
+        Shift(jnp.array([1.0, -1.0])),
+        TriangularLinear(matrix=jnp.array([[1.0, 0.0], [0.5, 2.0]])),
+    ])
+    constraint = Transformed(RealLine(shape=(2,)), bijector)
+
+    lower, upper = constraint.bounds
+    np.testing.assert_array_equal(lower, -jnp.inf)
+    np.testing.assert_array_equal(upper, jnp.inf)
+    y = bijector.forward(jnp.array([-5.0, -5.0]))
+    assert not jnp.any(constraint.is_outside(y))
+
+
+def test_transformed_leaves_a_mixed_element_unbounded():
+    """An element the bijector mixes has no bounds of its own; an unmixed one keeps its image."""
+    from parax.bijectors import TriangularLinear
+
+    bijector = TriangularLinear(matrix=jnp.array([[1.0, 0.0], [-1.0, 1.0]]))
+    constraint = Transformed(Interval(jnp.zeros(2), jnp.ones(2)), bijector)
+
+    lower, upper = constraint.bounds
+    np.testing.assert_array_equal(lower, jnp.array([0.0, -jnp.inf]))
+    np.testing.assert_array_equal(upper, jnp.array([1.0, jnp.inf]))
+    # (1, 0) maps to (1, -1), inside the image though below the second element's pushed bound.
+    assert not jnp.any(constraint.is_outside(bijector.forward(jnp.array([1.0, 0.0]))))
+
+
+def test_transformed_elementwise_bijector_keeps_pushed_bounds():
+    """A vector-valued elementwise bijector over a scalar base still pushes bounds through."""
+    constraint = Transformed(
+        Interval(0.0, 1.0),
+        ScalarAffine(shift=jnp.array([0.0, 1.0]), scale=jnp.array([2.0, -1.0])),
+    )
+    lower, upper = constraint.bounds
+    np.testing.assert_allclose(lower, jnp.array([0.0, 0.0]))
+    np.testing.assert_allclose(upper, jnp.array([2.0, 1.0]))

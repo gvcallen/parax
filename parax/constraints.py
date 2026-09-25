@@ -11,6 +11,7 @@ from abc import abstractmethod
 from typing import TypeVar, Union, Any, TypeGuard, Self
 
 import jax
+from jax.flatten_util import ravel_pytree
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
@@ -408,12 +409,45 @@ class NonPositive(LessThan):
         super().__init__(upper=jnp.zeros(shape, dtype=dtype), closed=True)
 
 
+def _mixed_elements(
+    constraint: AbstractConstraint, bijector: AbstractBijector, like: PyTree
+) -> PyTree:
+    """
+    Which elements of `bijector`'s output depend on more than the matching input element.
+
+    Read off the Jacobian at the point raw zero maps to, an interior point of
+    `constraint`. Returned in the structure of `like`, the bijector's output. Every
+    element counts as mixed when the input and output sizes differ.
+    """
+    x = constraint.bijector.forward(jax.tree.map(jnp.zeros_like, constraint.bounds[0]))
+    if jax.tree.structure(x) == jax.tree.structure(like):
+        # A scalar base under an array-valued bijector acts on each element alike.
+        x = jax.tree.map(lambda a, b: jnp.broadcast_to(a, jnp.broadcast_shapes(a.shape, b.shape)), x, like)
+    flat_x, unravel_x = ravel_pytree(x)
+    flat_like, unravel_like = ravel_pytree(like)
+
+    if flat_x.size != flat_like.size:
+        mixed = jnp.ones(flat_like.shape, dtype=bool)
+    else:
+        jacobian = jax.jacfwd(lambda f: ravel_pytree(bijector.forward(unravel_x(f)))[0])(flat_x)
+        off_diagonal = jnp.where(jnp.eye(flat_x.size, dtype=bool), 0.0, jacobian)
+        # NaN counts as nonzero, so an unreadable row counts as mixed.
+        mixed = jnp.any(off_diagonal != 0, axis=1)
+
+    return jax.tree.map(lambda m: m > 0, unravel_like(mixed.astype(flat_like.dtype)))
+
+
 class Transformed(AbstractConstraint):
     """
     A constraint modified by an arbitrary distreqx bijector.
     
     The custom bijector is applied *after* the base constraint. This allows 
     for complex normalizations or transformations on top of physical boundaries.
+
+    The bounds, and their closedness, are the base bounds pushed through the bijector
+    element by element. Where the bijector mixes an element with others (a
+    `TriangularLinear`, say), that element's bounds are ±∞, closed only where the base
+    space is closed at both ends.
 
     Attributes:
         base_constraint: The underlying physical constraint applied first.
@@ -434,21 +468,42 @@ class Transformed(AbstractConstraint):
         self.transform_bijector = bijector
         self.bijector = Chain([bijector, constraint.bijector])
         
-        # Bounds
+        # Bounds follow the base bounds through the bijector, element by element. Where
+        # that says nothing, the bound is unknown and falls back to ±∞: an element
+        # the bijector mixes with others, whose image depends on more than its own
+        # bounds, or one whose pushed bound is NaN (∞ - ∞ or 0·∞ inside the bijector).
         lower, upper = constraint.bounds
         l_transformed = bijector.forward(lower)
         u_transformed = bijector.forward(upper)
+        mixed = _mixed_elements(constraint, bijector, l_transformed)
+        unknown = jax.tree.map(
+            lambda m, l, u: m | jnp.isnan(l) | jnp.isnan(u), mixed, l_transformed, u_transformed
+        )
         self.bounds = (
-            jax.tree.map(jnp.minimum, l_transformed, u_transformed), 
-            jax.tree.map(jnp.maximum, l_transformed, u_transformed)
+            jax.tree.map(
+                lambda n, l, u: jnp.where(n, -jnp.inf, jnp.minimum(l, u)),
+                unknown, l_transformed, u_transformed,
+            ),
+            jax.tree.map(
+                lambda n, l, u: jnp.where(n, jnp.inf, jnp.maximum(l, u)),
+                unknown, l_transformed, u_transformed,
+            ),
         )
 
-        # A decreasing bijector swaps the bounds, and their closedness with them.
+        # A decreasing bijector swaps the bounds, and their closedness with them. An
+        # unknown bound is closed only where the base space is closed at both ends.
         lower_closed, upper_closed = constraint.closed
         swapped = jax.tree.map(jnp.greater, l_transformed, u_transformed)
+        both_closed = jax.tree.map(jnp.logical_and, lower_closed, upper_closed)
         self.closed = (
-            jax.tree.map(jnp.where, swapped, upper_closed, lower_closed),
-            jax.tree.map(jnp.where, swapped, lower_closed, upper_closed),
+            jax.tree.map(
+                lambda n, s, b, lc, uc: jnp.where(n, b, jnp.where(s, uc, lc)),
+                unknown, swapped, both_closed, lower_closed, upper_closed,
+            ),
+            jax.tree.map(
+                lambda n, s, b, lc, uc: jnp.where(n, b, jnp.where(s, lc, uc)),
+                unknown, swapped, both_closed, lower_closed, upper_closed,
+            ),
         )
 
     @property

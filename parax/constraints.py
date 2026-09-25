@@ -19,9 +19,6 @@ import parax.distributions as dists
 import distreqx.distributions as distreqx_dists
 from parax.bijectors import (
     AbstractBijector,
-    AbstractForwardInverseBijector,
-    AbstractFwdLogDetJacBijector,
-    AbstractInvLogDetJacBijector,
     Sigmoid,
     Chain,
     Shift,
@@ -29,6 +26,7 @@ from parax.bijectors import (
     TriangularLinear,
     Identity,
     Leafwise as LeafwiseBijector,
+    Elementwise,
     Softplus,
 )
 
@@ -273,52 +271,6 @@ def _base_space(lower: Array, upper: Array) -> tuple[Array, Array, AbstractBijec
     return base_lower, base_upper, base_bijector
 
 
-class _Elementwise(
-    AbstractForwardInverseBijector,
-    AbstractInvLogDetJacBijector,
-    AbstractFwdLogDetJacBijector,
-):
-    """
-    Applies one of several elementwise bijectors to each element, chosen by a mask
-    per bijector. The masks cover every element exactly once.
-
-    Every bijector is evaluated everywhere. Where its mask is off, its inverse is fed
-    a value from its own image instead of the real one, so that no NaN from an
-    unused branch reaches a gradient.
-
-    Attributes:
-        masks: One boolean array per bijector, `True` where it applies.
-        bijectors: The elementwise bijectors, one per mask.
-        safe_values: One value per bijector inside its image, used in place of
-            the input to its inverse where its mask is off.
-    """
-    masks: tuple[Array, ...]
-    bijectors: tuple[AbstractBijector, ...]
-    safe_values: tuple[Array, ...]
-
-    _is_constant_jacobian: bool = False
-    _is_constant_log_det: bool = False
-
-    def _select(self, pairs):
-        (out, log_det), *rest = pairs
-        for mask, (branch_out, branch_log_det) in zip(self.masks[1:], rest):
-            out = jnp.where(mask, branch_out, out)
-            log_det = jnp.where(mask, branch_log_det, log_det)
-        return out, log_det
-
-    def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
-        return self._select([b.forward_and_log_det(x) for b in self.bijectors])
-
-    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
-        return self._select([
-            b.inverse_and_log_det(jnp.where(mask, y, safe))
-            for mask, b, safe in zip(self.masks, self.bijectors, self.safe_values)
-        ])
-
-    def same_as(self, other: AbstractBijector) -> bool:
-        return other is self
-
-
 class Interval(AbstractUncorrelatedConstraint):
     """
     Represents a value bounded between a lower and upper value.
@@ -390,7 +342,7 @@ class Interval(AbstractUncorrelatedConstraint):
         # Stand-in bounds where an element takes another branch, so none is infinite.
         lower = jnp.where(lower_finite, self.lower, 0.0)
         upper = jnp.where(upper_finite, self.upper, 0.0)
-        return _Elementwise(
+        return Elementwise(
             masks=(
                 ~lower_finite & ~upper_finite,
                 lower_finite & upper_finite,

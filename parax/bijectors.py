@@ -28,6 +28,7 @@ from distreqx.bijectors import (
 )
 
 from parax._vendor._sigmoid import Sigmoid as Sigmoid
+from parax._bijectors import Elementwise as Elementwise
 
 try:
     from distreqx.bijectors import Identity as Identity
@@ -94,6 +95,7 @@ __all__ = [
     "Block",
     "Chain",
     "DiagLinear",
+    "Elementwise",
     "Exp",
     "Identity",
     "Inverse",

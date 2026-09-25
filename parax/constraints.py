@@ -19,6 +19,9 @@ import parax.distributions as dists
 import distreqx.distributions as distreqx_dists
 from parax.bijectors import (
     AbstractBijector,
+    AbstractForwardInverseBijector,
+    AbstractFwdLogDetJacBijector,
+    AbstractInvLogDetJacBijector,
     Sigmoid,
     Chain,
     Shift,
@@ -48,7 +51,7 @@ class AbstractConstraint(eqx.Module):
         closed: A tuple saying whether each of `bounds` is included in the constrained space.
             Each side matches the structure of its bound, with a bool (or bool array) for each
             leaf: `True` for an edge a value may sit on exactly, `False` for one it may only
-            approach.
+            approach. An infinite bound is closed unless asked otherwise, so ±∞ is inside.
         bijector: A `distreqx.bijectors.AbstractBijector` mapping from the unconstrained real line to the physical space.
             It maps onto the open interior, so a value exactly on a closed bound has an
             infinite raw value.
@@ -81,14 +84,15 @@ class AbstractConstraint(eqx.Module):
         Returns if another value is outside the constraint.
 
         A value on a closed bound is inside; a value on an open bound is outside.
+        NaN is outside every constraint.
         """
         lower, upper = self.bounds
         lower_closed, upper_closed = self.closed
 
         def _is_outside(x, l, u, lc, uc):
-            below = jnp.where(lc, x < l, x <= l)
-            above = jnp.where(uc, x > u, x >= u)
-            return jnp.logical_or(below, above)
+            above_lower = jnp.where(lc, x >= l, x > l)
+            below_upper = jnp.where(uc, x <= u, x < u)
+            return jnp.logical_not(jnp.logical_and(above_lower, below_upper))
 
         return jax.tree.map(_is_outside, value, lower, upper, lower_closed, upper_closed)
     
@@ -143,7 +147,8 @@ class RealLine(AbstractUncorrelatedConstraint):
     Represents a value that can span the entire real number line.
     
     Effectively a structural no-op constraint using an Identity bijector, 
-    useful for maintaining consistent types in mixed parameter sets.
+    useful for maintaining consistent types in mixed parameter sets. Both infinite
+    ends are closed, so ±∞ is inside; for an open end, use `Interval(-inf, inf, closed=...)`.
 
     Attributes:
         shape: The expected shape of the unconstrained parameter.
@@ -166,7 +171,7 @@ class RealLine(AbstractUncorrelatedConstraint):
 
     @property
     def closed(self) -> tuple[bool, bool]:
-        return (False, False)
+        return (True, True)
 
     @property
     def bijector(self) -> AbstractBijector:
@@ -180,19 +185,24 @@ class GreaterThan(AbstractUncorrelatedConstraint):
     Attributes:
         lower: The lower bound array or scalar.
         closed: Whether each bound is included, as a `(lower, upper)` pair. The upper
-            bound is infinite, so always open.
+            bound is +∞.
     """
     lower: jnp.ndarray
     closed: tuple[bool, bool] = eqx.field(static=True)
     
-    def __init__(self, lower: Union[float, Array], closed: bool = True):
+    def __init__(
+        self,
+        lower: Union[float, Array],
+        closed: bool | tuple[bool, bool] = True,
+    ):
         """
         Args:
             lower: The lower bound.
-            closed: Whether `lower` itself is included.
+            closed: Whether the bounds themselves are included: one bool for both
+                `lower` and +∞, or a `(lower, upper)` pair.
         """
         self.lower = jnp.asarray(lower, dtype=float)
-        self.closed = (closed, False)
+        self.closed = _as_pair(closed)
         
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
@@ -210,19 +220,24 @@ class LessThan(AbstractUncorrelatedConstraint):
     Attributes:
         upper: The upper bound array or scalar.
         closed: Whether each bound is included, as a `(lower, upper)` pair. The lower
-            bound is infinite, so always open.
+            bound is -∞.
     """
     upper: jnp.ndarray
     closed: tuple[bool, bool] = eqx.field(static=True)
 
-    def __init__(self, upper: Union[float, Array], closed: bool = True):
+    def __init__(
+        self,
+        upper: Union[float, Array],
+        closed: bool | tuple[bool, bool] = True,
+    ):
         """
         Args:
             upper: The upper bound.
-            closed: Whether `upper` itself is included.
+            closed: Whether the bounds themselves are included: one bool for both
+                -∞ and `upper`, or a `(lower, upper)` pair.
         """
         self.upper = jnp.asarray(upper, dtype=float)
-        self.closed = (False, closed)
+        self.closed = _as_pair(closed)
 
     @property
     def bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
@@ -241,9 +256,75 @@ class LessThan(AbstractUncorrelatedConstraint):
         ])
 
 
+def _base_space(lower: Array, upper: Array) -> tuple[Array, Array, AbstractBijector]:
+    """
+    The base space over one array of bounds, as `(base_lower, base_upper, base_bijector)`.
+
+    Elementwise: the unit box mapped affinely onto the bounds where both are finite,
+    and the physical space itself, unchanged, where either is infinite.
+    """
+    finite = jnp.isfinite(lower) & jnp.isfinite(upper)
+    base_lower = jnp.where(finite, 0.0, lower)
+    base_upper = jnp.where(finite, 1.0, upper)
+    base_bijector = Chain([
+        Shift(jnp.where(finite, lower, 0.0)),
+        ScalarAffine(shift=jnp.array(0.0), scale=jnp.where(finite, upper - lower, 1.0)),
+    ])
+    return base_lower, base_upper, base_bijector
+
+
+class _Elementwise(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+):
+    """
+    Applies one of several elementwise bijectors to each element, chosen by a mask
+    per bijector. The masks cover every element exactly once.
+
+    Every bijector is evaluated everywhere. Where its mask is off, its inverse is fed
+    a value from its own image instead of the real one, so that no NaN from an
+    unused branch reaches a gradient.
+
+    Attributes:
+        masks: One boolean array per bijector, `True` where it applies.
+        bijectors: The elementwise bijectors, one per mask.
+        safe_values: One value per bijector inside its image, used in place of
+            the input to its inverse where its mask is off.
+    """
+    masks: tuple[Array, ...]
+    bijectors: tuple[AbstractBijector, ...]
+    safe_values: tuple[Array, ...]
+
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def _select(self, pairs):
+        (out, log_det), *rest = pairs
+        for mask, (branch_out, branch_log_det) in zip(self.masks[1:], rest):
+            out = jnp.where(mask, branch_out, out)
+            log_det = jnp.where(mask, branch_log_det, log_det)
+        return out, log_det
+
+    def forward_and_log_det(self, x: Array) -> tuple[Array, Array]:
+        return self._select([b.forward_and_log_det(x) for b in self.bijectors])
+
+    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
+        return self._select([
+            b.inverse_and_log_det(jnp.where(mask, y, safe))
+            for mask, b, safe in zip(self.masks, self.bijectors, self.safe_values)
+        ])
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        return other is self
+
+
 class Interval(AbstractUncorrelatedConstraint):
     """
     Represents a value bounded between a lower and upper value.
+
+    Either end may be infinite, per element. Where it is, the element behaves like the
+    matching half-line or real line (bijector and base space), keeping its own `closed`.
     
     Attributes:
         lower: The lower bound.
@@ -278,47 +359,72 @@ class Interval(AbstractUncorrelatedConstraint):
     @property
     def base_bounds(self) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
         """
-        The unit box.
+        The unit box where both ends are finite, and the physical space elsewhere.
 
         Overrides the `Identity` default from `AbstractUncorrelatedConstraint`, which
         would hand a bounded optimizer the physical box. Normalising to `[0, 1]`
         is generally numerically better during optimization.
         """
-        return (jnp.zeros_like(self.lower), jnp.ones_like(self.upper))
+        base_lower, base_upper, _ = _base_space(self.lower, self.upper)
+        return (base_lower, base_upper)
 
     @property
     def base_bijector(self) -> AbstractBijector:
         """
-        Maps the unit box onto the physical interval.
+        Maps the base space onto the physical interval: affinely from the unit box
+        where both ends are finite, and unchanged elsewhere.
         """
-        return Chain([
-            Shift(self.lower),
-            ScalarAffine(shift=jnp.array(0.0), scale=self.upper - self.lower),
-        ])
+        return _base_space(self.lower, self.upper)[2]
 
     @property
     def bijector(self) -> AbstractBijector:
-        # Squashes the real line into the unit box, then reuses `base_bijector` to
-        # reach physical units, so the bounded and unconstrained spaces cannot drift
-        # apart. The two then differ only by the sigmoid: comparable step sizes through
-        # the bulk of the interval, with the unconstrained side damping towards the
-        # bounds rather than meeting them.
-        return Chain([self.base_bijector, Sigmoid()])
+        # Where both ends are finite, squashes the real line into the unit box, then
+        # reuses `base_bijector` to reach physical units, so the bounded and
+        # unconstrained spaces cannot drift apart. The two then differ only by the
+        # sigmoid: comparable step sizes through the bulk of the interval, with the
+        # unconstrained side damping towards the bounds rather than meeting them.
+        # Where an end is infinite, each element maps as the matching half-line or
+        # real line does.
+        lower_finite = jnp.isfinite(self.lower)
+        upper_finite = jnp.isfinite(self.upper)
+        # Stand-in bounds where an element takes another branch, so none is infinite.
+        lower = jnp.where(lower_finite, self.lower, 0.0)
+        upper = jnp.where(upper_finite, self.upper, 0.0)
+        return _Elementwise(
+            masks=(
+                ~lower_finite & ~upper_finite,
+                lower_finite & upper_finite,
+                lower_finite & ~upper_finite,
+                ~lower_finite & upper_finite,
+            ),
+            bijectors=(
+                Identity(),
+                Chain([self.base_bijector, Sigmoid()]),
+                GreaterThan(lower).bijector,
+                LessThan(upper).bijector,
+            ),
+            safe_values=(
+                jnp.array(0.0),
+                jnp.array(0.5),
+                lower + 1.0,
+                upper - 1.0,
+            ),
+        )
 
 
 class Positive(GreaterThan):
-    """Convenience constraint for values that must be strictly positive (> 0)."""
+    """Convenience constraint for values that must be strictly positive: (0, ∞]."""
     def __init__(self, shape: Any = (), dtype: Any = None):
         """
         Args:
             shape: The shape of the parameter array.
             dtype: The JAX data type of the parameter array.
         """
-        super().__init__(lower=jnp.zeros(shape, dtype=dtype), closed=False)
+        super().__init__(lower=jnp.zeros(shape, dtype=dtype), closed=(False, True))
 
 
 class NonNegative(GreaterThan):
-    """Convenience constraint for values that must be non-negative (>= 0)."""
+    """Convenience constraint for values that must be non-negative: [0, ∞]."""
     def __init__(self, shape: Any = (), dtype: Any = None):
         """
         Args:
@@ -329,18 +435,18 @@ class NonNegative(GreaterThan):
 
 
 class Negative(LessThan):
-    """Convenience constraint for values that must be strictly negative (< 0)."""
+    """Convenience constraint for values that must be strictly negative: [-∞, 0)."""
     def __init__(self, shape: Any = (), dtype: Any = None):
         """
         Args:
             shape: The shape of the parameter array.
             dtype: The JAX data type of the parameter array.
         """
-        super().__init__(upper=jnp.zeros(shape, dtype=dtype), closed=False)
+        super().__init__(upper=jnp.zeros(shape, dtype=dtype), closed=(True, False))
 
 
 class NonPositive(LessThan):
-    """Convenience constraint for values that must be non-positive (<= 0)."""
+    """Convenience constraint for values that must be non-positive: [-∞, 0]."""
     def __init__(self, shape: Any = (), dtype: Any = None):
         """
         Args:
@@ -488,7 +594,7 @@ class Custom(AbstractConstraint):
         self,
         bijector: AbstractBijector,
         bounds: tuple[PyTree, PyTree] = (jnp.array(-jnp.inf), jnp.array(jnp.inf)),
-        closed: bool | tuple[PyTree, PyTree] | None = None,
+        closed: bool | tuple[PyTree, PyTree] = True,
         base_bounds: tuple[PyTree, PyTree] | None = None,
         base_bijector: AbstractBijector | None = None
     ):
@@ -500,8 +606,8 @@ class Custom(AbstractConstraint):
                 the constrained value's structure. Defaults to `(-inf, inf)`.
             closed: Whether the bounds themselves are included: one bool for every
                 bound, or a `(lower, upper)` pair, each side a bool for all of that
-                side's leaves or a PyTree of them matching the bound. If None, each
-                bound is closed where it is finite.
+                side's leaves or a PyTree of them matching the bound. Defaults to
+                closed, infinite bounds included.
             base_bounds: Optional. A tuple of `(lower, upper)` defining the orthogonal
                 base boundaries. If None, defaults to `bounds`.
             base_bijector: Optional. The bijector handling spatial skew/correlation.
@@ -509,13 +615,10 @@ class Custom(AbstractConstraint):
         """
         self.bijector = bijector
         self.bounds = tuple(jax.tree.map(jnp.asarray, b) for b in bounds)
-        if closed is None:
-            self.closed = tuple(jax.tree.map(jnp.isfinite, b) for b in self.bounds)
-        else:
-            self.closed = tuple(
-                jax.tree.map(lambda _: side, bound) if isinstance(side, bool) else side
-                for side, bound in zip(_as_pair(closed), self.bounds)
-            )
+        self.closed = tuple(
+            jax.tree.map(lambda _: side, bound) if isinstance(side, bool) else side
+            for side, bound in zip(_as_pair(closed), self.bounds)
+        )
 
         # Default base_bounds to physical bounds if not provided
         if base_bounds is None:
@@ -541,10 +644,10 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
     hard-coded physical bounds when no ICDF is available.
 
     The whitening only shapes the raw space. The bounds are the distribution's
-    support, closed at an endpoint where the density there is positive and finite,
-    and the base space comes from the support too, not the prior: the unit box
-    mapped affinely onto a support with two finite bounds, and the support
-    itself otherwise.
+    support, closed at a finite endpoint where the density there is positive and
+    finite, and open at ±∞, where a prior puts no mass. The base space comes from
+    the support too, not the prior: the unit box mapped affinely onto a support
+    with two finite bounds, and the support itself otherwise.
 
     Container / structural distributions (Joint, Transformed, Combined, ...)
     are handled by the registered overloads below. To support a new
@@ -576,7 +679,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
     elif isinstance(dist, dists.Uniform):
         support = Interval(lower=dist.low, upper=dist.high)
     else:
-        return RealLine(shape=dist.event_shape)
+        return _on_real_line(dist, Identity())
 
     lower_bound, upper_bound = support.bounds
     return _from_support(
@@ -598,23 +701,6 @@ def _support_includes(dist: dists.AbstractDistribution, endpoint: Array) -> Arra
         return finite
 
 
-def _base_from_support(lower: Array, upper: Array) -> tuple[Array, Array, AbstractBijector]:
-    """
-    The base space over one array of a support, as `(base_lower, base_upper, base_bijector)`.
-
-    Elementwise: the unit box mapped affinely onto the support where both bounds are
-    finite, and the support itself, unchanged, where either is infinite.
-    """
-    finite = jnp.isfinite(lower) & jnp.isfinite(upper)
-    base_lower = jnp.where(finite, 0.0, lower)
-    base_upper = jnp.where(finite, 1.0, upper)
-    base_bijector = Chain([
-        Shift(jnp.where(finite, lower, 0.0)),
-        ScalarAffine(shift=jnp.array(0.0), scale=jnp.where(finite, upper - lower, 1.0)),
-    ])
-    return base_lower, base_upper, base_bijector
-
-
 def _from_support(
     bijector: AbstractBijector,
     bounds: tuple[PyTree, PyTree],
@@ -624,7 +710,7 @@ def _from_support(
     lower, upper = bounds
     lower_leaves, treedef = jax.tree.flatten(lower)
     upper_leaves = treedef.flatten_up_to(upper)
-    bases = [_base_from_support(l, u) for l, u in zip(lower_leaves, upper_leaves)]
+    bases = [_base_space(l, u) for l, u in zip(lower_leaves, upper_leaves)]
 
     base_lower = treedef.unflatten([b[0] for b in bases])
     base_upper = treedef.unflatten([b[1] for b in bases])
@@ -660,7 +746,7 @@ def _infer_transformed(dist) -> AbstractConstraint:
 
 
 def _on_real_line(dist, bijector: AbstractBijector) -> Custom:
-    """A constraint over the real line, whitened in raw space by `bijector`."""
+    """A constraint over the real line, open at ±∞, whitened in raw space by `bijector`."""
     return Custom(bijector=bijector, bounds=RealLine(shape=dist.event_shape).bounds, closed=False)
 
 
@@ -911,7 +997,8 @@ def intersect(a: AbstractConstraint, b: AbstractConstraint) -> AbstractConstrain
     Returns the most specific constraint class possible.
 
     Each bound is the tighter of the two, keeping its closedness. Where both
-    constraints share a bound, open wins.
+    constraints share a bound, finite or infinite, open wins. The result is a named
+    class (`RealLine`, `Positive`, ...) only when that class's closedness matches.
     """
     a_lower, a_upper = a.bounds
     b_lower, b_upper = b.bounds
@@ -948,19 +1035,24 @@ def intersect(a: AbstractConstraint, b: AbstractConstraint) -> AbstractConstrain
     is_zero_lower = jnp.all(jnp.equal(np_lower, 0.0))
     is_zero_upper = jnp.all(jnp.equal(np_upper, 0.0))
 
-    # Resolve to the most specific constraint class
-    if is_neginf_lower and is_posinf_upper:
+    # Resolve to the most specific constraint class whose closedness matches
+    closed = (lower_closed, upper_closed)
+    if is_neginf_lower and is_posinf_upper and closed == (True, True):
         return RealLine()
-    elif is_zero_lower and is_posinf_upper:
-        return NonNegative() if lower_closed else Positive()
-    elif is_neginf_lower and is_zero_upper:
-        return NonPositive() if upper_closed else Negative()
-    elif is_posinf_upper:
-        return GreaterThan(lower, closed=lower_closed)
-    elif is_neginf_lower:
-        return LessThan(upper, closed=upper_closed)
+    elif is_zero_lower and is_posinf_upper and closed == (True, True):
+        return NonNegative()
+    elif is_zero_lower and is_posinf_upper and closed == (False, True):
+        return Positive()
+    elif is_neginf_lower and is_zero_upper and closed == (True, True):
+        return NonPositive()
+    elif is_neginf_lower and is_zero_upper and closed == (True, False):
+        return Negative()
+    elif is_posinf_upper and not is_neginf_lower:
+        return GreaterThan(lower, closed=closed)
+    elif is_neginf_lower and not is_posinf_upper:
+        return LessThan(upper, closed=closed)
     else:
-        return Interval(lower, upper, closed=(lower_closed, upper_closed))
+        return Interval(lower, upper, closed=closed)
     
 
 def _is_unwrappable_constrained(x):

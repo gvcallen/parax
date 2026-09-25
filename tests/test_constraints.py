@@ -1,6 +1,7 @@
 import pytest
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 # Assuming your package is structured so these imports work
 from parax.constraints import (
@@ -298,11 +299,13 @@ def test_interval_closed_as_a_single_bool():
 
 
 def test_half_bounded_closedness():
-    assert GreaterThan(5.0).closed == (True, False)
+    assert GreaterThan(5.0).closed == (True, True)
     assert GreaterThan(5.0, closed=False).closed == (False, False)
-    assert LessThan(5.0).closed == (False, True)
+    assert GreaterThan(5.0, closed=(True, False)).closed == (True, False)
+    assert LessThan(5.0).closed == (True, True)
     assert LessThan(5.0, closed=False).closed == (False, False)
-    assert RealLine().closed == (False, False)
+    assert LessThan(5.0, closed=(False, True)).closed == (False, True)
+    assert RealLine().closed == (True, True)
 
     assert not GreaterThan(5.0).is_outside(jnp.array(5.0))
     assert GreaterThan(5.0, closed=False).is_outside(jnp.array(5.0))
@@ -310,17 +313,17 @@ def test_half_bounded_closedness():
     assert LessThan(5.0, closed=False).is_outside(jnp.array(5.0))
 
 
-def test_positive_and_negative_are_open():
-    assert Positive().closed == (False, False)
-    assert Negative().closed == (False, False)
+def test_positive_and_negative_are_open_at_zero():
+    assert Positive().closed == (False, True)
+    assert Negative().closed == (True, False)
     assert Positive().is_outside(jnp.array(0.0))
     assert Negative().is_outside(jnp.array(0.0))
     assert not Positive().is_outside(jnp.array(1e-30))
 
 
 def test_non_negative_and_non_positive_are_closed():
-    assert NonNegative().closed == (True, False)
-    assert NonPositive().closed == (False, True)
+    assert NonNegative().closed == (True, True)
+    assert NonPositive().closed == (True, True)
     assert not NonNegative().is_outside(jnp.array(0.0))
     assert not NonPositive().is_outside(jnp.array(0.0))
     assert NonNegative().is_outside(jnp.array(-1e-30))
@@ -375,7 +378,7 @@ def test_leafwise_reports_closedness_per_leaf():
     lower_closed, upper_closed = tree.closed
 
     assert lower_closed == {"a": False, "b": True}
-    assert upper_closed == {"a": False, "b": False}
+    assert upper_closed == {"a": True, "b": False}
 
     outside = tree.is_outside({"a": jnp.array(0.0), "b": jnp.array(0.0)})
     assert bool(outside["a"]) and not bool(outside["b"])
@@ -392,12 +395,173 @@ def test_custom_reports_closedness():
     assert Custom(bijector, tree_bounds, closed=False).closed == ({"a": False}, {"a": False})
 
 
-def test_custom_defaults_to_closed_only_where_a_bound_is_finite():
+def test_custom_is_closed_by_default():
     bijector = ScalarAffine(shift=jnp.array(0.0), scale=jnp.array(1.0))
 
     lower_closed, upper_closed = Custom(bijector).closed
-    assert not bool(lower_closed) and not bool(upper_closed)
-    assert Custom(bijector).is_outside(jnp.array(jnp.inf))
+    assert bool(lower_closed) and bool(upper_closed)
+    assert not Custom(bijector).is_outside(jnp.array(jnp.inf))
+    assert Custom(bijector, closed=False).is_outside(jnp.array(jnp.inf))
 
-    lower_closed, upper_closed = Custom(bijector, (jnp.array(0.0), jnp.array(jnp.inf))).closed
-    assert bool(lower_closed) and not bool(upper_closed)
+
+# ==========================================
+# Infinite bounds (ADR 0001)
+# ==========================================
+
+
+@pytest.mark.parametrize("constraint", [
+    RealLine(),
+    Positive(),
+    NonNegative(),
+    Negative(),
+    NonPositive(),
+    GreaterThan(1.0),
+    LessThan(1.0),
+    Interval(0.0, 1.0),
+    Interval(-jnp.inf, jnp.inf),
+    Custom(Identity()),
+    Transformed(Interval(0.0, 1.0), Identity()),
+], ids=lambda c: type(c).__name__)
+def test_nan_is_outside_every_constraint(constraint):
+    assert bool(constraint.is_outside(jnp.array(jnp.nan)))
+
+
+@pytest.mark.parametrize("constraint, at", [
+    (RealLine(), -jnp.inf),
+    (RealLine(), jnp.inf),
+    (Positive(), jnp.inf),
+    (NonNegative(), jnp.inf),
+    (Negative(), -jnp.inf),
+    (NonPositive(), -jnp.inf),
+    (GreaterThan(1.0), jnp.inf),
+    (LessThan(1.0), -jnp.inf),
+    (Custom(Identity()), jnp.inf),
+    (Custom(Identity()), -jnp.inf),
+], ids=lambda x: type(x).__name__ if not isinstance(x, float) else str(x))
+def test_infinite_ends_are_closed_by_default(constraint, at):
+    assert not bool(constraint.is_outside(jnp.array(at)))
+
+
+def test_an_infinite_end_can_be_open():
+    assert GreaterThan(1.0, closed=False).is_outside(jnp.array(1.0))
+    assert GreaterThan(1.0, closed=False).is_outside(jnp.array(jnp.inf))
+
+    half_open = GreaterThan(1.0, closed=(True, False))
+    assert not half_open.is_outside(jnp.array(1.0))
+    assert half_open.is_outside(jnp.array(jnp.inf))
+
+    assert LessThan(1.0, closed=(False, True)).is_outside(jnp.array(-jnp.inf))
+
+
+@pytest.mark.parametrize("lower, upper, y", [
+    (0.0, jnp.inf, jnp.array([1e-6, 0.5, 3.0, 1e6])),
+    (-jnp.inf, 0.0, jnp.array([-1e6, -3.0, -0.5, -1e-6])),
+    (-jnp.inf, jnp.inf, jnp.array([-1e6, -3.0, 0.0, 2.5, 1e6])),
+])
+def test_interval_with_infinite_ends(lower, upper, y):
+    interval = Interval(lower, upper)
+
+    bijector = interval.bijector
+    np.testing.assert_allclose(bijector.forward(bijector.inverse(y)), y, rtol=1e-6)
+    assert jnp.all(jnp.isfinite(bijector.inverse(y)))
+
+    # With no finite extent to normalise against, the base is the physical space.
+    for base, physical in zip(interval.base_bounds, interval.bounds):
+        np.testing.assert_array_equal(base, jnp.broadcast_to(physical, base.shape))
+    np.testing.assert_allclose(interval.base_bijector.forward(y), y)
+    np.testing.assert_allclose(interval.base_bijector.inverse(y), y)
+
+    # An infinite end is closed by default, like the matching half-line or real line.
+    assert not bool(interval.is_outside(jnp.array(upper)))
+    assert not bool(interval.is_outside(jnp.array(lower)))
+    assert bool(Interval(lower, upper, closed=False).is_outside(jnp.array(upper)))
+
+
+def test_interval_with_mixed_ends_works_per_element():
+    lower = jnp.array([2.0, -jnp.inf, -jnp.inf, 1.0])
+    upper = jnp.array([4.0, 0.0, jnp.inf, jnp.inf])
+    interval = Interval(lower, upper)
+    y = jnp.array([3.5, -2.0, 5.0, 3.0])
+
+    x = interval.bijector.inverse(y)
+    assert jnp.all(jnp.isfinite(x))
+    np.testing.assert_allclose(interval.bijector.forward(x), y, rtol=1e-6)
+
+    # Every element stays inside its own bounds across the whole real line.
+    for raw in (-50.0, 0.0, 50.0):
+        mapped = interval.bijector.forward(jnp.full(4, raw))
+        assert not jnp.any(Interval(lower, upper).is_outside(mapped))
+
+    # The unit box where both ends are finite, the physical space elsewhere.
+    np.testing.assert_array_equal(interval.base_bounds[0], jnp.array([0.0, -jnp.inf, -jnp.inf, 1.0]))
+    np.testing.assert_array_equal(interval.base_bounds[1], jnp.array([1.0, 0.0, jnp.inf, jnp.inf]))
+    np.testing.assert_allclose(
+        interval.base_bijector.forward(jnp.array([0.75, -2.0, 5.0, 3.0])), y
+    )
+
+
+def test_interval_with_mixed_ends_has_finite_gradients():
+    interval = Interval(jnp.array([2.0, -jnp.inf, -jnp.inf, 1.0]), jnp.array([4.0, 0.0, jnp.inf, jnp.inf]))
+    y = jnp.array([3.5, -2.0, 5.0, 3.0])
+
+    forward_grad = jax.grad(lambda x: jnp.sum(interval.bijector.forward(x)))(jnp.zeros(4))
+    inverse_grad = jax.grad(lambda v: jnp.sum(interval.bijector.inverse(v)))(y)
+    assert jnp.all(jnp.isfinite(forward_grad))
+    assert jnp.all(jnp.isfinite(inverse_grad))
+
+    _, log_det = interval.bijector.forward_and_log_det(jnp.zeros(4))
+    assert jnp.all(jnp.isfinite(log_det))
+
+
+def test_interval_with_infinite_ends_under_jit():
+    @jax.jit
+    def round_trip(lower, upper, y):
+        bijector = Interval(lower, upper).bijector
+        return bijector.forward(bijector.inverse(y))
+
+    y = jnp.array([3.5, -2.0])
+    np.testing.assert_allclose(
+        round_trip(jnp.array([2.0, -jnp.inf]), jnp.array([4.0, jnp.inf]), y), y, rtol=1e-6
+    )
+
+
+def test_intersection_keeps_closedness_at_infinity():
+    # Open at infinity wins over closed at infinity.
+    result = intersect(GreaterThan(1.0, closed=False), NonNegative())
+    assert result.closed == (False, False)
+    assert result.is_outside(jnp.array(jnp.inf))
+
+    result = intersect(Interval(-jnp.inf, jnp.inf, closed=False), RealLine())
+    assert result.closed == (False, False)
+    assert not isinstance(result, RealLine)
+    assert result.is_outside(jnp.array(-jnp.inf))
+
+    # Both closed at infinity stay closed there.
+    result = intersect(RealLine(), Positive())
+    assert isinstance(result, Positive)
+    assert not result.is_outside(jnp.array(jnp.inf))
+    assert isinstance(intersect(RealLine(), RealLine()), RealLine)
+
+
+def test_intersection_names_a_class_only_when_its_closedness_matches():
+    result = intersect(Positive(), GreaterThan(0.0, closed=(True, False)))
+    assert not isinstance(result, Positive)
+    assert result.closed == (False, False)
+    assert jnp.allclose(result.bounds[0], 0.0)
+
+    result = intersect(NonPositive(), LessThan(0.0, closed=(False, True)))
+    assert not isinstance(result, NonPositive)
+    assert result.closed == (False, True)
+
+
+def test_transformed_real_line_through_sigmoid_is_closed():
+    from parax.bijectors import Sigmoid
+
+    unit = Transformed(RealLine(), Sigmoid())
+    assert bool(unit.closed[0]) and bool(unit.closed[1])
+    assert not unit.is_outside(jnp.array(0.0))
+    assert not unit.is_outside(jnp.array(1.0))
+
+    open_unit = Transformed(Interval(-jnp.inf, jnp.inf, closed=False), Sigmoid())
+    assert open_unit.is_outside(jnp.array(0.0))
+    assert open_unit.is_outside(jnp.array(1.0))

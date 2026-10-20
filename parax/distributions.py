@@ -3,8 +3,8 @@ Distributions, filled in from distreqx where available.
 
 parax supports any distreqx: the latest release, the unreleased upstream main,
 or gvcallen's fork. Names the installed distreqx provides are re-exported from
-it; the rest fall back to parax's own copies, so importing from here always
-works regardless of which distreqx is installed.
+it; the rest fall back to parax's own copies, while TruncatedNormal belongs to
+Parax, so importing from here works regardless of which distreqx is installed.
 """
 
 import inspect
@@ -56,10 +56,7 @@ try:
 except ImportError:
     from parax._vendor._lognormal import LogNormal as LogNormal
 
-try:
-    from distreqx.distributions import TruncatedNormal as TruncatedNormal
-except ImportError:
-    from parax._vendor._truncated_normal import TruncatedNormal as TruncatedNormal
+from parax._distributions import TruncatedNormal as TruncatedNormal
 
 
 __all__ = [

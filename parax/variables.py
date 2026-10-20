@@ -376,6 +376,52 @@ class Bounded(
         return eqx.tree_at(lambda x: x.raw_value, self, jnp.asarray(value))
     
 
+def _raw_from_value(constraint, value):
+    value = jnp.asarray(value)
+    raw_value = constraint.bijector.inverse(value)
+    return eqx.error_if(
+        raw_value,
+        jnp.any(jnp.isnan(raw_value)) | jnp.any(constraint.is_outside(value)),
+        "Constraint violated for variable upon initialization (produced NaNs)."
+    )
+
+
+@eqx.filter_jit
+def _resolve_constrained(constraint, value, raw_value):
+    if raw_value is not None:
+        raw_value = jnp.asarray(raw_value)
+        shape = raw_value.shape
+    else:
+        value = jnp.asarray(value)
+        shape = value.shape
+
+    if constraint is None:
+        constraint = RealLine(shape=shape)
+    if value is not None:
+        raw_value = _raw_from_value(constraint, value)
+    return constraint, raw_value
+
+
+@eqx.filter_jit
+def _resolve_random(distribution, constraint, value, raw_value):
+    if value is None and raw_value is None:
+        try:
+            value = jnp.array(distribution.mean())
+        except Exception:
+            raise ValueError(
+                "`value` or `raw_value` must be provided if the "
+                "distribution does not support `mean()`."
+            )
+
+    if constraint is None:
+        constraint = infer_distribution_constraint(distribution)
+    if value is not None:
+        raw_value = _raw_from_value(constraint, value)
+    else:
+        raw_value = jnp.asarray(raw_value)
+    return constraint, raw_value
+
+
 class Constrained(
     AbstractVariable,
     AbstractConstrainable[Array],
@@ -418,26 +464,9 @@ class Constrained(
         if value is not None and raw_value is not None:
             raise ValueError("Cannot provide both `value` and `raw_value`.")
         
-        # Array standardization
-        if raw_value is not None:
-            raw_value = jnp.asarray(raw_value)
-            shape = raw_value.shape
-        else:
-            value = jnp.asarray(value)
-            shape = value.shape
-
-        # Constraint and distribution standardization
-        if constraint is None:
-            constraint = RealLine(shape=shape)
-        
-        # Raw value standardization
-        if value is not None:
-            raw_value = constraint.bijector.inverse(value)
-            raw_value = eqx.error_if(
-                raw_value,
-                jnp.any(jnp.isnan(raw_value)),
-                "Constraint violated for variable upon initialization (produced NaNs)."
-            )
+        constraint, raw_value = _resolve_constrained(constraint, value, raw_value)
+        if value is not None and not isinstance(raw_value, jax.core.Tracer):
+            raw_value.block_until_ready()
 
         self.constraint = constraint
         self.raw_value = raw_value
@@ -507,30 +536,10 @@ class Random(
         if value is not None and raw_value is not None:
             raise ValueError("Cannot provide both `value` and `raw_value`.")
 
-        # Derive physical value if both are missing
-        if value is None and raw_value is None:
-            try:
-                value = jnp.array(distribution.mean())
-            except Exception:
-                raise ValueError(
-                    "`value` or `raw_value` must be provided if the "
-                    "distribution does not support `mean()`."
-                )
-            
-        # Constraint resolution
-        if constraint is None:
-            constraint = infer_distribution_constraint(distribution)
-
-        # Calculate unconstrained raw_value
-        if value is not None:
-            raw_value = constraint.bijector.inverse(jnp.asarray(value))
-            raw_value = eqx.error_if(
-                raw_value,
-                jnp.any(jnp.isnan(raw_value)),
-                "Constraint violated for variable upon initialization (produced NaNs)."
-            )
-        else:
-            raw_value = jnp.asarray(raw_value)
+        check_value = value is not None or raw_value is None
+        constraint, raw_value = _resolve_random(distribution, constraint, value, raw_value)
+        if check_value and not isinstance(raw_value, jax.core.Tracer):
+            raw_value.block_until_ready()
 
         self.distribution = distribution
         self.constraint = constraint

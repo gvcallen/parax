@@ -1,6 +1,5 @@
 # Vendored from distreqx (https://github.com/lockwo/distreqx), Apache License 2.0.
 # Source: distreqx/distributions/_truncated_normal.py
-# Used when the installed distreqx does not provide this class.
 
 """Truncated Normal distribution."""
 
@@ -55,7 +54,10 @@ class TruncatedNormal(AbstractProbDistribution):
         return (self.low, self.high)
 
     def _standardize(self, value: Array) -> Array:
-        return (value - self.loc) / self.scale
+        finite = jnp.isfinite(value)
+        value_safe = jnp.where(finite, value, 0.0)
+        standardized = (value_safe - self.loc) / self.scale
+        return jnp.where(finite, standardized, value)
 
     @property
     def _std_low(self) -> Array:
@@ -157,17 +159,24 @@ class TruncatedNormal(AbstractProbDistribution):
         """Standard normal PDF helper for mean/variance/entropy calculations."""
         return _inv_sqrt_2pi * jnp.exp(-0.5 * jnp.square(value))
 
+    def _pdf_terms(self, x: Array) -> tuple[Array, Array]:
+        """Return pdf(x) and x * pdf(x), both zero at an infinite x."""
+        finite = jnp.isfinite(x)
+        x_safe = jnp.where(finite, x, 0.0)
+        pdf = jnp.where(finite, self._pdf(x_safe), 0.0)
+        return pdf, jnp.where(finite, x_safe * pdf, 0.0)
+
     def entropy(self) -> Array:
         """Calculates the Shannon entropy (in nats)."""
         alpha = self._std_low
         beta = self._std_high
         Z = jax.scipy.special.ndtr(beta) - jax.scipy.special.ndtr(alpha)
 
-        pdf_alpha = self._pdf(alpha)
-        pdf_beta = self._pdf(beta)
+        _, alpha_pdf_alpha = self._pdf_terms(alpha)
+        _, beta_pdf_beta = self._pdf_terms(beta)
 
         term1 = jnp.log(self.scale * Z) + 0.5 * math.log(2 * math.pi * math.e)
-        term2 = (alpha * pdf_alpha - beta * pdf_beta) / (2.0 * Z)
+        term2 = (alpha_pdf_alpha - beta_pdf_beta) / (2.0 * Z)
         return term1 + term2
 
     def mean(self) -> Array:
@@ -176,8 +185,8 @@ class TruncatedNormal(AbstractProbDistribution):
         beta = self._std_high
         Z = jax.scipy.special.ndtr(beta) - jax.scipy.special.ndtr(alpha)
 
-        pdf_alpha = self._pdf(alpha)
-        pdf_beta = self._pdf(beta)
+        pdf_alpha, _ = self._pdf_terms(alpha)
+        pdf_beta, _ = self._pdf_terms(beta)
 
         return self.loc + self.scale * ((pdf_alpha - pdf_beta) / Z)
 
@@ -187,11 +196,11 @@ class TruncatedNormal(AbstractProbDistribution):
         beta = self._std_high
         Z = jax.scipy.special.ndtr(beta) - jax.scipy.special.ndtr(alpha)
 
-        pdf_alpha = self._pdf(alpha)
-        pdf_beta = self._pdf(beta)
+        pdf_alpha, alpha_pdf_alpha = self._pdf_terms(alpha)
+        pdf_beta, beta_pdf_beta = self._pdf_terms(beta)
 
         term1 = 1.0
-        term2 = (alpha * pdf_alpha - beta * pdf_beta) / Z
+        term2 = (alpha_pdf_alpha - beta_pdf_beta) / Z
         term3 = jnp.square((pdf_alpha - pdf_beta) / Z)
 
         return jnp.square(self.scale) * (term1 + term2 - term3)

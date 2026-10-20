@@ -133,7 +133,10 @@ class TruncatedNormal(AbstractProbDistribution):
         cdf_high = jax.scipy.special.ndtr(self._std_high)
         Z = cdf_high - cdf_low
         p_unnormalized = value * Z + cdf_low
-        return self.loc + self.scale * jax.scipy.special.ndtri(p_unnormalized)
+        interior = self.loc + self.scale * jax.scipy.special.ndtri(p_unnormalized)
+        return jnp.where(
+            value == 0, self.low, jnp.where(value == 1, self.high, interior)
+        )
 
     def survival_function(self, value: Array) -> Array:
         """See `Distribution.survival_function`."""

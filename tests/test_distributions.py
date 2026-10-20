@@ -63,3 +63,16 @@ def test_two_sided_truncated_normal_moments_match_monte_carlo():
         samples = jax.vmap(dist.sample)(jax.random.split(jax.random.PRNGKey(0), 100_000))
         np.testing.assert_allclose(dist.mean(), jnp.mean(samples), atol=0.01)
         np.testing.assert_allclose(dist.variance(), jnp.var(samples), atol=0.01)
+
+
+@pytest.mark.parametrize(
+    "low, high", [(0.0, 1.0), (0.0, jnp.inf), (-jnp.inf, 1.0), (-jnp.inf, jnp.inf)]
+)
+def test_truncated_normal_icdf_returns_exact_endpoints_under_jit(low, high):
+    dist = dists.TruncatedNormal(2.0, 0.2, low, high)
+    compiled_icdf = jax.jit(lambda probability: dist.icdf(probability))
+    for probability, bound in ((0.0, low), (1.0, high)):
+        assert compiled_icdf(probability) == bound
+    interior = compiled_icdf(0.5)
+    assert low < interior < high
+    np.testing.assert_allclose(interior, dist.icdf(0.5), atol=1e-6)

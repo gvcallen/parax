@@ -179,8 +179,9 @@ class Quantile(
 
     def forward_and_log_det(self, u: PyTree) -> tuple[PyTree, PyTree]:
         """Computes y = ICDF(u) and log|det J(f)(u)|."""
-        # Guards only raw values beyond about +-38 sigma, where `ndtr` underflows
-        # to exactly 0 or 1 and the ICDF would land on (or past) the support's edge.
+        # Keeps the ICDF off the support's edge. At float64 this clips the raw
+        # space at about +-8.1 sigma on both sides: past that, every raw value gives
+        # the same constrained value, and a constrained value maps to an infinite raw.
         eps = jnp.finfo(jnp.result_type(u, float)).eps
         u_safe = jnp.clip(u, eps, 1.0 - eps)
         
@@ -198,6 +199,145 @@ class Quantile(
 
     def same_as(self, other: AbstractBijector) -> bool:
         return type(other) is Quantile and self.distribution == other.distribution
+
+
+def _log_sub_exp(a: Array, b: Array) -> Array:
+    """`log(exp(a) - exp(b))` for `a >= b`, without forming either exponential."""
+    return a + jnp.log(-jnp.expm1(b - a))
+
+
+def _lower_ndtri(log_p: Array, steps: int = 3) -> Array:
+    """
+    The standard normal quantile of `exp(log_p)`, for `log_p <= log(1/2)`.
+
+    `ndtri` gives the start where the probability is a normal float, and an
+    asymptotic expansion below that. Newton steps on `log_ndtr` then refine it,
+    which also gives the result an exact gradient. A `log_p` of -inf gives -inf.
+    """
+    dtype = jnp.result_type(log_p, float)
+    log_p = jnp.asarray(log_p, dtype)
+    log_half = jnp.log(jnp.asarray(0.5, dtype))
+    log_tiny = jnp.log(jnp.asarray(jnp.finfo(dtype).tiny, dtype))
+
+    finite = jnp.isfinite(log_p)
+    target = jnp.where(finite, log_p, log_half)
+    deep = target < log_tiny
+    # Each start sees a stand-in where it is not chosen, so neither makes a NaN.
+    x_ndtri = jss.ndtri(jnp.exp(jnp.where(deep, log_half, target)))
+    # log Phi(x) ~ -x^2/2 - log(-x) - log(2 pi)/2 as x -> -inf.
+    t = -2.0 * jnp.where(deep, target, log_tiny)
+    x_deep = -jnp.sqrt(t - jnp.log(t) - jnp.log(2.0 * jnp.pi))
+    x = jnp.where(deep, x_deep, x_ndtri)
+
+    for _ in range(steps):
+        log_cdf = jss.log_ndtr(x)
+        x = x - (log_cdf - target) * jnp.exp(log_cdf - jstats.norm.logpdf(x))
+    return jnp.where(finite, x, -jnp.inf)
+
+
+def _log_ndtri(log_p: Array) -> Array:
+    """
+    The standard normal quantile of `exp(log_p)`, accurate in both tails: above
+    one half it is taken from the complement. A `log_p` of 0 gives inf.
+    """
+    upper = log_p > jnp.log(0.5)
+    log_q = jnp.log(-jnp.expm1(jnp.where(upper, log_p, jnp.log(0.5))))
+    x = _lower_ndtri(jnp.where(upper, log_q, log_p))
+    return jnp.where(upper, -x, x)
+
+
+class TruncatedNormalWhitening(
+    AbstractForwardInverseBijector,
+    AbstractInvLogDetJacBijector,
+    AbstractFwdLogDetJacBijector,
+    strict=True,
+):
+    """
+    Maps a standard normal raw value onto a truncated normal's support, so that the
+    raw value stays standard normal under the distribution.
+
+    It is the copula map `icdf(ndtr(z))`, computed so that neither tail saturates.
+    Each half of the support comes from its own small tail probability, in log
+    space: with standardised bounds `a`, `b` and `Z = Phi(b) - Phi(a)`, a value
+    below the median of the untruncated normal is `Phi^-1(Phi(a) + Z Phi(z))`, and
+    one above it is `-Phi^-1(Phi(-b) + Z Phi(-z))`. With both bounds infinite it is
+    exactly `loc + scale * z`.
+
+    Attributes:
+        loc: The mean of the untruncated normal.
+        scale: The standard deviation of the untruncated normal.
+        low: The lower bound, possibly `-inf`.
+        high: The upper bound, possibly `inf`.
+    """
+    loc: Array
+    scale: Array
+    low: Array
+    high: Array
+
+    _is_constant_jacobian: bool = False
+    _is_constant_log_det: bool = False
+
+    def _standard_bounds(self) -> tuple[Array, Array, Array]:
+        """The standardised bounds `a`, `b` and `log Z`."""
+        a = (self.low - self.loc) / self.scale
+        b = (self.high - self.loc) / self.scale
+        # Take Z from whichever tail it is small in.
+        reflect = a + b > 0
+        log_z = jnp.where(
+            reflect,
+            _log_sub_exp(jss.log_ndtr(-a), jss.log_ndtr(-b)),
+            _log_sub_exp(jss.log_ndtr(b), jss.log_ndtr(a)),
+        )
+        return a, b, log_z
+
+    def _log_det(self, z: Array, x: Array, log_z: Array) -> Array:
+        """log|dy/dz| at raw `z` and standardised value `x`."""
+        return (
+            log_z + jstats.norm.logpdf(z) - jstats.norm.logpdf(x) + jnp.log(self.scale)
+        )
+
+    def forward_and_log_det(self, z: Array) -> tuple[Array, Array]:
+        """Computes the constrained value at raw `z`, and log|det J(f)(z)|."""
+        a, b, log_z = self._standard_bounds()
+        log_p = jnp.logaddexp(jss.log_ndtr(a), log_z + jss.log_ndtr(z))
+        log_q = jnp.logaddexp(jss.log_ndtr(-b), log_z + jss.log_ndtr(-z))
+        lower = log_p < jnp.log(0.5)
+        x = jnp.where(
+            lower,
+            _lower_ndtri(jnp.where(lower, log_p, jnp.log(0.25))),
+            -_lower_ndtri(jnp.where(lower, jnp.log(0.25), log_q)),
+        )
+        x = jnp.where(jnp.isinf(a) & jnp.isinf(b), z, x)
+
+        y = self.loc + self.scale * x
+        # Rounding must not carry a value past a bound.
+        y = jnp.where(y < self.low, self.low, jnp.where(y > self.high, self.high, y))
+        return y, self._log_det(z, x, log_z)
+
+    def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
+        """Computes the raw value at constrained `y`, and log|det J(f^{-1})(y)|."""
+        a, b, log_z = self._standard_bounds()
+        x = (y - self.loc) / self.scale
+        lower = x < 0
+        # Each branch sees an interior stand-in where it is not chosen.
+        inside = jnp.where(
+            jnp.isfinite(a) & jnp.isfinite(b), (a + b) / 2,
+            jnp.where(jnp.isfinite(a), a + 1.0, jnp.where(jnp.isfinite(b), b - 1.0, 0.0)),
+        )
+        x_lower = jnp.where(lower, x, inside)
+        x_upper = jnp.where(lower, inside, x)
+        log_p = _log_sub_exp(jss.log_ndtr(x_lower), jss.log_ndtr(a)) - log_z
+        log_q = _log_sub_exp(jss.log_ndtr(-x_upper), jss.log_ndtr(-b)) - log_z
+        z = jnp.where(
+            lower,
+            _log_ndtri(jnp.where(lower, log_p, jnp.log(0.25))),
+            -_log_ndtri(jnp.where(lower, jnp.log(0.25), log_q)),
+        )
+        z = jnp.where(jnp.isinf(a) & jnp.isinf(b), x, z)
+        return z, -self._log_det(z, x, log_z)
+
+    def same_as(self, other: AbstractBijector) -> bool:
+        return other is self
 
 
 

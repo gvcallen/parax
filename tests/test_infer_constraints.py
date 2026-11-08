@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import jax
 import jax.numpy as jnp
 import parax.distributions as dists
 import parax.bijectors as bij
@@ -11,7 +12,7 @@ from parax.constraints import (
     Interval,
     Leafwise,
 )
-from parax._bijectors import NormalCDF, Quantile
+from parax._bijectors import NormalCDF, Quantile, TruncatedNormalWhitening
 
 # ==========================================
 # Mocks & Dummies
@@ -265,3 +266,140 @@ def test_beta_support_is_closed_only_where_the_density_is_positive_and_finite(co
     assert bool(constraint.closed[1]) is closed
     np.testing.assert_array_equal(constraint.base_bounds[0], 0.0)
     np.testing.assert_array_equal(constraint.base_bounds[1], 1.0)
+
+
+# ==========================================
+# Exact whitening of LogNormal and TruncatedNormal
+# ==========================================
+# The generic copula clips its raw space at about +-8.1 sigma; these do not.
+
+_RAW_POINTS = [-30.0, -9.0, 0.0, 9.0, 30.0]
+
+
+def _exact_priors():
+    """The priors with exact handlers, built under x64."""
+    return {
+        "lower-bounded": dists.TruncatedNormal(100.0, 1.0, 0.0, jnp.inf),
+        "upper-bounded": dists.TruncatedNormal(100.0, 1.0, -jnp.inf, 200.0),
+        "two-sided": dists.TruncatedNormal(0.3, 1.0, -0.5, 1.2),
+        "lognormal": dists.LogNormal(jnp.log(100.0), 0.01),
+    }
+
+
+def test_truncated_normal_and_lognormal_have_exact_handlers():
+    with jax.enable_x64():
+        tn = infer_distribution_constraint(dists.TruncatedNormal(0.0, 1.0, -1.0, 2.0))
+        ln = infer_distribution_constraint(dists.LogNormal(0.0, 1.0))
+
+    assert isinstance(tn.bijector, TruncatedNormalWhitening)
+    assert not any(isinstance(b, Quantile) for b in ln.bijector.bijectors)
+    np.testing.assert_array_equal(tn.bounds[0], -1.0)
+    np.testing.assert_array_equal(tn.bounds[1], 2.0)
+    assert bool(tn.closed[0]) and bool(tn.closed[1])
+    np.testing.assert_array_equal(ln.bounds[0], 0.0)
+    np.testing.assert_array_equal(ln.bounds[1], jnp.inf)
+    assert not bool(ln.closed[0]) and not bool(ln.closed[1])
+
+
+def test_truncated_normal_reaches_far_past_eight_sigma():
+    with jax.enable_x64():
+        bijector = infer_distribution_constraint(
+            dists.TruncatedNormal(100.0, 1.0, 0.0, jnp.inf)).bijector
+        np.testing.assert_allclose(bijector.forward(jnp.array(20.0)), 120.0, rtol=1e-9)
+        np.testing.assert_allclose(bijector.forward(jnp.array(-20.0)), 80.0, rtol=1e-9)
+
+        raw = bijector.inverse(jnp.array(120.0))
+        np.testing.assert_allclose(raw, 20.0, rtol=1e-9)
+        np.testing.assert_allclose(bijector.forward(raw), 120.0, rtol=1e-9)
+
+
+@pytest.mark.parametrize("low, high, open_sides", [
+    (0.0, jnp.inf, (False, True)),
+    (-jnp.inf, 200.0, (True, False)),
+])
+def test_one_sided_truncated_normal_is_finite_and_increasing(low, high, open_sides):
+    with jax.enable_x64():
+        bijector = infer_distribution_constraint(
+            dists.TruncatedNormal(100.0, 1.0, low, high)).bijector
+        y = np.asarray(bijector.forward(jnp.linspace(-100.0, 100.0, 4001)))
+
+    assert np.all(np.isfinite(y))
+    assert np.all(np.diff(y) > 0)
+    open_lower, open_upper = open_sides
+    if open_lower:
+        assert y[0] < 100.0 - 99.0
+    if open_upper:
+        assert y[-1] > 100.0 + 99.0
+
+
+def test_untruncated_truncated_normal_is_exactly_affine():
+    with jax.enable_x64():
+        bijector = infer_distribution_constraint(
+            dists.TruncatedNormal(2.5, 3.0, -jnp.inf, jnp.inf)).bijector
+        z = jnp.linspace(-50.0, 50.0, 101)
+        np.testing.assert_array_equal(bijector.forward(z), 2.5 + 3.0 * z)
+        np.testing.assert_array_equal(bijector.inverse(2.5 + 3.0 * z), z)
+
+
+def test_two_sided_truncated_normal_round_trips_up_to_its_bounds():
+    with jax.enable_x64():
+        dist = dists.TruncatedNormal(0.3, 1.0, -0.5, 1.2)
+        bijector = infer_distribution_constraint(dist).bijector
+
+        y = jnp.concatenate([
+            jnp.linspace(-0.5, 1.2, 101)[1:-1],
+            jnp.array([-0.5 + 1e-6, -0.5 + 1e-9, 1.2 - 1e-6, 1.2 - 1e-9]),
+        ])
+        np.testing.assert_allclose(bijector.forward(bijector.inverse(y)), y, rtol=1e-9)
+
+        inside = np.asarray(bijector.forward(jnp.linspace(-30.0, 30.0, 601)))
+    assert np.all((inside >= -0.5) & (inside <= 1.2))
+
+
+def test_lognormal_is_exp_of_its_normal():
+    with jax.enable_x64():
+        bijector = infer_distribution_constraint(dists.LogNormal(jnp.log(100.0), 0.01)).bijector
+        np.testing.assert_allclose(
+            bijector.forward(jnp.array(20.0)), 100.0 * np.exp(0.2), rtol=1e-12)
+        np.testing.assert_allclose(
+            bijector.forward(bijector.inverse(jnp.array(150.0))), 150.0, rtol=1e-12)
+
+
+@pytest.mark.parametrize("name", list(_exact_priors()))
+def test_exact_whitening_log_det_matches_autodiff(name):
+    with jax.enable_x64():
+        bijector = infer_distribution_constraint(_exact_priors()[name]).bijector
+        raw = jnp.array(_RAW_POINTS)
+        _, log_det = bijector.forward_and_log_det(raw)
+        jacobian = jax.vmap(jax.jacfwd(bijector.forward))(raw)
+        gradient = jax.vmap(jax.grad(bijector.forward))(raw)
+
+    assert np.all(np.isfinite(gradient))
+    np.testing.assert_allclose(log_det, np.log(jacobian), rtol=1e-9, atol=1e-9)
+
+    # The inverse matches it too, short of where a two-sided map rests on its bound.
+    with jax.enable_x64():
+        raw = jnp.array([-5.0, -1.0, 0.0, 1.0, 5.0])
+        _, log_det = bijector.forward_and_log_det(raw)
+        _, inverse_log_det = bijector.inverse_and_log_det(bijector.forward(raw))
+    np.testing.assert_allclose(inverse_log_det, -log_det, rtol=1e-9, atol=1e-9)
+
+
+# 20,000 draws; reject at a KS statistic above 1.95 / sqrt(n), the 0.1% level.
+_KS_SAMPLES = 20_000
+_KS_THRESHOLD = 1.95 / np.sqrt(_KS_SAMPLES)
+
+
+@pytest.mark.parametrize("name", list(_exact_priors()))
+def test_exact_whitening_pushes_a_standard_normal_onto_the_prior(name):
+    with jax.enable_x64():
+        dist = _exact_priors()[name]
+        bijector = infer_distribution_constraint(dist).bijector
+        z = jax.random.normal(jax.random.key(0), (_KS_SAMPLES,), dtype=jnp.float64)
+        y = jnp.sort(bijector.forward(z))
+        cdf = np.asarray(dist.cdf(y))
+
+    n = _KS_SAMPLES
+    ranks = np.arange(1, n + 1)
+    statistic = max(np.max(ranks / n - cdf), np.max(cdf - (ranks - 1) / n))
+    assert statistic < _KS_THRESHOLD

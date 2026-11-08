@@ -246,6 +246,27 @@ def _log_ndtri(log_p: Array) -> Array:
     return jnp.where(upper, -x, x)
 
 
+def _log_ndtr(x: Array) -> Array:
+    """`log_ndtr`, with a clean gradient at an infinite `x`."""
+    finite = jnp.isfinite(x)
+    value = jss.log_ndtr(jnp.where(finite, x, 0.0))
+    return jnp.where(finite, value, jnp.where(x > 0, 0.0, -jnp.inf))
+
+
+def _from_tails(lower: Array, log_p: Array, log_q: Array, ndtri) -> Array:
+    """
+    `ndtri(log_p)` where `lower`, and `-ndtri(log_q)` elsewhere: a standard
+    normal value from whichever tail probability is its own. Each side sees a
+    stand-in where it is not chosen, so that neither makes a NaN.
+    """
+    stand_in = jnp.log(0.25)
+    return jnp.where(
+        lower,
+        ndtri(jnp.where(lower, log_p, stand_in)),
+        -ndtri(jnp.where(lower, stand_in, log_q)),
+    )
+
+
 class TruncatedNormalWhitening(
     AbstractForwardInverseBijector,
     AbstractInvLogDetJacBijector,
@@ -277,16 +298,21 @@ class TruncatedNormalWhitening(
     _is_constant_jacobian: bool = False
     _is_constant_log_det: bool = False
 
+    def _standardize(self, value: Array) -> Array:
+        """`(value - loc) / scale`, keeping an infinite value, and its gradient, clean."""
+        finite = jnp.isfinite(value)
+        standard = (jnp.where(finite, value, 0.0) - self.loc) / self.scale
+        return jnp.where(finite, standard, value)
+
     def _standard_bounds(self) -> tuple[Array, Array, Array]:
         """The standardised bounds `a`, `b` and `log Z`."""
-        a = (self.low - self.loc) / self.scale
-        b = (self.high - self.loc) / self.scale
+        a = self._standardize(self.low)
+        b = self._standardize(self.high)
         # Take Z from whichever tail it is small in.
-        reflect = a + b > 0
         log_z = jnp.where(
-            reflect,
-            _log_sub_exp(jss.log_ndtr(-a), jss.log_ndtr(-b)),
-            _log_sub_exp(jss.log_ndtr(b), jss.log_ndtr(a)),
+            a + b > 0,
+            _log_sub_exp(_log_ndtr(-a), _log_ndtr(-b)),
+            _log_sub_exp(_log_ndtr(b), _log_ndtr(a)),
         )
         return a, b, log_z
 
@@ -299,25 +325,22 @@ class TruncatedNormalWhitening(
     def forward_and_log_det(self, z: Array) -> tuple[Array, Array]:
         """Computes the constrained value at raw `z`, and log|det J(f)(z)|."""
         a, b, log_z = self._standard_bounds()
-        log_p = jnp.logaddexp(jss.log_ndtr(a), log_z + jss.log_ndtr(z))
-        log_q = jnp.logaddexp(jss.log_ndtr(-b), log_z + jss.log_ndtr(-z))
-        lower = log_p < jnp.log(0.5)
-        x = jnp.where(
-            lower,
-            _lower_ndtri(jnp.where(lower, log_p, jnp.log(0.25))),
-            -_lower_ndtri(jnp.where(lower, jnp.log(0.25), log_q)),
-        )
+        log_p = jnp.logaddexp(_log_ndtr(a), log_z + jss.log_ndtr(z))
+        log_q = jnp.logaddexp(_log_ndtr(-b), log_z + jss.log_ndtr(-z))
+        # Both tail probabilities are at most one half here, as they sum to one.
+        x = _from_tails(log_p < jnp.log(0.5), log_p, log_q, _lower_ndtri)
         x = jnp.where(jnp.isinf(a) & jnp.isinf(b), z, x)
 
         y = self.loc + self.scale * x
-        # Rounding must not carry a value past a bound.
+        # Rounding must not carry a value past a bound. Unlike `jnp.clip`, this
+        # keeps the full gradient at a value that lands exactly on one.
         y = jnp.where(y < self.low, self.low, jnp.where(y > self.high, self.high, y))
         return y, self._log_det(z, x, log_z)
 
     def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
         """Computes the raw value at constrained `y`, and log|det J(f^{-1})(y)|."""
         a, b, log_z = self._standard_bounds()
-        x = (y - self.loc) / self.scale
+        x = self._standardize(y)
         lower = x < 0
         # Each branch sees an interior stand-in where it is not chosen.
         inside = jnp.where(
@@ -326,13 +349,11 @@ class TruncatedNormalWhitening(
         )
         x_lower = jnp.where(lower, x, inside)
         x_upper = jnp.where(lower, inside, x)
-        log_p = _log_sub_exp(jss.log_ndtr(x_lower), jss.log_ndtr(a)) - log_z
-        log_q = _log_sub_exp(jss.log_ndtr(-x_upper), jss.log_ndtr(-b)) - log_z
-        z = jnp.where(
-            lower,
-            _log_ndtri(jnp.where(lower, log_p, jnp.log(0.25))),
-            -_log_ndtri(jnp.where(lower, jnp.log(0.25), log_q)),
-        )
+        log_p = _log_sub_exp(jss.log_ndtr(x_lower), _log_ndtr(a)) - log_z
+        log_q = _log_sub_exp(jss.log_ndtr(-x_upper), _log_ndtr(-b)) - log_z
+        # Here a tail probability may pass one half, as the raw value is not
+        # split at its median, so take the quantile that handles both halves.
+        z = _from_tails(lower, log_p, log_q, _log_ndtri)
         z = jnp.where(jnp.isinf(a) & jnp.isinf(b), x, z)
         return z, -self._log_det(z, x, log_z)
 

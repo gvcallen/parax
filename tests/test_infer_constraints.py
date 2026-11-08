@@ -277,7 +277,7 @@ _RAW_POINTS = [-30.0, -9.0, 0.0, 9.0, 30.0]
 
 
 def _exact_priors():
-    """The priors with exact handlers, built under x64."""
+    """The priors with exact handlers; build them under x64."""
     return {
         "lower-bounded": dists.TruncatedNormal(100.0, 1.0, 0.0, jnp.inf),
         "upper-bounded": dists.TruncatedNormal(100.0, 1.0, -jnp.inf, 200.0),
@@ -403,3 +403,24 @@ def test_exact_whitening_pushes_a_standard_normal_onto_the_prior(name):
     ranks = np.arange(1, n + 1)
     statistic = max(np.max(ranks / n - cdf), np.max(cdf - (ranks - 1) / n))
     assert statistic < _KS_THRESHOLD
+
+
+@pytest.mark.parametrize("low, high", [
+    (0.0, jnp.inf), (-jnp.inf, 200.0), (-jnp.inf, jnp.inf), (90.0, 110.0),
+])
+def test_truncated_normal_has_finite_gradients_in_its_parameters(low, high):
+    """An infinite bound must not leak a NaN into the gradient in `loc` or `scale`."""
+    def forward(loc, scale):
+        bijector = TruncatedNormalWhitening(loc=loc, scale=scale, low=low, high=high)
+        y, log_det = bijector.forward_and_log_det(jnp.array([-30.0, 0.0, 30.0]))
+        return y.sum() + log_det.sum()
+
+    def inverse(loc, scale):
+        bijector = TruncatedNormalWhitening(loc=loc, scale=scale, low=low, high=high)
+        z, log_det = bijector.inverse_and_log_det(jnp.array([95.0, 100.0, 105.0]))
+        return z.sum() + log_det.sum()
+
+    with jax.enable_x64():
+        for f in (forward, inverse):
+            grads = jax.grad(f, argnums=(0, 1))(jnp.array(100.0), jnp.array(1.0))
+            assert np.all(np.isfinite(grads))

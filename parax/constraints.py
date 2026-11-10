@@ -29,10 +29,11 @@ from parax.bijectors import (
     Leafwise as LeafwiseBijector,
     Elementwise,
     Softplus,
+    Exp,
 )
 
 from parax.bounds import AbstractBounded
-from parax._bijectors import NormalCDF, Quantile
+from parax._bijectors import NormalCDF, Quantile, TruncatedNormalWhitening
 
 T = TypeVar("Value")
 
@@ -663,7 +664,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
     """
     # The TFP-Standard Copula Whitening (NormalCDF -> Quantile).
     # Automatically intercepts bounded/skewed distributions (Gamma, Beta,
-    # Uniform, LogNormal, ...) and custom distributions, mapping them to an
+    # Uniform, ...) and custom distributions, mapping them to an
     # isotropic Standard Normal raw space. The base space comes from the support.
     try:
         lower_bound = jnp.asarray(dist.icdf(0.0))
@@ -679,7 +680,7 @@ def infer_distribution_constraint(dist: dists.AbstractDistribution) -> AbstractC
         )
 
     # Fallback: hard-coded physical bounds for distributions lacking an ICDF.
-    if isinstance(dist, (dists.LogNormal, dists.Gamma)):
+    if isinstance(dist, dists.Gamma):
         support = Positive(shape=dist.event_shape)
     elif isinstance(dist, dists.Beta):
         support = Interval(lower=jnp.zeros(dist.event_shape), upper=jnp.ones(dist.event_shape))
@@ -785,6 +786,40 @@ def _infer_mvn_full(dist) -> AbstractConstraint:
     L = jnp.linalg.cholesky(dist.covariance_matrix)
     bijector = Chain([Shift(dist.loc), TriangularLinear(matrix=L)])
     return _on_real_line(dist, bijector)
+
+
+# --- Exact whitening of normal-based supports ------------------------------
+# These map raw space through the normal itself rather than the generic copula,
+# whose clip saturates the raw space at about +-8.1 sigma.
+
+
+@infer_distribution_constraint.register(dists.LogNormal)
+def _infer_lognormal(dist) -> AbstractConstraint:
+    bijector = Chain([
+        Exp(), Shift(dist.loc), ScalarAffine(shift=jnp.array(0.0), scale=dist.scale)
+    ])
+    lower, upper = dist.support
+    shape = dist.event_shape
+    return _from_support(
+        bijector,
+        bounds=(jnp.broadcast_to(lower, shape), jnp.broadcast_to(upper, shape)),
+        closed=False,
+    )
+
+
+@infer_distribution_constraint.register(dists.TruncatedNormal)
+def _infer_truncated_normal(dist) -> AbstractConstraint:
+    shape = dist.event_shape
+    lower = jnp.broadcast_to(dist.low, shape)
+    upper = jnp.broadcast_to(dist.high, shape)
+    bijector = TruncatedNormalWhitening(
+        loc=dist.loc, scale=dist.scale, low=dist.low, high=dist.high
+    )
+    return _from_support(
+        bijector,
+        bounds=(lower, upper),
+        closed=(_support_includes(dist, lower), _support_includes(dist, upper)),
+    )
 
 
 # --- Recursive container handlers (version-guarded) -----------------------

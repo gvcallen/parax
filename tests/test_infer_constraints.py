@@ -424,3 +424,38 @@ def test_truncated_normal_has_finite_gradients_in_its_parameters(low, high):
         for f in (forward, inverse):
             grads = jax.grad(f, argnums=(0, 1))(jnp.array(100.0), jnp.array(1.0))
             assert np.all(np.isfinite(grads))
+
+
+@pytest.mark.parametrize("low, high", [
+    (0.0, jnp.inf), (-jnp.inf, 0.0), (0.0, 1.0), (-jnp.inf, jnp.inf),
+])
+def test_truncated_normal_whitening_maps_nan_to_nan(low, high):
+    """A NaN marks a rejected value, so it must not read back as a finite value or an infinity."""
+    with jax.enable_x64():
+        bijector = TruncatedNormalWhitening(
+            loc=jnp.array(0.5), scale=jnp.array(1.0), low=jnp.array(low), high=jnp.array(high))
+        raw = jnp.array([-30.0, -1.0, 0.0, 2.0, 30.0, -jnp.inf, jnp.inf])
+        value = bijector.forward(raw)
+        cases = [
+            (bijector.forward_and_log_det, raw),
+            (bijector.inverse_and_log_det, value),
+        ]
+        for f, clean in cases:
+            with_nan = jnp.concatenate([clean[:2], jnp.array([jnp.nan]), clean[2:]])
+            out, log_det = f(with_nan)
+            expected_out, expected_log_det = f(clean)
+            assert np.isnan(out[2]) and np.isnan(log_det[2])
+            assert not np.any(np.isnan(expected_out))
+            np.testing.assert_array_equal(np.delete(out, 2), expected_out)
+            np.testing.assert_array_equal(np.delete(log_det, 2), expected_log_det)
+
+        # A NaN must come only from a NaN: the support's ends, and values past
+        # them, map to and from +-inf.
+        np.testing.assert_allclose(
+            bijector.forward(jnp.array([-jnp.inf, jnp.inf])), [low, high], atol=1e-12)
+        for ends in ([low, high], [low - 1.0, high + 1.0]):
+            np.testing.assert_array_equal(
+                bijector.inverse(jnp.array(ends)), [-jnp.inf, jnp.inf])
+
+        assert np.isnan(bijector.forward(jnp.array(jnp.nan)))
+        assert np.isnan(bijector.inverse(jnp.array(jnp.nan)))

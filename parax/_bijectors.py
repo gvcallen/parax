@@ -267,6 +267,16 @@ def _from_tails(lower: Array, log_p: Array, log_q: Array, ndtri) -> Array:
     )
 
 
+def _keep_nan(value: Array, out: Array, log_det: Array) -> tuple[Array, Array]:
+    """
+    `out` and `log_det`, but NaN wherever `value` is. The tail helpers send a
+    NaN to an infinity, as they do any non-finite probability, so a NaN input
+    is passed through here instead.
+    """
+    nan = jnp.isnan(value)
+    return jnp.where(nan, value, out), jnp.where(nan, value, log_det)
+
+
 class TruncatedNormalWhitening(
     AbstractForwardInverseBijector,
     AbstractInvLogDetJacBijector,
@@ -335,7 +345,7 @@ class TruncatedNormalWhitening(
         # Rounding must not carry a value past a bound. Unlike `jnp.clip`, this
         # keeps the full gradient at a value that lands exactly on one.
         y = jnp.where(y < self.low, self.low, jnp.where(y > self.high, self.high, y))
-        return y, self._log_det(z, x, log_z)
+        return _keep_nan(z, y, self._log_det(z, x, log_z))
 
     def inverse_and_log_det(self, y: Array) -> tuple[Array, Array]:
         """Computes the raw value at constrained `y`, and log|det J(f^{-1})(y)|."""
@@ -355,7 +365,7 @@ class TruncatedNormalWhitening(
         # split at its median, so take the quantile that handles both halves.
         z = _from_tails(lower, log_p, log_q, _log_ndtri)
         z = jnp.where(jnp.isinf(a) & jnp.isinf(b), x, z)
-        return z, -self._log_det(z, x, log_z)
+        return _keep_nan(y, z, -self._log_det(z, x, log_z))
 
     def same_as(self, other: AbstractBijector) -> bool:
         return other is self
